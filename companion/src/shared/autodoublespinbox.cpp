@@ -26,7 +26,7 @@ AutoDoubleSpinBox::AutoDoubleSpinBox(QWidget * parent):
   m_field(nullptr),
   m_offset(0)
 {
-  connect(this, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &AutoDoubleSpinBox::onValueChanged);
+  connect(this, SIGNAL(valueChanged(double)), this, SLOT(onValueChanged(double)));
 }
 
 AutoDoubleSpinBox::~AutoDoubleSpinBox()

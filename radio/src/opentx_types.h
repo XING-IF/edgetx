@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -22,7 +21,7 @@
 #ifndef _OPENTX_TYPES_H_
 #define _OPENTX_TYPES_H_
 
-#include "thirdparty/libopenui/src/libopenui_types.h"
+#include <inttypes.h>
 
 typedef uint32_t tmr10ms_t;
 typedef int32_t rotenc_t;
@@ -30,13 +29,8 @@ typedef int32_t getvalue_t;
 typedef uint32_t mixsrc_t;
 typedef int32_t swsrc_t;
 typedef int16_t safetych_t;
-typedef int16_t gvar_t;
 typedef uint32_t bitfield_channels_t;
+typedef uint16_t event_t;
 typedef uint16_t FlightModesType;
-#if defined(PCBFRSKY) || defined(PCBNV14)
-typedef uint16_t source_t;
-#else
-typedef uint8_t source_t;
-#endif
 
 #endif // _OPENTX_TYPES_H_

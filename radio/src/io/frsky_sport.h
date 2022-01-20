@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -34,5 +33,10 @@ PACK(union SportTelemetryPacket
   };
   uint8_t raw[8];
 });
+
+#if defined(STM32)
+bool isBootloader(const char * filename);
+void bootloaderFlash(const char * filename);
+#endif
 
 #endif // _IO_FRSKY_SPORT_H_

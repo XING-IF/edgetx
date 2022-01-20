@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -473,7 +472,7 @@ const char * eeBackupModel(uint8_t i_fileSrc)
 
   uint16_t size = eeModelSize(i_fileSrc);
 
-  *(uint32_t*)&buf[0] = ETX_FOURCC;
+  *(uint32_t*)&buf[0] = OTX_FOURCC;
   buf[4] = g_eeGeneral.version;
   buf[5] = 'M';
   *(uint16_t*)&buf[6] = size;
@@ -540,7 +539,7 @@ const char * eeRestoreModel(uint8_t i_fileDst, char *model_name)
   }
 
   uint8_t version = (uint8_t)buf[4];
-  if (*(uint32_t*)&buf[0] != ETX_FOURCC || version < FIRST_CONV_EEPROM_VER || version > EEPROM_VER || buf[5] != 'M') {
+  if (*(uint32_t*)&buf[0] != OTX_FOURCC || version < FIRST_CONV_EEPROM_VER || version > EEPROM_VER || buf[5] != 'M') {
     f_close(&restoreFile);
     return STR_INCOMPATIBLE;
   }
@@ -585,7 +584,7 @@ const char * eeRestoreModel(uint8_t i_fileDst, char *model_name)
 
   eeLoadModelHeader(i_fileDst, &modelHeaders[i_fileDst]);
 
-#if defined(STORAGE_CONVERSIONS)
+#if defined(EEPROM_CONVERSIONS)
   if (version < EEPROM_VER) {
     eeConvertModel(i_fileDst, version);
     eeLoadModel(g_eeGeneral.currModel);

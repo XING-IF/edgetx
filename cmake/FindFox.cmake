@@ -56,7 +56,7 @@ else()
   set(FOX_LIBRARIES ${FOX_LIBRARY})
 endif()
 
-find_package_handle_standard_args(Fox
+find_package_handle_standard_args(FOX
   DEFAULT_MSG
   FOX_INCLUDE_DIR
   FOX_LIBRARY

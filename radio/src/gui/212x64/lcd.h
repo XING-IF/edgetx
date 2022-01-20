@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -22,14 +21,9 @@
 #ifndef _LCD_H_
 #define _LCD_H_
 
-#include <inttypes.h>
-
-#include "opentx_types.h"
-#include "board.h"
-
-typedef uint32_t LcdFlags;
-typedef uint8_t pixel_t;
 typedef int coord_t;
+typedef uint32_t LcdFlags;
+typedef uint8_t display_t;
 
 #define BOX_WIDTH                      31
 #define CENTER                         "\015"
@@ -93,11 +87,11 @@ typedef int coord_t;
 #define DISPLAY_BUFFER_SIZE            (LCD_W*LCD_H*4/8)
 
 #if (defined(PCBX9E) || defined(PCBX9DP)) && defined(LCD_DUAL_BUFFER)
-  extern pixel_t displayBuf1[DISPLAY_BUFFER_SIZE];
-  extern pixel_t displayBuf2[DISPLAY_BUFFER_SIZE];
-  extern pixel_t * displayBuf;
+  extern display_t displayBuf1[DISPLAY_BUFFER_SIZE];
+  extern display_t displayBuf2[DISPLAY_BUFFER_SIZE];
+  extern display_t * displayBuf;
 #else
-  extern pixel_t displayBuf[DISPLAY_BUFFER_SIZE];
+  extern display_t displayBuf[DISPLAY_BUFFER_SIZE];
 #endif
 
 extern coord_t lcdLastRightPos;
@@ -107,12 +101,12 @@ extern coord_t lcdNextPos;
 #define DISPLAY_END                    (displayBuf + DISPLAY_BUFFER_SIZE)
 #define ASSERT_IN_DISPLAY(p)           assert((p) >= displayBuf && (p) < DISPLAY_END)
 
-void lcdDrawChar(coord_t x, coord_t y, uint8_t c);
-void lcdDrawChar(coord_t x, coord_t y, uint8_t c, LcdFlags mode);
+void lcdDrawChar(coord_t x, coord_t y, const unsigned char c);
+void lcdDrawChar(coord_t x, coord_t y, const unsigned char c, LcdFlags mode);
 void lcdDrawCenteredText(coord_t y, const char * s, LcdFlags flags = 0);
 void lcdDrawText(coord_t x, coord_t y, const char * s, LcdFlags mode);
 void lcdDrawTextAtIndex(coord_t x, coord_t y, const char * s,uint8_t idx, LcdFlags mode);
-void lcdDrawSizedText(coord_t x, coord_t y, const char * s, unsigned char len, LcdFlags mode);
+void lcdDrawSizedText(coord_t x, coord_t y, const char * s,unsigned char len, LcdFlags mode);
 void lcdDrawText(coord_t x, coord_t y, const char * s);
 void lcdDrawSizedText(coord_t x, coord_t y, const char * s, unsigned char len);
 void lcdDrawTextAlignedLeft(coord_t y, const char * s);
@@ -121,9 +115,9 @@ void lcdDrawHexNumber(coord_t x, coord_t y, uint32_t val, LcdFlags mode=0);
 void lcdDrawNumber(coord_t x, coord_t y, int32_t val, LcdFlags mode, uint8_t len);
 void lcdDrawNumber(coord_t x, coord_t y, int32_t val, LcdFlags mode=0);
 
-void drawModelName(coord_t x, coord_t y, char *name, uint8_t id, LcdFlags att);
+void putsModelName(coord_t x, coord_t y, char *name, uint8_t id, LcdFlags att);
 void drawSwitch(coord_t x, coord_t y, int32_t swtch, LcdFlags att=0, bool autoBold = true);
-void drawStickName(coord_t x, coord_t y, uint8_t idx, LcdFlags att=0);
+void putsStickName(coord_t x, coord_t y, uint8_t idx, LcdFlags att=0);
 void drawSource(coord_t x, coord_t y, uint32_t idx, LcdFlags att=0);
 void drawCurveName(coord_t x, coord_t y, int8_t idx, LcdFlags att=0);
 void drawTimerMode(coord_t x, coord_t y, swsrc_t mode, LcdFlags att=0);
@@ -168,9 +162,7 @@ void drawTelemetryTopBar();
 void lcdDraw1bitBitmap(coord_t x, coord_t y, const unsigned char * img, uint8_t idx, LcdFlags att=0);
 
 void lcdDrawBitmap(coord_t x, coord_t y, const uint8_t * img, coord_t offset=0, coord_t width=0);
-void lcdDrawRleBitmap(coord_t x, coord_t y, const uint8_t * img, coord_t offset=0, coord_t width=0);
-#define LCD_ICON(x, y, icon) lcdDrawRleBitmap(x, y, icons, icon)
-
+#define LCD_ICON(x, y, icon) lcdDrawBitmap(x, y, icons, icon)
 
 void lcdClear();
 
@@ -183,87 +175,16 @@ uint8_t * lcdLoadBitmap(uint8_t * dest, const char * filename, uint16_t width, u
   #define SLOW_BLINK_ON_PHASE   (g_blinkTmr10ms & (1 << 7))
 #endif
 
-inline pixel_t getPixel(unsigned int x, unsigned int y)
+inline display_t getPixel(unsigned int x, unsigned int y)
 {
   if (x>=LCD_W || y>=LCD_H) {
     return 0;
   }
 
-  pixel_t * p = &displayBuf[y / 2 * LCD_W + x];
+  display_t * p = &displayBuf[y / 2 * LCD_W + x];
   return (y & 1) ? (*p >> 4) : (*p & 0x0F);
 }
 
 uint8_t getTextWidth(const char * s, uint8_t len=0, LcdFlags flags=0);
-
-class RleBitmap
-{
-public:
-  RleBitmap(const uint8_t *src, coord_t offset) :
-    state(RLE_FIRST_BYTE), src(src), curPtr(src), byte(0), curCount(0), pos(0)
-  {
-    width = *curPtr++;
-    rawRows = *curPtr++;
-    rows = (rawRows +1)/2;
-    skip(offset);
-  }
-
-  void skip(coord_t count)
-  {
-    while(count)
-    {
-      count--;
-      getNext();
-    }
-  }
-
-  uint8_t getNext()
-  {
-    pos++;
-    switch(state)
-    {
-    case RLE_FIRST_BYTE:
-      byte = *curPtr++;
-      if(byte == *curPtr)
-        state = RLE_SECOND_BYTE;
-      break;
-    case RLE_SECOND_BYTE:
-      byte = *curPtr++;
-      curCount = (*curPtr++)+1;
-      state = RLE_CONTINUE;
-      // fall through
-    case RLE_CONTINUE:
-      curCount--;
-      if(!curCount)
-        state = RLE_FIRST_BYTE;
-      break;
-    }
-    return byte;
-  }
-
-  uint8_t getWidth() const { return width; }
-  uint8_t getRows() const { return rows; }
-  uint8_t getRawRows() const { return rawRows; }
-  void goToNextRow()
-  {
-    coord_t offset = pos%width;
-    if(offset)
-      skip(width - pos%width);
-  }
-
-private:
-  enum State {RLE_FIRST_BYTE, RLE_SECOND_BYTE, RLE_CONTINUE} state;
-  const uint8_t* src;
-  const uint8_t* curPtr;
-
-  uint8_t width;
-  uint8_t rows;
-  uint8_t rawRows;
-
-  uint8_t byte;
-  uint16_t curCount;
-
-  coord_t pos;
-};
-
 
 #endif // _LCD_H_

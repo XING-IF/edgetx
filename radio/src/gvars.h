@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -50,9 +49,9 @@
   #define GET_GVAR_PREC1(x, ...)       (x*10)
 #endif
 
-#define GV_GET_GV1_VALUE(vmin, vmax)        ((vmax<=GV_RANGESMALL && vmin>=GV_RANGESMALL_NEG) ? GV1_SMALL : GV1_LARGE)
-#define GV_INDEX_CALCULATION(x,max)  ((max<=GV_RANGESMALL && min>=GV_RANGESMALL_NEG) ? (uint8_t) x-GV1_SMALL : ((x&(GV1_LARGE*2-1))-GV1_LARGE))
-#define GV_IS_GV_VALUE(x,min,max)    ((max>GV1_SMALL || min<-GV1_SMALL) ? (x>GV_RANGELARGE || x<GV_RANGELARGE_NEG) : (x>max) || (x<min))
+  #define GV_GET_GV1_VALUE(max)        ((max<=GV_RANGESMALL && min>=GV_RANGESMALL_NEG) ? GV1_SMALL : GV1_LARGE)
+  #define GV_INDEX_CALCULATION(x,max)  ((max<=GV_RANGESMALL && min>=GV_RANGESMALL_NEG) ? (uint8_t) x-GV1_SMALL : ((x&(GV1_LARGE*2-1))-GV1_LARGE))
+  #define GV_IS_GV_VALUE(x,min,max)    ((max>GV1_SMALL || min<-GV1_SMALL) ? (x>GV_RANGELARGE || x<GV_RANGELARGE_NEG) : (x>max) || (x<min))
 
 #define GV_INDEX_CALC_DELTA(x,delta)   ((x&(delta*2-1)) - delta)
 
@@ -64,12 +63,12 @@
 #define GV_RANGELARGE                  (GV1_LARGE - (RESERVE_RANGE_FOR_GVARS+1))
 #define GV_RANGELARGE_NEG              (-GV1_LARGE + (RESERVE_RANGE_FOR_GVARS+1))
 
-// the define GV1_LARGE marks the highest bit value used for this variables
-// because this would give too big numbers for ARM, we limit it further for
-// offset and weight
-constexpr int32_t MIX_WEIGHT_MAX = 500;
-constexpr int32_t MIX_WEIGHT_MIN = -500;
-constexpr int32_t MIX_OFFSET_MAX = 500;       
-constexpr int32_t MIX_OFFSET_MIN = -500;      
+  // the define GV1_LARGE marks the highest bit value used for this variables
+  // because this would give too big numbers for ARM, we limit it further for
+  // offset and weight
+  #define GV_RANGELARGE_WEIGHT         (GV_RANGE_WEIGHT)
+  #define GV_RANGELARGE_WEIGHT_NEG     (-GV_RANGE_WEIGHT)
+  #define GV_RANGELARGE_OFFSET         (GV_RANGE_OFFSET)
+  #define GV_RANGELARGE_OFFSET_NEG     (-GV_RANGE_OFFSET)
 
 #endif // _GVARS_H_

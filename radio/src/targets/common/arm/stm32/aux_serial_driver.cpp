@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -25,12 +24,7 @@
 #if defined(AUX_SERIAL)
 uint8_t auxSerialMode = UART_MODE_COUNT;  // Prevent debug output before port is setup
 Fifo<uint8_t, 512> auxSerialTxFifo;
-
-#if defined(AUX_SERIAL_DMA_Stream_RX)
 AuxSerialRxFifo auxSerialRxFifo __DMA (AUX_SERIAL_DMA_Stream_RX);
-#else
-AuxSerialRxFifo auxSerialRxFifo;
-#endif
 
 void auxSerialSetup(unsigned int baudrate, bool dma, uint16_t length, uint16_t parity, uint16_t stop)
 {
@@ -62,21 +56,6 @@ void auxSerialSetup(unsigned int baudrate, bool dma, uint16_t length, uint16_t p
   USART_InitStructure.USART_Mode = USART_Mode_Tx | USART_Mode_Rx;
   USART_Init(AUX_SERIAL_USART, &USART_InitStructure);
 
-#if defined(AUX_SERIAL_TX_INVERT_GPIO_PIN)
-  GPIO_InitStructure.GPIO_Pin = AUX_SERIAL_TX_INVERT_GPIO_PIN;
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
-  GPIO_Init(AUX_SERIAL_TX_INVERT_GPIO, &GPIO_InitStructure);
-  GPIO_ResetBits(AUX_SERIAL_TX_INVERT_GPIO, AUX_SERIAL_TX_INVERT_GPIO_PIN);
-#endif
-
-#if defined(AUX_SERIAL_RX_INVERT_GPIO_PIN)
-  GPIO_InitStructure.GPIO_Pin = AUX_SERIAL_RX_INVERT_GPIO_PIN;
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
-  GPIO_Init(AUX_SERIAL_RX_INVERT_GPIO, &GPIO_InitStructure);
-  GPIO_ResetBits(AUX_SERIAL_RX_INVERT_GPIO, AUX_SERIAL_RX_INVERT_GPIO_PIN);
-#endif
-
-#if defined(AUX_SERIAL_DMA_Stream_RX)
   if (dma) {
     DMA_InitTypeDef DMA_InitStructure;
     auxSerialRxFifo.clear();
@@ -101,16 +80,14 @@ void auxSerialSetup(unsigned int baudrate, bool dma, uint16_t length, uint16_t p
     USART_DMACmd(AUX_SERIAL_USART, USART_DMAReq_Rx, ENABLE);
     USART_Cmd(AUX_SERIAL_USART, ENABLE);
     DMA_Cmd(AUX_SERIAL_DMA_Stream_RX, ENABLE);
-    return;
   }
-#endif
-
-  // no DMA ...
-  USART_Cmd(AUX_SERIAL_USART, ENABLE);
-  USART_ITConfig(AUX_SERIAL_USART, USART_IT_RXNE, ENABLE);
-  USART_ITConfig(AUX_SERIAL_USART, USART_IT_TXE, DISABLE);
-  NVIC_SetPriority(AUX_SERIAL_USART_IRQn, 7);
-  NVIC_EnableIRQ(AUX_SERIAL_USART_IRQn);
+  else {
+    USART_Cmd(AUX_SERIAL_USART, ENABLE);
+    USART_ITConfig(AUX_SERIAL_USART, USART_IT_RXNE, ENABLE);
+    USART_ITConfig(AUX_SERIAL_USART, USART_IT_TXE, DISABLE);
+    NVIC_SetPriority(AUX_SERIAL_USART_IRQn, 7);
+    NVIC_EnableIRQ(AUX_SERIAL_USART_IRQn);
+  }
 }
 
 void auxSerialInit(unsigned int mode, unsigned int protocol)
@@ -160,7 +137,11 @@ void auxSerialInit(unsigned int mode, unsigned int protocol)
 void auxSerialPutc(char c)
 {
 #if !defined(SIMU)
-  if (auxSerialTxFifo.isFull()) return;
+  int n = 0;
+  while (auxSerialTxFifo.isFull()) {
+    delay_ms(1);
+    if (++n > 100) return;
+  }
   auxSerialTxFifo.push(c);
   USART_ITConfig(AUX_SERIAL_USART, USART_IT_TXE, ENABLE);
 #endif
@@ -173,10 +154,7 @@ void auxSerialSbusInit()
 
 void auxSerialStop()
 {
-#if defined(AUX_SERIAL_DMA_Stream_RX)
   DMA_DeInit(AUX_SERIAL_DMA_Stream_RX);
-#endif
-
   USART_DeInit(AUX_SERIAL_USART);
 }
 
@@ -189,10 +167,10 @@ uint8_t auxSerialTracesEnabled()
 #endif
 }
 
+#if !defined(SIMU)
 extern "C" void AUX_SERIAL_USART_IRQHandler(void)
 {
   DEBUG_INTERRUPT(INT_SER2);
-
   // Send
   if (USART_GetITStatus(AUX_SERIAL_USART, USART_IT_TXE) != RESET) {
     uint8_t txchar;
@@ -214,7 +192,7 @@ extern "C" void AUX_SERIAL_USART_IRQHandler(void)
       if (!(status & USART_FLAG_ERRORS)) {
         switch (auxSerialMode) {
           case UART_MODE_DEBUG:
-            cliReceiveData(&data, 1);
+            cliRxFifo.push(data);
             break;
         }
       }
@@ -222,7 +200,6 @@ extern "C" void AUX_SERIAL_USART_IRQHandler(void)
     }
   }
 #endif
-
   // Receive
   uint32_t status = AUX_SERIAL_USART->SR;
   while (status & (USART_FLAG_RXNE | USART_FLAG_ERRORS)) {
@@ -237,6 +214,7 @@ extern "C" void AUX_SERIAL_USART_IRQHandler(void)
     status = AUX_SERIAL_USART->SR;
   }
 }
+#endif // SIMU
 #endif // AUX_SERIAL
 
 #if defined(AUX2_SERIAL)
@@ -355,7 +333,11 @@ void aux2SerialInit(unsigned int mode, unsigned int protocol)
 void aux2SerialPutc(char c)
 {
 #if !defined(SIMU)
-  if (aux2SerialTxFifo.isFull()) return;
+  int n = 0;
+  while (aux2SerialTxFifo.isFull()) {
+    delay_ms(1);
+    if (++n > 100) return;
+  }
   aux2SerialTxFifo.push(c);
   USART_ITConfig(AUX2_SERIAL_USART, USART_IT_TXE, ENABLE);
 #endif
@@ -381,10 +363,10 @@ uint8_t aux2SerialTracesEnabled()
 #endif
 }
 
+#if !defined(SIMU)
 extern "C" void AUX2_SERIAL_USART_IRQHandler(void)
 {
   DEBUG_INTERRUPT(INT_SER2);
-
   // Send
   if (USART_GetITStatus(AUX2_SERIAL_USART, USART_IT_TXE) != RESET) {
     uint8_t txchar;
@@ -406,7 +388,7 @@ extern "C" void AUX2_SERIAL_USART_IRQHandler(void)
       if (!(status & USART_FLAG_ERRORS)) {
         switch (aux2SerialMode) {
           case UART_MODE_DEBUG:
-            cliReceiveData(&data, 1);
+            cliRxFifo.push(data);
             break;
         }
       }
@@ -414,7 +396,6 @@ extern "C" void AUX2_SERIAL_USART_IRQHandler(void)
     }
   }
 #endif
-
   // Receive
   uint32_t status = AUX2_SERIAL_USART->SR;
   while (status & (USART_FLAG_RXNE | USART_FLAG_ERRORS)) {
@@ -430,4 +411,5 @@ extern "C" void AUX2_SERIAL_USART_IRQHandler(void)
     status = AUX2_SERIAL_USART->SR;
   }
 }
+#endif // SIMU
 #endif // AUX2_SERIAL

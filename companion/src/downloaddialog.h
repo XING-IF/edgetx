@@ -22,9 +22,9 @@
 #define _DOWNLOADDIALOG_H_
 
 #include <QtWidgets>
-#include <QtNetwork/QNetworkAccessManager>
-#include <QtNetwork/QNetworkReply>
-#include <QtNetwork/QNetworkRequest>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkRequest>
 #include <QFile>
 
 namespace Ui {

@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -21,8 +20,6 @@
 
 #ifndef OPENTX_MULTI_H
 #define OPENTX_MULTI_H
-
-#include "../timers.h"
 
 #define MULTI_BUFFER_SIZE 177
 extern uint8_t * Multi_Buffer;
@@ -107,7 +104,6 @@ struct MultiModuleStatus {
 
   uint8_t flags;
   uint8_t requiresFailsafeCheck;
-  uint8_t failsafeChecked;
   tmr10ms_t lastUpdate;
 
   uint8_t protocolPrev = 0;
@@ -128,29 +124,17 @@ struct MultiModuleStatus {
   inline bool protocolValid() const { return (bool) (flags & 0x04); }
   inline bool serialMode() const { return (bool) (flags & 0x02); }
   inline bool inputDetected() const { return (bool) (flags & 0x01); }
-
-  inline void invalidate() {
-    lastUpdate = get_tmr10ms() - 500;
-    protocolSubNbr = 0;
-    protocolName[0] = '\0';
-    protocolSubName[0] = '\0';
-  }
 };
 
 MultiModuleStatus& getMultiModuleStatus(uint8_t module);
 
 enum MultiBindStatus : uint8_t {
-  MULTI_BIND_NONE,
+  MULTI_NORMAL_OPERATION,
   MULTI_BIND_INITIATED,
   MULTI_BIND_FINISHED,
 };
 
 uint8_t getMultiBindStatus(uint8_t module);
 void setMultiBindStatus(uint8_t module, uint8_t bindStatus);
-
-bool isMultiModeScanning(uint8_t module);
-bool isMultiTelemReceiving(uint8_t module);
-
-void checkFailsafeMulti();
 
 #endif //OPENTX_MULTI_H

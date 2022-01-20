@@ -1,9 +1,8 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
- *   th9x - http://code.google.com/p/th9x
+ *   th9x - http://code.google.com/p/th9x 
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
  *
@@ -36,14 +35,13 @@ uint8_t s_maxLines = 8;
 uint8_t s_copySrcIdx;
 uint8_t s_copySrcCh;
 
-uint8_t editNameCursorPos = 0;
+  uint8_t editNameCursorPos = 0;
 
-void editSingleName(coord_t x, coord_t y, const char* label, char* name,
-                    uint8_t size, event_t event, uint8_t active,
-                    uint8_t old_editMode)
+
+void editSingleName(coord_t x, coord_t y, const char * label, char * name, uint8_t size, event_t event, uint8_t active)
 {
   lcdDrawTextAlignedLeft(y, label);
-  editName(x, y, name, size, event, active, 0, old_editMode);
+  editName(x, y, name, size, event, active);
 }
 
 uint8_t s_currIdx;

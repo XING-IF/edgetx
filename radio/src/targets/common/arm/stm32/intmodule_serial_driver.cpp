@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -20,43 +19,12 @@
  */
 
 #include "opentx.h"
-#include "intmodule_serial_driver.h"
 
 ModuleFifo intmoduleFifo;
 #if !defined(INTMODULE_DMA_STREAM)
 uint8_t * intmoduleTxBufferData;
-volatile uint8_t intmoduleTxBufferRemaining;
+uint8_t intmoduleTxBufferRemaining;
 #endif
-
-struct etx_serial_driver {
-  void (*on_receive)(uint8_t data);
-  void (*on_error)();
-};
-
-static etx_serial_driver intmodule_driver = { nullptr, nullptr };
-
-// TODO: move this somewhere else
-static void intmoduleFifoReceive(uint8_t data)
-{
-  intmoduleFifo.push(data);
-}
-
-static void intmoduleFifoError()
-{
-  intmoduleFifo.errors++;
-}
-
-etx_serial_init::etx_serial_init():
-  baudrate(0),
-  parity(USART_Parity_No),
-  stop_bits(USART_StopBits_1),
-  word_length(USART_WordLength_8b),
-  rx_enable(false),
-  // TODO: this should not be needed
-  on_receive(intmoduleFifoReceive),
-  on_error(intmoduleFifoError)
-{
-}
 
 void intmoduleStop()
 {
@@ -77,38 +45,27 @@ void intmoduleStop()
   USART_DeInit(INTMODULE_USART);
 
   GPIO_ResetBits(INTMODULE_GPIO, INTMODULE_TX_GPIO_PIN | INTMODULE_RX_GPIO_PIN);
-
-  // reset callbacks
-  intmodule_driver.on_receive = nullptr;
-  intmodule_driver.on_error = nullptr;
 }
 
 void intmodulePxx1SerialStart()
 {
-  etx_serial_init params;
-  params.baudrate = INTMODULE_PXX1_SERIAL_BAUDRATE;
-  intmoduleSerialStart(&params);
+  intmoduleSerialStart(INTMODULE_PXX1_SERIAL_BAUDRATE, false, USART_Parity_No, USART_StopBits_1, USART_WordLength_8b);
 }
 
-void intmoduleSerialStart(const etx_serial_init* params)
+void intmoduleSerialStart(uint32_t baudrate, uint8_t rxEnable, uint16_t parity, uint16_t stopBits, uint16_t wordLength)
 {
-  if (!params) return;
-  
   INTERNAL_MODULE_ON();
 
-  // init callbacks
-  intmodule_driver.on_receive = params->on_receive;
-  intmodule_driver.on_error = params->on_error;
-  
-#if !defined(INTMODULE_DMA_STREAM)
-  // IRQ based TX
   NVIC_InitTypeDef NVIC_InitStructure;
+#if defined(INTMODULE_DMA_STREAM)
+  NVIC_InitStructure.NVIC_IRQChannel = INTMODULE_DMA_STREAM_IRQ;
+#else
   NVIC_InitStructure.NVIC_IRQChannel = INTMODULE_USART_IRQn;
+#endif
   NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
-  NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+  NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0; /* Not used as 4 bits are used for the pre-emption priority. */;
   NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
   NVIC_Init(&NVIC_InitStructure);
-#endif
 
   GPIO_PinAFConfig(INTMODULE_GPIO, INTMODULE_GPIO_PinSource_TX, INTMODULE_GPIO_AF);
   GPIO_PinAFConfig(INTMODULE_GPIO, INTMODULE_GPIO_PinSource_RX, INTMODULE_GPIO_AF);
@@ -123,16 +80,17 @@ void intmoduleSerialStart(const etx_serial_init* params)
 
   USART_DeInit(INTMODULE_USART);
   USART_InitTypeDef USART_InitStructure;
-  USART_InitStructure.USART_BaudRate = params->baudrate;
-  USART_InitStructure.USART_Parity = params->parity;
-  USART_InitStructure.USART_StopBits = params->stop_bits;
-  USART_InitStructure.USART_WordLength = params->word_length;
+  USART_InitStructure.USART_BaudRate = baudrate;
+  USART_InitStructure.USART_Parity = parity;
+  USART_InitStructure.USART_StopBits = stopBits;
+  USART_InitStructure.USART_WordLength = wordLength;
   USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
   USART_InitStructure.USART_Mode = USART_Mode_Tx | USART_Mode_Rx;
   USART_Init(INTMODULE_USART, &USART_InitStructure);
   USART_Cmd(INTMODULE_USART, ENABLE);
 
-  if (params->rx_enable) {
+  if (rxEnable) {
+    intmoduleFifo.clear();
     USART_ITConfig(INTMODULE_USART, USART_IT_RXNE, ENABLE);
     NVIC_SetPriority(INTMODULE_USART_IRQn, 6);
     NVIC_EnableIRQ(INTMODULE_USART_IRQn);
@@ -161,12 +119,10 @@ extern "C" void INTMODULE_USART_IRQHandler(void)
   while (status & (USART_FLAG_RXNE | USART_FLAG_ERRORS)) {
     uint8_t data = INTMODULE_USART->DR;
     if (status & USART_FLAG_ERRORS) {
-      if (intmodule_driver.on_error)
-        intmodule_driver.on_error();
+      intmoduleFifo.errors++;
     }
     else {
-      if (intmodule_driver.on_receive)
-        intmodule_driver.on_receive(data);
+      intmoduleFifo.push(data);
     }
     status = INTMODULE_USART->SR;
   }
@@ -211,16 +167,25 @@ void intmoduleSendBuffer(const uint8_t * data, uint8_t size)
 #endif
 }
 
-void intmoduleWaitForTxCompleted()
+void intmoduleSendNextFrame()
 {
-#if !defined(SIMU)
-#if defined(INTMODULE_DMA_STREAM)
-  if (DMA_GetCmdStatus(INTMODULE_DMA_STREAM) == ENABLE) {
-    while(DMA_GetFlagStatus(INTMODULE_DMA_STREAM, INTMODULE_DMA_FLAG_TC) == RESET);
-    DMA_ClearFlag(INTMODULE_DMA_STREAM, INTMODULE_DMA_FLAG_TC);
+  switch (moduleState[INTERNAL_MODULE].protocol) {
+#if defined(PXX2)
+    case PROTOCOL_CHANNELS_PXX2_HIGHSPEED:
+      intmoduleSendBuffer(intmodulePulsesData.pxx2.getData(), intmodulePulsesData.pxx2.getSize());
+      break;
+#endif
+
+#if defined(PXX1)
+    case PROTOCOL_CHANNELS_PXX1_SERIAL:
+      intmoduleSendBuffer(intmodulePulsesData.pxx_uart.getData(), intmodulePulsesData.pxx_uart.getSize());
+      break;
+#endif
+
+#if defined(INTERNAL_MODULE_MULTI)
+    case PROTOCOL_CHANNELS_MULTIMODULE:
+      intmoduleSendBuffer(intmodulePulsesData.multi.getData(), intmodulePulsesData.multi.getSize());
+      break;
+#endif
   }
-#else
-  while (intmoduleTxBufferRemaining > 0);
-#endif
-#endif
 }

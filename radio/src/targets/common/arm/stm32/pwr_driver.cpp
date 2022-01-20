@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -45,6 +44,12 @@ void pwrInit()
   EXTERNAL_MODULE_PWR_OFF();
   GPIO_InitStructure.GPIO_Pin = EXTMODULE_PWR_GPIO_PIN;
   GPIO_Init(EXTMODULE_PWR_GPIO, &GPIO_InitStructure);
+  EXTERNAL_MODULE_PWR_OFF();
+
+#if defined(RADIO_T8)
+  GPIO_InitStructure.GPIO_Pin = EXTMODULE_RF_SWITCH_GPIO_PIN;
+  GPIO_Init(EXTMODULE_RF_SWITCH_GPIO,&GPIO_InitStructure);
+#endif
 
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
 

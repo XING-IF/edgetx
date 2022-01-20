@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -22,27 +21,21 @@
 #ifndef _SDCARD_RAW_H_
 #define _SDCARD_RAW_H_
 
-#include "FatFs/ff.h"
+#include "ff.h"
 
-#if defined(SDCARD_RAW)
+#define DEFAULT_CATEGORY         "Models"
+#define DEFAULT_MODEL_FILENAME   "model1.bin"
 
-#define writeModel           writeModelBin
-#define loadRadioSettings    loadRadioSettingsBin
-#define writeGeneralSettings writeGeneralSettingsBin
+// opens radio.bin or model file
+const char * openFile(const char * fullpath, FIL * file, uint16_t * size, uint8_t * version);
 
-const char* readModel(const char* filename, uint8_t* buffer, uint32_t size);
+void getModelPath(char * path, const char * filename);
 
-#endif
+const char * readModel(const char * filename, uint8_t * buffer, uint32_t size, uint8_t * version);
+const char * loadModel(const char * filename, bool alarms=true);
+const char * createModel();
 
-const char* loadRadioSettingsBin();
-const char * writeGeneralSettingsBin();
+const char * loadRadioSettings(const char * path);
+const char * loadRadioSettings();
 
-const char* openFileBin(const char* fullpath, FIL* file, uint16_t* size,
-                        uint8_t* version);
-
-const char* readModelBin(const char* filename, uint8_t* buffer, uint32_t size,
-                         uint8_t* version);
-
-const char* writeModelBin();
-
-#endif
+#endif // _SDCARD_RAW_H_

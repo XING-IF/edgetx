@@ -334,8 +334,3 @@ int Er9xInterface::getCapability(Capability capability)
       return 0;
   }
 }
-
-QString Er9xInterface::getCapabilityStr(Capability capability)
-{
-  return QString();
-}

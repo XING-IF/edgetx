@@ -32,7 +32,6 @@
 #include "storage.h"
 #include "radiointerface.h"
 #include "radiodataconversionstate.h"
-#include "filtereditemmodels.h"
 
 #include <algorithm>
 #include <ExportableTableView>
@@ -698,6 +697,10 @@ QVector<int> MdiChild::getSelectedModels() const
 void MdiChild::updateTitle()
 {
   QString title =  "[*]" + userFriendlyCurrentFile();  // + " (" + firmware->getName() + QString(")");
+  int availableEEpromSize = modelsListModel->getAvailableEEpromSize();
+  if (availableEEpromSize >= 0) {
+    title += QString(" - %1 ").arg(availableEEpromSize) + tr("free bytes");
+  }
   QFileInfo fi(curFile);
   if (!isUntitled && !fi.isWritable()) {
     title += QString(" (%1)").arg(tr("read only"));
@@ -1092,15 +1095,9 @@ void MdiChild::pasteGeneralData(const QMimeData * mimeData)
 
 void MdiChild::generalEdit()
 {
-  if (getModelEditDialogsList()->count() > 0) {
-    QMessageBox::information(this, CPN_STR_APP_NAME, tr("Unable to Edit Radio Settings whilst models are open for editing."));
-    return;
-  }
-
   GeneralEdit * t = new GeneralEdit(this, radioData, firmware);
   connect(t, &GeneralEdit::modified, this, &MdiChild::setModified);
-  connect(t, &GeneralEdit::internalModuleChanged, this, &MdiChild::onInternalModuleChanged);  // passed up from HardwarePanel >> GeneralEdit
-  t->exec();
+  t->show();
 }
 
 void MdiChild::copyGeneralSettings()
@@ -1267,13 +1264,6 @@ void MdiChild::openModelEditWindow(int row)
   if (row < 0 && (row = getCurrentModel()) < 0)
     return;
 
-  QDialog * med = getModelEditDialog(row);
-  if (med) {
-    med->activateWindow();
-    med->raise();
-    return;
-  }
-
   QApplication::setOverrideCursor(Qt::WaitCursor);
   checkAndInitModel(row);
   ModelData & model = radioData.models[row];
@@ -1330,7 +1320,7 @@ void MdiChild::newFile(bool createDefaults)
 {
   static int sequenceNumber = 1;
   isUntitled = true;
-  curFile = QString("document%1.etx").arg(sequenceNumber++);
+  curFile = QString("document%1.otx").arg(sequenceNumber++);
   updateTitle();
 
   if (createDefaults && firmware->getCapability(Capability::HasModelCategories)) {
@@ -1355,7 +1345,6 @@ bool MdiChild::loadFile(const QString & filename, bool resetCurrentFile)
     setCurrentFile(filename);
   }
 
-  //  For etx files this will never be true as any conversion occurs when parsing file
   if (!Boards::isBoardCompatible(storage.getBoard(), getCurrentBoard())) {
     if (!convertStorage(storage.getBoard(), getCurrentBoard(), true))
       return false;
@@ -1371,7 +1360,7 @@ bool MdiChild::loadFile(const QString & filename, bool resetCurrentFile)
 bool MdiChild::save()
 {
   QFileInfo fi(curFile);
-  if (isUntitled || !fi.isWritable() || fi.suffix().toLower() != "etx") {
+  if (isUntitled || !fi.isWritable()) {
     return saveAs(true);
   }
   else {
@@ -1386,10 +1375,10 @@ bool MdiChild::saveAs(bool isNew)
 #ifdef __APPLE__
   QString filter;
 #else
-  QString filter(ETX_FILES_FILTER % YML_FILES_FILTER);
+  QString filter(OTX_FILES_FILTER);
 #endif
 
-  QString fileName = QFileDialog::getSaveFileName(this, tr("Save As"), g.eepromDir() + "/" + fi.fileName(), filter);
+  QString fileName = QFileDialog::getSaveFileName(this, tr("Save As"), g.eepromDir() + "/" +fi.fileName(), filter);
   if (fileName.isEmpty())
     return false;
   g.eepromDir( QFileInfo(fileName).dir().absolutePath() );
@@ -1466,7 +1455,7 @@ void MdiChild::setCurrentFile(const QString & fileName)
 
 void MdiChild::forceNewFilename(const QString & suffix, const QString & ext)
 {
-  curFile.replace(QRegExp("\\.(eepe|bin|hex|otx|etx)$"), suffix + "." + ext);
+  curFile.replace(QRegExp("\\.(eepe|bin|hex|otx)$"), suffix + "." + ext);
 }
 
 bool MdiChild::convertStorage(Board::Type from, Board::Type to, bool newFile)
@@ -1539,40 +1528,22 @@ int MdiChild::askQuestion(const QString & msg, QMessageBox::StandardButtons butt
   return QMessageBox::question(this, CPN_STR_APP_NAME, msg, buttons, defaultButton);
 }
 
-void MdiChild::writeSettings()  // write to Tx
+void MdiChild::writeEeprom()  // write to Tx
 {
-  if (g.confirmWriteModelsAndSettings()) {
-    QMessageBox msgbox;
-    msgbox.setText(tr("You are about to overwrite ALL models on the Radio."));
-    msgbox.setInformativeText(tr("Do you want to continue?"));
-    msgbox.setIcon(QMessageBox::Icon::Question);
-    msgbox.setStandardButtons(QMessageBox::Yes | QMessageBox::Abort);
-    msgbox.setDefaultButton(QMessageBox::Abort);
-
-    QCheckBox *cb = new QCheckBox(tr("Don't show this message again"));
-    msgbox.setCheckBox(cb);
-    connect(cb, &QCheckBox::stateChanged, [=](const int &state){ g.confirmWriteModelsAndSettings(!state); });
-
-    if (msgbox.exec() == QMessageBox::Abort)
-      return;
-  }
-
   Board::Type board = getCurrentBoard();
-
-  if (Boards::getCapability(board, Board::HasSDCard)) {
+  if (IS_FAMILY_HORUS_OR_T16(board)) {
     QString radioPath = findMassstoragePath("RADIO", true);
     qDebug() << "Searching for SD card, found" << radioPath;
     if (radioPath.isEmpty()) {
-      qDebug() << "Radio SD card not found";
+      qDebug() << "MdiChild::writeEeprom(): Horus radio not found";
       QMessageBox::critical(this, CPN_STR_TTL_ERROR, tr("Unable to find radio SD card!"));
       return;
     }
     if (saveFile(radioPath, false)) {
-      QMessageBox::information(this, CPN_STR_TTL_INFO, tr("Saved models and settings to radio"));
+      emit newStatusMessage(tr("Models and Settings written"), 2000);
     }
     else {
       qDebug() << "MdiChild::writeEeprom(): saveFile error";
-      QMessageBox::critical(this, CPN_STR_TTL_ERROR, tr("Error saving models and settings to radio!"));
     }
   }
   else {
@@ -1637,63 +1608,4 @@ bool MdiChild::loadBackup()
 #else
   return false;
 #endif
-}
-
-QList<QDialog *> * MdiChild::getModelEditDialogsList()
-{
-  QList<QDialog *> *ret = new QList<QDialog *>();
-
-  QList<QDialog *> dlgs = findChildren<QDialog *>();
-
-  for (QDialog *dlg : dlgs) {
-    ModelEdit * med = dynamic_cast<ModelEdit *>(dlg);
-    if (med)
-      ret->append(dlg);
-  }
-
-  return ret;
-}
-
-QDialog * MdiChild::getModelEditDialog(int row)
-{
-  QList<QDialog *> *dlgs = getModelEditDialogsList();
-
-  for (QDialog *dlg : *dlgs) {
-    ModelEdit * med = dynamic_cast<ModelEdit *>(dlg);
-    if (med && med->getModelId() == row)
-      return med;
-  }
-
-  return nullptr;
-}
-
-void MdiChild::onInternalModuleChanged()
-{
-  FilteredItemModel * fim = new FilteredItemModel(ModuleData::protocolItemModel(radioData.generalSettings), 0 + 1/*flag cannot be 0*/);
-
-  int cnt = 0;
-
-  for (unsigned int i = 0; i < radioData.models.size(); i++) {
-    ModuleData & module = radioData.models[i].moduleData[0];
-    bool found = false;
-
-    for (int j = 0; j < fim->rowCount(); j++) {
-      if (fim->data(fim->index(j, 0), AbstractItemModel::IMDR_Id).toInt() == (int)module.protocol) {
-        found = true;
-        break;
-      }
-    }
-
-    if (!found) {
-      module.clear();
-      cnt++;
-    }
-  }
-
-  if (cnt > 0) {
-    QMessageBox::warning(this, CPN_STR_APP_NAME, tr("Internal module protocol changed to <b>OFF</b> for %1 models!").arg(cnt));
-    setModified();
-  }
-
-  delete fim;
 }

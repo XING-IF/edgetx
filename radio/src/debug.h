@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -22,16 +21,21 @@
 #ifndef _DEBUG_H_
 #define _DEBUG_H_
 
-#include <float.h>
-#include "definitions.h"
+#include <inttypes.h>
 #include "rtc.h"
 #include "dump.h"
 
 #define CRLF "\r\n"
 
+#if defined(CLI)
+#include "cli.h"
+#else
 #include "serial.h"
+#endif
 
-extern volatile uint32_t g_tmr10ms;
+#if defined(__cplusplus)
+extern "C" {
+#endif
 
 uint8_t auxSerialTracesEnabled();
 uint8_t aux2SerialTracesEnabled();
@@ -39,12 +43,11 @@ uint8_t aux2SerialTracesEnabled();
 #if defined(SIMU)
   typedef void (*traceCallbackFunc)(const char * text);
   extern traceCallbackFunc traceCallback;
-  EXTERN_C(void debugPrintf(const char * format, ...));
+  void debugPrintf(const char * format, ...);
 #elif defined(SEMIHOSTING)
   #include <stdio.h>
   #define debugPrintf(...) printf(__VA_ARGS__)
 #elif defined(DEBUG) && defined(CLI)
-  #include "cli_traces.h"
   #define debugPrintf(...) do { if (cliTracesEnabled) serialPrintf(__VA_ARGS__); } while(0)
 #elif defined(DEBUG)
   #define debugPrintf(...) do { serialPrintf(__VA_ARGS__); } while(0)
@@ -52,11 +55,12 @@ uint8_t aux2SerialTracesEnabled();
   #define debugPrintf(...)
 #endif
 
-#define TRACE_TIME_FORMAT     "%0.2fs: "
-#define TRACE_TIME_VALUE      ((float)g_tmr10ms / 100.0)
+#if defined(__cplusplus)
+}
+#endif
 
 #define TRACE_NOCRLF(...)     debugPrintf(__VA_ARGS__)
-#define TRACE(f_, ...)        debugPrintf((TRACE_TIME_FORMAT f_ CRLF), TRACE_TIME_VALUE, ##__VA_ARGS__)
+#define TRACE(f_, ...)        debugPrintf((f_ CRLF), ##__VA_ARGS__)
 #define DUMP(data, size)      dump(data, size)
 #define TRACE_DEBUG(...)      debugPrintf("-D- " __VA_ARGS__)
 #define TRACE_DEBUG_WP(...)   debugPrintf(__VA_ARGS__)
@@ -65,14 +69,6 @@ uint8_t aux2SerialTracesEnabled();
 #define TRACE_WARNING(...)    debugPrintf("-W- " __VA_ARGS__)
 #define TRACE_WARNING_WP(...) debugPrintf(__VA_ARGS__)
 #define TRACE_ERROR(...)      debugPrintf("-E- " __VA_ARGS__)
-
-#if defined(DEBUG_WINDOWS)
-#define TRACE_WINDOWS(f_, ...) TRACE(f_, ##__VA_ARGS__)
-#define TRACE_WINDOWS_INDENT(f_, ...) debugPrintf((TRACE_TIME_FORMAT "%s" f_ CRLF), TRACE_TIME_VALUE, getIndentString().c_str(), ##__VA_ARGS__)
-#else
-#define TRACE_WINDOWS(...)
-#define TRACE_WINDOWS_INDENT(...)
-#endif
 
 #if defined(TRACE_LUA_INTERNALS_ENABLED)
   #define TRACE_LUA_INTERNALS(f_, ...)     debugPrintf(("[LUA INT] " f_ CRLF), ##__VA_ARGS__)
@@ -88,12 +84,6 @@ uint8_t aux2SerialTracesEnabled();
 #else
   #define TRACE_LUA_INTERNALS(...)
   #define TRACE_LUA_INTERNALS_WITH_LINEINFO(L, f_, ...)
-#endif
-
-#if defined(DEBUG_YAML)
-#define TRACE_YAML(f_, ...) TRACE(f_, ##__VA_ARGS__)
-#else
-#define TRACE_YAML(f_, ...)
 #endif
 
 #if defined(DEBUG) && !defined(SIMU)
@@ -391,8 +381,9 @@ enum DebugTimers {
   debugTimerPerMain,
   debugTimerPerMain1,
   debugTimerGuiMain,
-  debugTimerLua,
+  debugTimerLuaBg,
   debugTimerLcdRefreshWait,
+  debugTimerLuaFg,
   debugTimerLcdRefresh,
   debugTimerMenus,
   debugTimerMenuHandlers,

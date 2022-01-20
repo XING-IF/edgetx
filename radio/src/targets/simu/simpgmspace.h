@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -246,27 +245,25 @@ extern char * main_thread_error;
 inline void getADC() { }
 
 uint64_t simuTimerMicros(void);
+
+void simuInit();
+void StartSimu(bool tests=true, const char * sdPath = 0, const char * settingsPath = 0);
+void StopSimu();
+bool simuIsRunning();
 uint8_t simuSleep(uint32_t ms);  // returns true if thread shutdown requested
 
 void simuSetKey(uint8_t key, bool state);
 void simuSetTrim(uint8_t trim, bool state);
 void simuSetSwitch(uint8_t swtch, int8_t state);
 
-#if defined(__cplusplus)
-void simuInit();
-void simuStart(bool tests = true, const char * sdPath = nullptr, const char * settingsPath = nullptr);
-void simuStop();
-bool simuIsRunning();
-void startEepromThread(const char * filename = "eeprom.bin");
-void stopEepromThread();
-
+void StartEepromThread(const char *filename="eeprom.bin");
+void StopEepromThread();
 #if defined(SIMU_AUDIO)
-  void startAudioThread(int volumeGain = 10);
-  void stopAudioThread(void);
+  void StartAudioThread(int volumeGain = 10);
+  void StopAudioThread(void);
 #else
-  #define startAudioThread(dummy)
-  #define stopAudioThread()
-#endif
+  #define StartAudioThread(dummy)
+  #define StopAudioThread()
 #endif
 
 void simuMain();
@@ -277,6 +274,7 @@ void simuMain();
 #define USART_ClearFlag(...)
 
 #if defined(STM32)
+inline void GPIO_Init(GPIO_TypeDef* GPIOx, GPIO_InitTypeDef* GPIO_InitStruct) { }
 #define TIM_DeInit(...)
 #define TIM_SetCompare2(...)
 #define TIM_ClearFlag(...)
@@ -287,10 +285,27 @@ void simuMain();
 #define GPIO_ReadInputDataBit(GPIOx, pin) (GPIOx->BSRRL & pin)
 #define RCC_AHB1PeriphClockCmd(...)
 #define RCC_APB2PeriphClockCmd(...)
+inline void SPI_Init(SPI_TypeDef* SPIx, SPI_InitTypeDef* SPI_InitStruct) { }
+inline void SPI_CalculateCRC(SPI_TypeDef* SPIx, FunctionalState NewState) { }
+inline void SPI_Cmd(SPI_TypeDef* SPIx, FunctionalState NewState) { }
+inline FlagStatus SPI_I2S_GetFlagStatus(SPI_TypeDef* SPIx, uint16_t SPI_I2S_FLAG) { return RESET; }
+inline uint16_t SPI_I2S_ReceiveData(SPI_TypeDef* SPIx) { return 0; }
+inline void SPI_I2S_SendData(SPI_TypeDef* SPIx, uint16_t Data) { }
+inline void DMA_DeInit(DMA_Stream_TypeDef* DMAy_Streamx) { }
+inline void DMA_Init(DMA_Stream_TypeDef* DMAy_Streamx, DMA_InitTypeDef* DMA_InitStruct) { }
+inline void DMA_ITConfig(DMA_Stream_TypeDef* DMAy_Streamx, uint32_t DMA_IT, FunctionalState NewState) { }
+inline void DMA_StructInit(DMA_InitTypeDef* DMA_InitStruct) { }
+inline void DMA_Cmd(DMA_Stream_TypeDef* DMAy_Streamx, FunctionalState NewState) { }
+void DMACopy(void * src, void * dest, unsigned size);
+inline FlagStatus DMA_GetFlagStatus(DMA_Stream_TypeDef* DMAy_Streamx, uint32_t DMA_FLAG) { return RESET; }
+inline ITStatus DMA_GetITStatus(DMA_Stream_TypeDef* DMAy_Streamx, uint32_t DMA_IT) { return RESET; }
+inline void DMA_ClearITPendingBit(DMA_Stream_TypeDef* DMAy_Streamx, uint32_t DMA_IT) { }
+inline void SPI_I2S_DMACmd(SPI_TypeDef* SPIx, uint16_t SPI_I2S_DMAReq, FunctionalState NewState) { }
+inline void UART3_Configure(uint32_t baudrate, uint32_t masterClock) { }
+inline void NVIC_Init(NVIC_InitTypeDef *) { }
 #endif
 
-// inline void delay_01us(uint32_t dummy) { }
-
+inline void delay_01us(int dummy) { }
 #define configure_pins(...)
 
 #if defined(SDCARD) && !defined(SKIP_FATFS_DECLARATION) && !defined(SIMU_DISKIO)
@@ -319,11 +334,6 @@ void simuMain();
   #define TRACE_SIMPGMSPACE   TRACE
 #else
   #define TRACE_SIMPGMSPACE(...)
-#endif
-
-#if defined(HARDWARE_TOUCH)
-  extern struct TouchState simTouchState;
-  extern bool simTouchOccured;
 #endif
 
 #endif // _SIMPGMSPACE_H_

@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -124,20 +123,14 @@ bool redirectToSettingsDirectory(const std::string & path)
       * model (*.bin) files in /MODELS directory
   */
   if (!simuSettingsDirectory.empty()) {
-#if defined(SDCARD_RAW) || defined(SDCARD_YAML)
-    if (path == MODELS_PATH || path == RADIO_PATH) return true;
-  #if !defined(EEPROM_RLC)
-    if (path == RADIO_MODELSLIST_PATH || path == RADIO_SETTINGS_PATH)
+#if defined(COLORLCD)
+    if (path == RADIO_MODELSLIST_PATH || path == RADIO_SETTINGS_PATH) {
       return true;
-    if (startsWith(path, MODELS_PATH) && endsWith(path, MODELS_EXT))
-      return true;
-  #endif
+    }
 #endif
-#if defined(SDCARD_YAML)
-    if (path == MODELSLIST_YAML_PATH || path == RADIO_SETTINGS_YAML_PATH)
+    if (startsWith(path, "/MODELS") && endsWith(path, MODELS_EXT)) {
       return true;
-    if (startsWith(path, MODELS_PATH) && endsWith(path, YAML_EXT)) return true;
-#endif
+    }
   }
   return false;
 }
@@ -157,7 +150,7 @@ std::string convertToSimuPath(const char * path)
   else {
     result = std::string(path);
   }
-  // TRACE_SIMPGMSPACE("convertToSimuPath(): %s -> %s", path, result.c_str());
+  TRACE_SIMPGMSPACE("convertToSimuPath(): %s -> %s", path, result.c_str());
   return result;
 }
 
@@ -176,7 +169,7 @@ std::string convertFromSimuPath(const char * path)
       result = "/" + result;
     }
   }
-  // TRACE_SIMPGMSPACE("convertFromSimuPath(): %s -> %s", path, result.c_str());
+  TRACE_SIMPGMSPACE("convertFromSimuPath(): %s -> %s", path, result.c_str());
   return result;
 }
 
@@ -206,24 +199,24 @@ void splitPath(const std::string & path, std::string & dir, std::string & name)
 
 
 #if !MSVC_BUILD
-bool isFile(const std::string & fullName)
+bool isFile(const std::string & fullName, unsigned int d_type)
 {
-//#if defined(WIN32) || defined(__APPLE__) || defined(__FreeBSD__)
-//  #define REGULAR_FILE DT_REG
-//  #define SYMBOLIC_LINK DT_LNK
-//#else
-//  #define REGULAR_FILE simu::DT_REG
-//  #define SYMBOLIC_LINK simu::DT_LNK
-//#endif
+#if defined(WIN32) || defined(__APPLE__) || defined(__FreeBSD__)
+  #define REGULAR_FILE DT_REG
+  #define SYMBOLIC_LINK DT_LNK
+#else
+  #define REGULAR_FILE simu::DT_REG
+  #define SYMBOLIC_LINK simu::DT_LNK
+#endif
 
-  //if (d_type == REGULAR_FILE) return true;
-  //if (d_type == SYMBOLIC_LINK) {
+  if (d_type == REGULAR_FILE) return true;
+  if (d_type == SYMBOLIC_LINK) {
     struct stat tmp;
     if (stat(fullName.c_str(), &tmp) == 0) {
       // TRACE_SIMPGMSPACE("\tsymlik: %s is %s", fullName.c_str(), (tmp.st_mode & S_IFREG) ? "file" : "other");
       if (tmp.st_mode & S_IFREG) return true;
     }
-  //}
+  }
   return false;
 }
 #endif
@@ -253,7 +246,7 @@ std::vector<std::string> listDirectoryFiles(const std::string & dirName)
     struct simu::dirent * res;
     while ((res = simu::readdir(dir)) != 0) {
       std::string fullName = dirName + "/" + std::string(res->d_name);
-      if (isFile(fullName)) {
+      if (isFile(fullName, res->d_type)) {
         // TRACE_SIMPGMSPACE("listDirectoryFiles(): %s", fullName.c_str());
         result.push_back(fullName);
       }
@@ -266,12 +259,12 @@ std::vector<std::string> listDirectoryFiles(const std::string & dirName)
 
 std::string findTrueFileName(const std::string & path)
 {
-  // TRACE_SIMPGMSPACE("findTrueFileName(%s)", path.c_str());
+  TRACE_SIMPGMSPACE("findTrueFileName(%s)", path.c_str());
   std::string result;
   filemap_t::iterator i = fileMap.find(path);
   if (i != fileMap.end()) {
     result = i->second;
-    // TRACE_SIMPGMSPACE("\tfound in map: %s", result.c_str());
+    TRACE_SIMPGMSPACE("\tfound in map: %s", result.c_str());
     return result;
   }
   else {
@@ -282,7 +275,7 @@ std::string findTrueFileName(const std::string & path)
     std::vector<std::string> files = listDirectoryFiles(dirName);
     for(unsigned int i=0; i<files.size(); ++i) {
       if (!strcasecmp(files[i].c_str(), path.c_str())) {
-        // TRACE_SIMPGMSPACE("\tfound: %s", files[i].c_str());
+        TRACE_SIMPGMSPACE("\tfound: %s", files[i].c_str());
         fileMap.insert(filemap_t::value_type(path, files[i]));
         return files[i];
       }
@@ -419,27 +412,14 @@ FRESULT f_chdir (const TCHAR *name)
   return FR_OK;
 }
 
-struct _simu_DIR
-{
-    std::string name;
-    simu::DIR*  dir;
-
-    _simu_DIR(simu::DIR* dir, const TCHAR* name) :
-        name(name), dir(dir)
-    {}
-};
-
 FRESULT f_opendir (DIR * rep, const TCHAR * name)
 {
   std::string path = convertToSimuPath(name);
-  simu::DIR* dp = simu::opendir(path.c_str());
-  if (dp) {
-    rep->obj.fs = reinterpret_cast<FATFS*>(new _simu_DIR(dp, name));
+  rep->obj.fs = (FATFS *)simu::opendir(path.c_str());
+  if (rep->obj.fs) {
     TRACE_SIMPGMSPACE("f_opendir(%s) = OK", path.c_str());
     return FR_OK;
   }
-
-  rep->obj.fs = nullptr;
   TRACE_SIMPGMSPACE("f_opendir(%s) = error %d (%s)", path.c_str(), errno, strerror(errno));
   return FR_NO_PATH;
 }
@@ -448,10 +428,7 @@ FRESULT f_closedir (DIR * rep)
 {
   TRACE_SIMPGMSPACE("f_closedir(%p)", rep);
   if (rep->obj.fs) {
-    _simu_DIR* sd = reinterpret_cast<_simu_DIR*>(rep->obj.fs);
-    rep->obj.fs = nullptr;
-    simu::closedir(sd->dir);
-    delete sd;
+    simu::closedir((simu::DIR *)rep->obj.fs);
   }
   return FR_OK;
 }
@@ -459,21 +436,32 @@ FRESULT f_closedir (DIR * rep)
 FRESULT f_readdir (DIR * rep, FILINFO * fil)
 {
   simu::dirent * ent;
-  _simu_DIR* sd = reinterpret_cast<_simu_DIR*>(rep->obj.fs);
-
-  if (!sd) return FR_NO_FILE;
-
+  if (!rep->obj.fs) return FR_NO_FILE;
   for(;;) {
-    ent = simu::readdir(sd->dir);
+    ent = simu::readdir((simu::DIR *)rep->obj.fs);
     if (!ent) return FR_NO_FILE;
     if (strcmp(ent->d_name, ".") && strcmp(ent->d_name, "..") ) break;
   }
 
-  memset(fil->fname, 0, FF_MAX_LFN);
+#if defined(WIN32) || !defined(__GNUC__) || defined(__APPLE__) || defined(__FreeBSD__)
+  fil->fattrib = (ent->d_type == DT_DIR ? AM_DIR : 0);
+#else
+  if (ent->d_type == simu::DT_UNKNOWN || ent->d_type == simu::DT_LNK) {
+    fil->fattrib = 0;
+    struct stat buf;
+    if (stat(ent->d_name, &buf) == 0) {
+      fil->fattrib = (S_ISDIR(buf.st_mode) ? AM_DIR : 0);
+    }
+  }
+  else {
+    fil->fattrib = (ent->d_type == simu::DT_DIR ? AM_DIR : 0);
+  }
+#endif
+
+  memset(fil->fname, 0, _MAX_LFN);
   strcpy(fil->fname, ent->d_name);
   // TRACE_SIMPGMSPACE("f_readdir(): %s", fil->fname);
-  std::string fullName = sd->name + std::string("/") + std::string(ent->d_name);
-  return f_stat(fullName.c_str(), fil);
+  return FR_OK;
 }
 
 FRESULT f_mkfs (const TCHAR* path, BYTE opt, DWORD au, void* work, UINT len)

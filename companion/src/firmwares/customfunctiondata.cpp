@@ -84,7 +84,7 @@ QString CustomFunctionData::funcToString(const AssignFunc func, const ModelData 
   else if (func == FuncReset)
     return tr("Reset");
   else if (func >= FuncSetTimer1 && func <= FuncSetTimerLast)
-    return tr("Set %1").arg(RawSource(SOURCE_TYPE_SPECIAL, SOURCE_TYPE_SPECIAL_FIRST_TIMER + func - FuncSetTimer1).toString(model));
+    return tr("Set %1").arg(RawSource(SOURCE_TYPE_SPECIAL, SOURCE_TYPE_SPECIAL_TIMER1_IDX + func - FuncSetTimer1).toString(model));
   else if (func == FuncVario)
     return tr("Vario");
   else if (func == FuncPlayPrompt)
@@ -119,10 +119,6 @@ QString CustomFunctionData::funcToString(const AssignFunc func, const ModelData 
     return tr("Bind Int. Module");
   else if (func == FuncBindExternalModule)
     return tr("Bind Ext. Module");
-  else if (func == FuncRacingMode)
-    return tr("Racing Mode");
-  else if (func == FuncDisableTouch)
-    return tr("Disable Touch");
   else {
     return QString(CPN_STR_UNKNOWN_ITEM);
   }
@@ -222,8 +218,7 @@ bool CustomFunctionData::isFuncAvailable(const int index)
         ((index >= FuncSetTimer1 && index <= FuncSetTimerLast) && index > FuncSetTimer1 + fw->getCapability(Timers)) ||
         ((index == FuncScreenshot) && !IS_HORUS_OR_TARANIS(fw->getBoard())) ||
         ((index >= FuncRangeCheckInternalModule && index <= FuncBindExternalModule) && !fw->getCapability(DangerousFunctions)) ||
-        ((index >= FuncAdjustGV1 && index <= FuncAdjustGVLast) && !fw->getCapability(Gvars)) ||
-		((index == FuncDisableTouch) && !IS_HORUS_OR_TARANIS(fw->getBoard()))
+        ((index >= FuncAdjustGV1 && index <= FuncAdjustGVLast) && !fw->getCapability(Gvars))
         );
   return !ret;
 }
@@ -249,7 +244,7 @@ QString CustomFunctionData::resetToString(const int value, const ModelData * mod
 
   if (value < step) {
     if (value < firmware->getCapability(Timers))
-      return RawSource(SOURCE_TYPE_SPECIAL, value + SOURCE_TYPE_SPECIAL_FIRST_TIMER).toString(model);
+      return RawSource(SOURCE_TYPE_SPECIAL, value + SOURCE_TYPE_SPECIAL_TIMER1_IDX).toString(model);
     else
       return QString(CPN_STR_UNKNOWN_ITEM);
   }

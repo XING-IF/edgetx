@@ -4,13 +4,13 @@
   * @author    MCD Application Team
   * @version   V1.3.0
   * @date      08-November-2013
-  * @brief     STM32F42xxx/43xxx Devices vector table for RIDE7 toolchain.
+  * @brief     STM32F42xxx/43xxx Devices vector table for RIDE7 toolchain.          
   *            This module performs:
   *                - Set the initial SP
   *                - Set the initial PC == Reset_Handler,
   *                - Set the vector table entries with the exceptions ISR address
   *                - Configure the clock system and the external SRAM mounted on 
-  *                  STM32F4xG-EVAL board to be used as data memory (optional,
+  *                  STM32F4xG-EVAL board to be used as data memory (optional, 
   *                  to be enabled by user)
   *                - Branches to main in the C library (which eventually
   *                  calls main()).

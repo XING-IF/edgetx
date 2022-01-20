@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -28,7 +27,6 @@
 
 #define SWAP_DEFINED
 #include "opentx.h"
-#include "model_init.h"
 
 #define CHANNEL_MAX (1024*256)
 
@@ -42,7 +40,7 @@ extern const char * nchar2string(const char * string, int size);
 #define EXPECT_ZSTREQ(c_string, z_string)   EXPECT_STREQ(c_string, zchar2string(z_string, sizeof(z_string)))
 #define EXPECT_STRNEQ(c_string, n_string)   EXPECT_STREQ(c_string, nchar2string(n_string, sizeof(n_string)))
 
-#if defined(PCBFRSKY)
+#if defined(PCBTARANIS) || defined(PCBHORUS)
 #define RADIO_RESET() \
   g_eeGeneral.switchConfig = 0x00007bff
 #else
@@ -106,7 +104,7 @@ class OpenTxTest : public testing::Test
       SYSTEM_RESET();
       MODEL_RESET();
       MIXER_RESET();
-      setModelDefaults();
+      modelDefault(0);
       RADIO_RESET();
     }
 };

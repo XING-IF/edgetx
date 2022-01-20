@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -123,7 +122,7 @@ extern "C" void BT_USART_IRQHandler(void)
     USART_ClearITPendingBit(BT_USART, USART_IT_RXNE);
     uint8_t byte = USART_ReceiveData(BT_USART);
     btRxFifo.push(byte);
-    BLUETOOTH_TRACE_VERBOSE("BT %02X" CRLF, byte);
+    TRACE("BT %02X", byte);
 #if defined(BLUETOOTH_PROBE)
     if (!btChipPresent) {
       // This is to differentiate X7 and X7S and X-Lite with/without BT

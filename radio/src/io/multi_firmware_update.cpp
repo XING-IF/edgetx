@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -21,25 +20,10 @@
 
 #if !defined(DISABLE_MULTI_UPDATE)
 
-#include <stdio.h>
 #include "opentx.h"
 #include "multi_firmware_update.h"
 #include "stk500.h"
 #include "debug.h"
-
-#if defined(LIBOPENUI)
-  #include "libopenui.h"
-#else
-  #include "libopenui/src/libopenui_file.h"
-#endif
-
-#if defined(MULTI_PROTOLIST)
-  #include "io/multi_protolist.h"
-#endif
-
-#if defined(INTMODULE_USART)
-#include "intmodule_serial_driver.h"
-#endif
 
 #define UPDATE_MULTI_EXT_BIN ".bin"
 
@@ -47,7 +31,7 @@ class MultiFirmwareUpdateDriver
 {
   public:
     MultiFirmwareUpdateDriver() {}
-    const char * flashFirmware(FIL * file, const char * label, ProgressHandler progressHandler) const;
+    const char * flashFirmware(FIL * file, const char * label) const;
 
   protected:
     virtual void moduleOn() const = 0;
@@ -81,10 +65,7 @@ class MultiInternalUpdateDriver: public MultiFirmwareUpdateDriver
 
     void init(bool inverted) const override
     {
-      etx_serial_init params;
-      params.baudrate = 57600;
-      params.rx_enable = true;
-      intmoduleSerialStart(&params);
+      intmoduleSerialStart(57600, true, USART_Parity_No, USART_StopBits_1, USART_WordLength_8b);
     }
 
     bool getByte(uint8_t & byte) const override
@@ -286,7 +267,7 @@ const char * MultiFirmwareUpdateDriver::waitForInitialSync(bool & inverted) cons
   // in case the receiver is too slow changing
   // to RX mode (half-duplex).
   RTOS_WAIT_TICKS(1);
-
+  
   return nullptr;
 }
 
@@ -370,17 +351,8 @@ void MultiFirmwareUpdateDriver::leaveProgMode(bool inverted) const
   deinit(inverted);
 }
 
-const char * MultiFirmwareUpdateDriver::flashFirmware(FIL * file, const char * label, ProgressHandler progressHandler) const
+const char * MultiFirmwareUpdateDriver::flashFirmware(FIL * file, const char * label) const
 {
-#if defined(SIMU)
-  for (uint16_t i = 0; i < 100; i++) {
-    progressHandler(label, STR_WRITING, i, 100);
-    if (SIMU_SLEEP_OR_EXIT_MS(30))
-      break;
-  }
-  return nullptr;
-#endif
-
   const char * result = nullptr;
   moduleOn();
 
@@ -419,7 +391,8 @@ const char * MultiFirmwareUpdateDriver::flashFirmware(FIL * file, const char * l
   }
 
   while (!f_eof(file)) {
-    progressHandler(label, STR_WRITING, file->fptr, file->obj.objsize);
+
+    drawProgressScreen(label, STR_WRITING, file->fptr, file->obj.objsize);
 
     UINT count = 0;
     memclear(buffer, pageSize);
@@ -447,7 +420,7 @@ const char * MultiFirmwareUpdateDriver::flashFirmware(FIL * file, const char * l
   }
 
   if (f_eof(file)) {
-    progressHandler(label, STR_WRITING, file->fptr, file->obj.objsize);
+    drawProgressScreen(label, STR_WRITING, file->fptr, file->obj.objsize);
   }
 
   leaveProgMode(inverted);
@@ -567,7 +540,7 @@ const char * MultiFirmwareInformation::readMultiFirmwareInformation(FIL * file)
   return readV1Signature(buffer);
 }
 
-bool MultiDeviceFirmwareUpdate::flashFirmware(const char * filename, ProgressHandler progressHandler)
+bool multiFlashFirmware(uint8_t moduleIdx, const char * filename, MultiModuleType type)
 {
   FIL file;
 
@@ -585,17 +558,19 @@ bool MultiDeviceFirmwareUpdate::flashFirmware(const char * filename, ProgressHan
     }
     f_lseek(&file, 0);
 
-    if (module == EXTERNAL_MODULE) {
+    if (moduleIdx == EXTERNAL_MODULE) {
       if (!firmwareFile.isMultiExternalFirmware()) {
         f_close(&file);
-        POPUP_WARNING(STR_NEEDS_FILE, STR_EXT_MULTI_SPEC);
+        POPUP_WARNING(STR_NEEDS_FILE);
+        SET_WARNING_INFO(STR_EXT_MULTI_SPEC, strlen(STR_EXT_MULTI_SPEC), 0);
         return false;
       }
     }
     else {
       if (!firmwareFile.isMultiInternalFirmware()) {
         f_close(&file);
-        POPUP_WARNING(STR_NEEDS_FILE, STR_INT_MULTI_SPEC);
+        POPUP_WARNING(STR_NEEDS_FILE);
+        SET_WARNING_INFO(STR_INT_MULTI_SPEC, strlen(STR_INT_MULTI_SPEC), 0);
         return false;
       }
     }
@@ -603,7 +578,7 @@ bool MultiDeviceFirmwareUpdate::flashFirmware(const char * filename, ProgressHan
 
   const MultiFirmwareUpdateDriver * driver = &multiExternalUpdateDriver;
 #if defined(INTERNAL_MODULE_MULTI)
-  if (module == INTERNAL_MODULE)
+  if (moduleIdx == INTERNAL_MODULE)
     driver = &multiInternalUpdateDriver;
 #endif
   if (type == MULTI_TYPE_ELRS)
@@ -621,22 +596,28 @@ bool MultiDeviceFirmwareUpdate::flashFirmware(const char * filename, ProgressHan
   EXTERNAL_MODULE_OFF();
 #endif
 
-#if defined(SPORT_UPDATE_PWR_GPIO)
   uint8_t spuPwr = IS_SPORT_UPDATE_POWER_ON();
   SPORT_UPDATE_POWER_OFF();
-#endif
 
-  progressHandler(getBasename(filename), STR_DEVICE_RESET, 0, 0);
+  drawProgressScreen(getBasename(filename), STR_DEVICE_RESET, 0, 0);
 
   /* wait 2s off */
   watchdogSuspend(500 /*5s*/);
   RTOS_WAIT_MS(3000);
 
-  const char * result = driver->flashFirmware(&file, getBasename(filename), progressHandler);
+  const char * result = driver->flashFirmware(&file, getBasename(filename));
   f_close(&file);
 
   AUDIO_PLAY(AU_SPECIAL_SOUND_BEEP1);
   BACKLIGHT_ENABLE();
+
+  if (result) {
+    POPUP_WARNING(STR_FIRMWARE_UPDATE_ERROR);
+    SET_WARNING_INFO(result, strlen(result), 0);
+  }
+  else {
+    POPUP_INFORMATION(STR_FIRMWARE_UPDATE_SUCCESS);
+  }
 
 #if defined(HARDWARE_INTERNAL_MODULE)
   INTERNAL_MODULE_OFF();
@@ -648,21 +629,11 @@ bool MultiDeviceFirmwareUpdate::flashFirmware(const char * filename, ProgressHan
   watchdogSuspend(500 /*5s*/);
   RTOS_WAIT_MS(2000);
 
-  if (result) {
-    POPUP_WARNING(STR_FIRMWARE_UPDATE_ERROR, result);
-  }
-  else {
-    POPUP_INFORMATION(STR_FIRMWARE_UPDATE_SUCCESS);
-  }
-
   // reset telemetry protocol
   telemetryInit(255);
 
 #if defined(HARDWARE_INTERNAL_MODULE)
   if (intPwr) {
-#if defined(MULTI_PROTOLIST)
-    MultiRfProtocols::removeInstance(INTERNAL_MODULE);
-#endif
     INTERNAL_MODULE_ON();
     setupPulsesInternalModule();
   }
@@ -670,19 +641,14 @@ bool MultiDeviceFirmwareUpdate::flashFirmware(const char * filename, ProgressHan
 
 #if defined(HARDWARE_EXTERNAL_MODULE)
   if (extPwr) {
-#if defined(MULTI_PROTOLIST)
-    MultiRfProtocols::removeInstance(EXTERNAL_MODULE);
-#endif
     EXTERNAL_MODULE_ON();
     setupPulsesExternalModule();
   }
 #endif
 
-#if defined(SPORT_UPDATE_PWR_GPIO)
   if (spuPwr) {
     SPORT_UPDATE_POWER_ON();
   }
-#endif
 
   resumePulses();
 

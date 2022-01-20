@@ -136,13 +136,18 @@ bool TreeItem::isModel() const
 
 TreeModel::TreeModel(RadioData * radioData, QObject * parent):
   QAbstractItemModel(parent),
-  radioData(radioData)
+  radioData(radioData),
+  availableEEpromSize(-1)
 {
+  Board::Type board = getCurrentBoard();
   hasCategories = getCurrentFirmware()->getCapability(Capability::HasModelCategories);
   QVector<QVariant> labels;
   if (!hasCategories)
     labels << tr("Index");
   labels << tr("Name");
+  if (!(IS_FAMILY_HORUS_OR_T16(board) || IS_SKY9X(board))) {
+    labels << tr("Size");
+  }
   labels << tr("RX #");
   rootItem = new TreeItem(labels);
   // uniqueId and version for drag/drop operations (see encodeHeaderData())
@@ -553,7 +558,7 @@ TreeItem * TreeModel::getItem(const QModelIndex & index) const
 // recursive
 QModelIndex TreeModel::getIndexForModel(const int modelIndex, QModelIndex parent)
 {
-  for (int i = 0; i < rowCount(parent); ++i) {
+  for (int i=0; i < rowCount(parent); ++i) {
     QModelIndex idx = index(i, 0, parent);
     if (hasChildren(idx) && (idx = getIndexForModel(modelIndex, idx)).isValid())
       return idx;
@@ -565,11 +570,16 @@ QModelIndex TreeModel::getIndexForModel(const int modelIndex, QModelIndex parent
 
 QModelIndex TreeModel::getIndexForCategory(const int categoryIndex)
 {
-  for (int i = 0; i < rowCount(); ++i) {
+  for (int i=0; i < rowCount(); ++i) {
     if (getItem(index(i, 0))->getCategoryIndex() == categoryIndex)
       return index(i, 0);
   }
   return QModelIndex();
+}
+
+int TreeModel::getAvailableEEpromSize()
+{
+  return availableEEpromSize;
 }
 
 int TreeModel::getModelIndex(const QModelIndex & index) const
@@ -638,7 +648,15 @@ void TreeModel::onRowsRemoved(const QModelIndex & parent, int first, int last)
 
 void TreeModel::refresh()
 {
+  EEPROMInterface * eepromInterface = getCurrentEEpromInterface();
+  Board::Type board = eepromInterface->getBoard();
   TreeItem * defaultCategoryItem = NULL;
+  bool hasEepromSizeData = (IS_FAMILY_HORUS_OR_T16(board) ? false : true);
+
+  if (hasEepromSizeData) {
+    availableEEpromSize = Boards::getEEpromSize(board) - 64; // let's consider fat
+    availableEEpromSize -= 16 * ((eepromInterface->getSize(radioData->generalSettings) + 14) / 15);
+  }
 
   this->blockSignals(true);  // make sure onRowsRemoved is not triggered
   removeRows(0, rowCount());
@@ -651,7 +669,7 @@ void TreeModel::refresh()
     }
   }
 
-  for (unsigned i = 0; i < radioData->models.size(); i++) {
+  for (unsigned i=0; i<radioData->models.size(); i++) {
     ModelData & model = radioData->models[i];
     int currentColumn = 0;
     TreeItem * current = NULL;
@@ -671,7 +689,6 @@ void TreeModel::refresh()
             defaultCategoryItem = rootItem->appendChild(0, -1);
             /*: Translators do NOT use accent for this, this is the default category name on Horus. */
             defaultCategoryItem->setData(0, tr("Models"));
-            radioData->categories.push_back(qPrintable(tr("Models")));
           }
           categoryItem = defaultCategoryItem;
         }
@@ -693,7 +710,16 @@ void TreeModel::refresh()
         modelName = tr("Model %1").arg(uint(i+1), 2, 10, QChar('0'));
       }
       current->setData(currentColumn++, modelName);
-
+      if (hasEepromSizeData) {
+        int size = eepromInterface->getSize(model);
+        current->setData(currentColumn++, QString().sprintf("%5d", size));
+        size = 16 * ((size + 14) / 15);
+        availableEEpromSize -= size;
+        if (i == radioData->generalSettings.currModelIndex) {
+          // Because we need this space for a TEMP model each time we have to write it again
+          availableEEpromSize -= size;
+        }
+      }
       int protocol;
       QString rxs;
       unsigned moduleIdx = 0;
@@ -716,6 +742,10 @@ void TreeModel::refresh()
       current->setData(currentColumn++, rxs);
     }
   }
+
+  if (hasEepromSizeData) {
+    availableEEpromSize = (availableEEpromSize / 16) * 15;
+  }
 }
 
 bool TreeModel::isModelIdUnique(unsigned modelIdx, unsigned module, unsigned protocol)
@@ -723,7 +753,7 @@ bool TreeModel::isModelIdUnique(unsigned modelIdx, unsigned module, unsigned pro
   int cnt = 0;
   if (protocol== PULSES_PXX_XJT_D8)
     return true;
-
+  
   for (auto const& model: radioData->models) {
     if (!model.isEmpty()) {
       const ModuleData& moduleData = model.moduleData[module];

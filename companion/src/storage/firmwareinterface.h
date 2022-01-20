@@ -36,13 +36,10 @@
 #define ERSKY9X_SPE "SPE"
 #define ERSKY9X_OFFSET (7)
 
-// 3kB - width and height bytes
-#define RLE_SPLASH_MAX_SIZE (3070)
-
 class FirmwareInterface
 {
   public:
-    FirmwareInterface(const QString & filename, QDialog* parentDialog = nullptr);
+    FirmwareInterface(const QString & filename);
     inline QString getDate() { return date; }
     inline QString getTime() { return time; }
     int getSize() { return flashSize; }
@@ -62,7 +59,6 @@ class FirmwareInterface
     bool isValid();
 
   private:
-    QDialog* parentDialog;
     QByteArray flash;
     uint flashSize;
     QString seekString(const QString & string);

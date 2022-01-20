@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -29,8 +28,6 @@
 #include "audio_driver.h"
 #include "../opentx_constants.h"
 
-#define CPU_FREQ                       36000000
-
 extern uint16_t ResetReason;
 
 #define BOOTLOADER_SIZE                0x8000
@@ -56,10 +53,6 @@ void rotaryEncoderEnd();
 #define NUM_SWITCHES                   7
 #define STORAGE_NUM_SWITCHES           NUM_SWITCHES
 #define NUM_SWITCHES_POSITIONS         9
-
-#if !defined(NUM_FUNCTIONS_SWITCHES)
-#define NUM_FUNCTIONS_SWITCHES          0
-#endif
 
 enum EnumKeys
 {
@@ -219,11 +212,9 @@ void calcConsumption();
 
 // Trainer driver
 #define SLAVE_MODE()                   (pwrCheck() == e_power_trainer)
+#define TRAINER_CONNECTED()            (PIOA->PIO_PDSR & PIO_PA8)
 void init_trainer_capture();
 void stop_trainer_capture();
-#define TRAINER_DETECT_GPIO             PIOA
-#define TRAINER_DETECT_GPIO_PIN         PIO_PA8
-#define TRAINER_CONNECTED()            (TRAINER_DETECT_GPIO->PIO_PDSR & TRAINER_DETECT_GPIO_PIN)
 
 // Write Flash driver
 #define FLASH_PAGESIZE                 256
@@ -356,12 +347,12 @@ void coprocReadData(bool onlytemp=false);
 extern int8_t volumeRequired;
 
 #if defined(COPROCESSOR)
-typedef struct  {
+struct CoprocData {
   uint8_t read;
   int8_t valid;
   int8_t temp;
   int8_t maxtemp;
-} CoprocData;
+};
 
 extern CoprocData coprocData;
 #endif

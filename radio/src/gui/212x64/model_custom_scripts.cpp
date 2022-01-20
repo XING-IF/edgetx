@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -26,7 +25,7 @@ void onModelCustomScriptMenu(const char *result)
   ScriptData &sd = g_model.scriptsData[s_currIdx];
 
   if (result == STR_UPDATE_LIST) {
-    if (!sdListFiles(SCRIPTS_MIXES_PATH, SCRIPTS_EXT, sizeof(sd.file), nullptr)) {
+    if (!sdListFiles(SCRIPTS_MIXES_PATH, SCRIPTS_EXT, sizeof(sd.file), NULL)) {
       POPUP_WARNING(STR_NO_SCRIPTS_ON_SD);
     }
   }
@@ -55,8 +54,6 @@ void menuModelCustomScriptOne(event_t event)
   drawStringWithIndex(PSIZE(TR_MENUCUSTOMSCRIPTS)*FW+FW, 0, "LUA", s_currIdx+1, 0);
   lcdDrawFilledRect(0, 0, LCD_W, FH, SOLID, FILL_WHITE|GREY_DEFAULT);
 
-  uint8_t old_editMode = s_editMode;
-
   SUBMENU(STR_MENUCUSTOMSCRIPTS, 3+scriptInputsOutputs[s_currIdx].inputsCount, { 0, 0, LABEL(inputs), 0/*repeated*/ });
 
   int8_t sub = menuVerticalPosition;
@@ -84,12 +81,12 @@ void menuModelCustomScriptOne(event_t event)
     }
     else if (i == ITEM_MODEL_CUSTOMSCRIPT_NAME) {
       lcdDrawTextAlignedLeft(y, TR_NAME);
-      editName(SCRIPT_ONE_2ND_COLUMN_POS, y, sd.name, sizeof(sd.name), event,
-               (attr != 0), attr, old_editMode);
-    } else if (i == ITEM_MODEL_CUSTOMSCRIPT_PARAMS_LABEL) {
+      editName(SCRIPT_ONE_2ND_COLUMN_POS, y, sd.name, sizeof(sd.name), event, attr);
+    }
+    else if (i == ITEM_MODEL_CUSTOMSCRIPT_PARAMS_LABEL) {
       lcdDrawTextAlignedLeft(y, STR_INPUTS);
-    } else if (i <= ITEM_MODEL_CUSTOMSCRIPT_PARAMS_LABEL +
-                        scriptInputsOutputs[s_currIdx].inputsCount) {
+    }
+    else if (i <= ITEM_MODEL_CUSTOMSCRIPT_PARAMS_LABEL+scriptInputsOutputs[s_currIdx].inputsCount) {
       int inputIdx = i-ITEM_MODEL_CUSTOMSCRIPT_PARAMS_LABEL-1;
       lcdDrawSizedText(INDENT_WIDTH, y, scriptInputsOutputs[s_currIdx].inputs[inputIdx].name, 10, 0);
       if (scriptInputsOutputs[s_currIdx].inputs[inputIdx].type == INPUT_TYPE_VALUE) {
@@ -150,6 +147,9 @@ void menuModelCustomScripts(event_t event)
       switch (scriptInternalData[scriptIndex].state) {
         case SCRIPT_SYNTAX_ERROR:
           lcdDrawText(30*FW+2, y, "(error)");
+          break;
+        case SCRIPT_KILLED:
+          lcdDrawText(29*FW+2, y, "(killed)");
           break;
         default:
           lcdDrawNumber(34*FW, y, luaGetCpuUsed(scriptIndex), RIGHT);

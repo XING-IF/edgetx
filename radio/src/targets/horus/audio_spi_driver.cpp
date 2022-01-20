@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -133,12 +132,6 @@ void audioSpiInit(void)
 
   SPI_I2S_ClearFlag(AUDIO_SPI, SPI_I2S_FLAG_RXNE);
   SPI_I2S_ClearFlag(AUDIO_SPI, SPI_I2S_FLAG_TXE);
-}
-
-void audioWaitReady()
-{
-  // The audio amp needs ~2s to start
-  RTOS_WAIT_MS(2000); // 2s
 }
 
 void audioSpiSetSpeed(uint8_t speed)

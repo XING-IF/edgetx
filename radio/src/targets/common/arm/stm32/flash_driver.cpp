@@ -1,9 +1,8 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
- *   th9x - http://code.google.com/p/th9x
+ *   th9x - http://code.google.com/p/th9x 
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
  *
@@ -168,11 +167,11 @@ uint32_t isFirmwareStart(const uint8_t * buffer)
     return 0;
   }
   // First ISR pointer in FLASH
-  if ((block[1] & 0xFFC00000) != 0x08000000) {//for nv14 firmware may start up to 0x81F ....
+  if ((block[1] & 0xFFF00000) != 0x08000000) {
     return 0;
   }
   // Second ISR pointer in FLASH
-  if ((block[2] & 0xFFC00000) != 0x08000000) {
+  if ((block[2] & 0xFFF00000) != 0x08000000) {
     return 0;
   }
 #else

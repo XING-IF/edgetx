@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -32,7 +31,7 @@ TEST_F(SpecialFunctionsTest, SwitchFiledSize)
   EXPECT_EQ(g_model.customFn[0].swtch, -SWSRC_LAST) << "CustomFunctionData.swtch member is too small to hold all possible values";
 }
 
-#if defined(PCBFRSKY)
+#if defined(PCBTARANIS) || defined(PCBHORUS)
 TEST_F(SpecialFunctionsTest, FlightReset)
 {
   g_model.customFn[0].swtch = SWSRC_SA0;
@@ -115,5 +114,5 @@ TEST_F(SpecialFunctionsTest, GvarsInc)
 }
 #endif // #if defined(GVARS)
 
-#endif // #if defined(PCBFRSKY)
+#endif // #if defined(PCBTARANIS) || defined(PCBHORUS)
 

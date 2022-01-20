@@ -355,7 +355,7 @@ void MixesPanel::mixersDuplicate()
 void MixesPanel::mixerOpen()
 {
   QListWidgetItem *item = mixersListWidget->currentItem();
-  if (item == nullptr)
+  if (item == nullptr) 
     return;
 
   int idx = item->data(Qt::UserRole).toByteArray().at(0);
@@ -376,7 +376,7 @@ void MixesPanel::mixerOpen()
 void MixesPanel::mixerHighlight()
 {
   QListWidgetItem *item = mixersListWidget->currentItem();
-  if (item == nullptr)
+  if (item == nullptr) 
     return;
 
   int idx = item->data(Qt::UserRole).toByteArray().at(0);
@@ -389,7 +389,10 @@ void MixesPanel::mixerHighlight()
   }
   highlightedSource = ( (int)highlightedSource ==  dest) ? 0 : dest;
   // qDebug() << "MixesPanel::mixerHighlight(): " << highlightedSource ;
-  update();
+  for(int i=0; i<mixersListWidget->count(); i++) {
+    int t = mixersListWidget->item(i)->data(Qt::UserRole).toByteArray().at(0);
+    mixersListWidget->item(i)->setText(getMixerText(t, 0));
+  }
 }
 
 void MixesPanel::mixerAdd()

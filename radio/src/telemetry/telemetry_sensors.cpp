@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -22,12 +21,6 @@
 #include "opentx.h"
 #define _USE_MATH_DEFINES
 #include <math.h>
-
-#if defined(LIBOPENUI)
-  #include "libopenui.h"
-#endif
-
-#include "telemetry/flysky_nv14.h"
 
 TelemetryItem telemetryItems[MAX_TELEMETRY_SENSORS];
 uint8_t allowNewSensors;
@@ -513,17 +506,11 @@ int setTelemetryValue(TelemetryProtocol protocol, uint16_t id, uint8_t subId, ui
   bool sensorFound = false;
 
   for (int index = 0; index < MAX_TELEMETRY_SENSORS; index++) {
-    TelemetrySensor &telemetrySensor = g_model.telemetrySensors[index];
-
-    if (telemetrySensor.type == TELEM_TYPE_CUSTOM && telemetrySensor.id == id &&
-        telemetrySensor.subId == subId &&
-        (telemetrySensor.isSameInstance(protocol, instance) ||
-         g_model.ignoreSensorIds)) {
-
+    TelemetrySensor & telemetrySensor = g_model.telemetrySensors[index];
+    if (telemetrySensor.type == TELEM_TYPE_CUSTOM && telemetrySensor.id == id && telemetrySensor.subId == subId && (telemetrySensor.isSameInstance(protocol, instance) || g_model.ignoreSensorIds)) {
       telemetryItems[index].setValue(telemetrySensor, value, unit, prec);
       sensorFound = true;
-      // we continue search here, because sensors can share the same id and
-      // instance
+      // we continue search here, because sensors can share the same id and instance
     }
   }
 
@@ -554,15 +541,9 @@ int setTelemetryValue(TelemetryProtocol protocol, uint16_t id, uint8_t subId, ui
         break;
 #endif
 
-#if defined(MULTIMODULE) || defined(AFHDS3) || defined(AFHDS2)
+#if defined(MULTIMODULE) || defined(AFHDS3)
       case PROTOCOL_TELEMETRY_FLYSKY_IBUS:
-        flySkySetDefault(index, id, subId, instance);
-        break;
-#endif
-
-#if defined(AFHDS2)
-      case PROTOCOL_TELEMETRY_FLYSKY_NV14:
-        flySkyNv14SetDefault(index, id, subId, instance);
+        flySkySetDefault(index,id, subId, instance);
         break;
 #endif
 
@@ -629,11 +610,11 @@ void TelemetrySensor::init(const char * label, uint8_t unit, uint8_t prec)
 
 void TelemetrySensor::init(uint16_t id)
 {
-  char label[TELEM_LABEL_LEN]; // 4
-  label[0] = hex2char((id & 0xf000) >> 12);
-  label[1] = hex2char((id & 0x0f00) >> 8);
-  label[2] = hex2char((id & 0x00f0) >> 4);
-  label[3] = hex2char((id & 0x000f) >> 0);
+  char label[4];
+  label[0] = hex2zchar((id & 0xf000) >> 12);
+  label[1] = hex2zchar((id & 0x0f00) >> 8);
+  label[2] = hex2zchar((id & 0x00f0) >> 4);
+  label[3] = hex2zchar((id & 0x000f) >> 0);
   init(label);
 }
 

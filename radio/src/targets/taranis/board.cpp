@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -20,9 +19,6 @@
  */
 
 #include "opentx.h"
-
-#include "hal/adc_driver.h"
-#include "stm32_hal_adc.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -85,7 +81,7 @@ void boardInit()
                          AUDIO_RCC_AHB1Periph |
                          BACKLIGHT_RCC_AHB1Periph |
                          ADC_RCC_AHB1Periph |
-                         I2C_B1_RCC_AHB1Periph |
+                         I2C_RCC_AHB1Periph |
                          SD_RCC_AHB1Periph |
                          HAPTIC_RCC_AHB1Periph |
                          INTMODULE_RCC_AHB1Periph |
@@ -96,7 +92,7 @@ void boardInit()
                          TRAINER_RCC_AHB1Periph |
                          TRAINER_MODULE_RCC_AHB1Periph |
                          BT_RCC_AHB1Periph |
-                         I2C_B2_RCC_AHB1Periph |
+                         GYRO_RCC_AHB1Periph |
                          USB_CHARGER_RCC_AHB1Periph,
                          ENABLE);
 
@@ -108,7 +104,7 @@ void boardInit()
                          HAPTIC_RCC_APB1Periph |
                          INTERRUPT_xMS_RCC_APB1Periph |
                          TIMER_2MHz_RCC_APB1Periph |
-                         I2C_B1_RCC_APB1Periph |
+                         I2C_RCC_APB1Periph |
                          SD_RCC_APB1Periph |
                          TRAINER_RCC_APB1Periph |
                          TELEMETRY_RCC_APB1Periph |
@@ -117,7 +113,7 @@ void boardInit()
                          TRAINER_MODULE_RCC_APB1Periph |
                          MIXER_SCHEDULER_TIMER_RCC_APB1Periph |
                          BT_RCC_APB1Periph |
-                         I2C_B2_RCC_APB1Periph,
+                         GYRO_RCC_APB1Periph,
                          ENABLE);
 
   RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG |
@@ -163,12 +159,11 @@ void boardInit()
   }
 #endif
 
-  if (!adcInit(&stm32_hal_adc_driver))
-      TRACE("adcInit failed");
+  adcInit();
   lcdInit(); // delaysInit() must be called before
   audioInit();
   init2MhzTimer();
-  init1msTimer();
+  init5msTimer();
   __enable_irq();
   i2cInit();
   usbInit();
@@ -226,10 +221,6 @@ void boardInit()
 #endif
 
   backlightInit();
-
-#if defined(GUI)
-  lcdSetContrast(true);
-#endif
 }
 
 void boardOff()
@@ -284,23 +275,15 @@ void boardOff()
   #define BATTERY_DIVIDER 22830
 #elif defined (RADIO_T8)
   #define BATTERY_DIVIDER 50000
-#elif defined (RADIO_ZORRO)
-  #define BATTERY_DIVIDER 23711 // = 2047*128*BATT_SCALE/(100*(VREF*(160+499)/160))
 #else
   #define BATTERY_DIVIDER 26214
 #endif 
-
-#if defined(RADIO_ZORRO)
-  #define VOLTAGE_DROP 45
-#else
-  #define VOLTAGE_DROP 20
-#endif
 
 uint16_t getBatteryVoltage()
 {
   int32_t instant_vbat = anaIn(TX_VOLTAGE); // using filtered ADC value on purpose
   instant_vbat = (instant_vbat * BATT_SCALE * (128 + g_eeGeneral.txVoltageCalibration) ) / BATTERY_DIVIDER;
-  instant_vbat += VOLTAGE_DROP; // add voltage drop because of the diode TODO check if this is needed, but removal will break existing calibrations!
+  instant_vbat += 20; // add 0.2V because of the diode TODO check if this is needed, but removal will break existing calibrations!
   return (uint16_t)instant_vbat;
 }
 

@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -45,43 +44,32 @@ extern tmr10ms_t rambackupDirtyTime10ms;
 #define TIME_TO_BACKUP_RAM()            (rambackupDirtyMsk && (tmr10ms_t)(get_tmr10ms() - rambackupDirtyTime10ms) >= (tmr10ms_t)100)
 #endif
 
-//
-// Generic storage interface
-//
 void storageEraseAll(bool warn);
 void storageFormat();
 void storageReadAll();
-void storageCheck(bool immediately);
-
-//
-// Generic storage functions (implemented in storage_common.cpp)
-//
 void storageDirty(uint8_t msk);
+void storageCheck(bool immediately);
 void storageFlushCurrentModel();
 void postRadioSettingsLoad();
 void preModelLoad();
 void postModelLoad(bool alarms);
 void checkExternalAntenna();
 
-#if !defined(STORAGE_MODELSLIST)
-extern ModelHeader modelHeaders[MAX_MODELS];
-
-void loadModelHeader(uint8_t id, ModelHeader *header);
-void loadModelHeaders();
-
-uint8_t findNextUnusedModelId(uint8_t index, uint8_t module);
-#endif
-
-#if defined(EEPROM)
+#if defined(EEPROM_RLC)
 #include "eeprom_common.h"
-#endif
-
-#if defined(SDCARD_RAW) || defined(SDCARD_YAML)
-#include "sdcard_common.h"
+#include "eeprom_rlc.h"
+#elif defined(EEPROM)
+#include "eeprom_common.h"
+#include "eeprom_raw.h"
+#elif defined(SDCARD)
+#include "sdcard_raw.h"
 #endif
 
 #if defined(RTC_BACKUP_RAM)
-#include "rtc_backup.h"
+void rambackupWrite();
+bool rambackupRestore();
+unsigned int compress(uint8_t * dst, unsigned int dstsize, const uint8_t * src, unsigned int len);
+unsigned int uncompress(uint8_t * dst, unsigned int dstsize, const uint8_t * src, unsigned int len);
 #endif
 
 #endif // _STORAGE_H_

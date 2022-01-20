@@ -40,7 +40,7 @@ enum LCDFormat {LCD9X, LCDTARANIS};
 class Side
 {
 public:
-  Side(QDialog* parent);
+  Side();
   void markSourceButton();
   void copyImage( Side );
   bool displayImage( QString fileName, Source source );
@@ -59,7 +59,6 @@ public:
   QString *saveToFileName;
 
 private:
-  QDialog* parent;
   Source *source;
   LCDFormat *format;
 };

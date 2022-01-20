@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -75,14 +74,10 @@ void evalTimers(int16_t throttle, uint8_t tick10ms)
   for (uint8_t i=0; i<TIMERS; i++) {
     tmrmode_t timerMode = g_model.timers[i].mode;
     tmrstart_t timerStart = g_model.timers[i].start;
-    int16_t     timerSwtch = g_model.timers[i].swtch;
     TimerState * timerState = &timersStates[i];
 
     if (timerMode) {
-      if ((timerState->state == TMR_OFF)
-          && (timerMode != TMRMODE_THR_START)
-          && (timerMode != TMRMODE_START)) {
-       
+      if ((timerState->state == TMR_OFF) && (timerMode != TMRMODE_THR_TRG)) {
         timerState->state = TMR_RUNNING;
         timerState->cnt = 0;
         timerState->sum = 0;
@@ -97,52 +92,44 @@ void evalTimers(int16_t throttle, uint8_t tick10ms)
         if (timerState->val == TIMER_MAX) break;
         if (timerState->val == TIMER_MIN) break;
 
-        timerState->val_10ms -= 100;
+        timerState->val_10ms -= 100 ;
         tmrval_t newTimerVal = timerState->val;
         if (timerStart) newTimerVal = timerStart - newTimerVal;
 
-        if (timerMode == TMRMODE_START) {
-          // Start timer based on switch
-          if (getSwitch(timerSwtch) && timerState->state == TMR_OFF) {
+        if (timerMode == TMRMODE_ABS) {
+          newTimerVal++;
+        }
+        else if (timerMode == TMRMODE_THR) {
+          if (throttle) newTimerVal++;
+        }
+        else if (timerMode == TMRMODE_THR_REL) {
+          if ((timerState->sum/timerState->cnt) >= 128) {  // throttle was normalized to 0 to 128 value (throttle/64*2 (because - range is added as well)
+            newTimerVal++;  // add second used of throttle
+            timerState->sum -= 128*timerState->cnt;
+          }
+          timerState->cnt = 0;
+        }
+        else if (timerMode == TMRMODE_THR_TRG) {
+          // we can't rely on (throttle || newTimerVal > 0) as a detection if timer should be running
+          // because having persistent timer brakes this rule
+          if ((throttle > THR_TRG_TRESHOLD) && timerState->state == TMR_OFF) {
             timerState->state = TMR_RUNNING;  // start timer running
             timerState->cnt = 0;
             timerState->sum = 0;
+            // TRACE("Timer[%d] THr triggered", i);
           }
-          if (timerState->state != TMR_OFF) {
+          if (timerState->state != TMR_OFF) newTimerVal++;
+        }
+        else {
+          if (timerMode > 0) timerMode -= (TMRMODE_COUNT-1);
+          if (getSwitch(timerMode)) {
             newTimerVal++;
-          } 
-        } else if (getSwitch(timerSwtch)) {
-
-          // Modes conditional on switch at any time
-          if (timerMode == TMRMODE_ON) {
-            newTimerVal++;
-          } else if (timerMode == TMRMODE_THR) {
-            if (throttle) newTimerVal++;
-          } else if (timerMode == TMRMODE_THR_REL) {
-            // throttle was normalized to 0 to 128 value
-            // (throttle/64*2 (because - range is added as well)
-            if ((timerState->sum / timerState->cnt) >= 128) {  
-              newTimerVal++;  // add second used of throttle
-              timerState->sum -= 128 * timerState->cnt;
-            }
-            timerState->cnt = 0;
-          } else if (timerMode == TMRMODE_THR_START) {
-            // we can't rely on (throttle || newTimerVal > 0) as a detection if
-            // timer should be running because having persistent timer brakes
-            // this rule
-            if ((throttle > THR_TRG_TRESHOLD) && timerState->state == TMR_OFF) {
-              timerState->state = TMR_RUNNING;  // start timer running
-              timerState->cnt = 0;
-              timerState->sum = 0;
-              // TRACE("Timer[%d] THr triggered", i);
-            }
-            if (timerState->state != TMR_OFF) newTimerVal++;
           }
         }
 
         switch (timerState->state) {
           case TMR_RUNNING:
-            if (timerStart && newTimerVal >= (tmrval_t)timerStart) {
+            if (timerStart && newTimerVal>=(tmrval_t)timerStart) {
               AUDIO_TIMER_ELAPSED(i);
               timerState->state = TMR_NEGATIVE;
               // TRACE("Timer[%d] negative", i);
@@ -156,8 +143,7 @@ void evalTimers(int16_t throttle, uint8_t tick10ms)
             break;
         }
 
-        // if counting backwards - display backwards
-        if (timerStart) newTimerVal = timerStart - newTimerVal;
+        if (timerStart) newTimerVal = timerStart - newTimerVal; // if counting backwards - display backwards
 
         if (newTimerVal != timerState->val) {
           timerState->val = newTimerVal;
@@ -165,7 +151,7 @@ void evalTimers(int16_t throttle, uint8_t tick10ms)
             if (g_model.timers[i].countdownBeep && g_model.timers[i].start) {
               AUDIO_TIMER_COUNTDOWN(i, newTimerVal);
             }
-            if (g_model.timers[i].minuteBeep && (newTimerVal % 60) == 0) {
+            if (g_model.timers[i].minuteBeep && (newTimerVal % 60)==0) {
               AUDIO_TIMER_MINUTE(newTimerVal);
               // TRACE("Timer[%d] %d minute announcement", i, newTimerVal/60);
             }
@@ -174,23 +160,4 @@ void evalTimers(int16_t throttle, uint8_t tick10ms)
       }
     }
   }
-}
-
-int16_t throttleSource2Source(int16_t thrSrc)
-{
-  if (thrSrc == 0) return (int16_t)MIXSRC_Thr;
-  if (--thrSrc < NUM_POTS + NUM_SLIDERS)
-    return (int16_t)(thrSrc + MIXSRC_FIRST_POT);
-  return (int16_t)(thrSrc - (NUM_POTS + NUM_SLIDERS) + MIXSRC_FIRST_CH);
-}
-
-int16_t source2ThrottleSource(int16_t src)
-{
-  if (src == MIXSRC_Thr)
-    return 0;
-  else if (src <= MIXSRC_LAST_POT)
-    return src - MIXSRC_FIRST_POT + 1;
-  else if (src <= MIXSRC_LAST_CH)
-    return src - MIXSRC_FIRST_CH + NUM_POTS + NUM_SLIDERS + 1;
-  return -1;
 }

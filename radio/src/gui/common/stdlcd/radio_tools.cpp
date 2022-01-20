@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -62,7 +61,7 @@ void addRadioScriptTool(uint8_t index, const char * path)
   }
 
   if (addRadioTool(index, toolName)) {
-    char toolPath[FF_MAX_LFN];
+    char toolPath[_MAX_LFN];
     strcpy(toolPath, path);
     *((char *)getBasename(toolPath)-1) = '\0';
     f_chdir(toolPath);
@@ -97,7 +96,7 @@ void menuRadioTools(event_t event)
   FRESULT res = f_opendir(&dir, SCRIPTS_TOOLS_PATH);
   if (res == FR_OK) {
     for (;;) {
-      TCHAR path[FF_MAX_LFN+1] = SCRIPTS_TOOLS_PATH "/";
+      TCHAR path[_MAX_LFN+1] = SCRIPTS_TOOLS_PATH "/";
       res = f_readdir(&dir, &fno);                   /* Read a directory item */
       if (res != FR_OK || fno.fname[0] == 0) break;  /* Break on error or end of dir */
       if (fno.fattrib & AM_DIR) continue;            /* Skip subfolders */

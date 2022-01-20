@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -29,10 +28,10 @@ const unsigned char sticks[]  = {
 
 #define RADIO_SETUP_2ND_COLUMN  79
 
-#define SLIDER_5POS(y, value, event, attr) { \
+#define SLIDER_5POS(y, value, label, event, attr) { \
   int8_t tmp = value; \
   drawSlider(RADIO_SETUP_2ND_COLUMN, y, LCD_W - 2 - RADIO_SETUP_2ND_COLUMN, 2+tmp, 4, attr); \
-  value = editChoice(RADIO_SETUP_2ND_COLUMN, y, nullptr, nullptr, tmp, -2, +2, attr, event); \
+  value = editChoice(RADIO_SETUP_2ND_COLUMN, y, label, nullptr, tmp, -2, +2, attr, event); \
 }
 
 #if defined(SPLASH)
@@ -135,9 +134,7 @@ void menuRadioSetup(event_t event)
   }
 #endif
 
-  uint8_t old_editMode = s_editMode;
-  
-  MENU(STR_RADIO_SETUP, menuTabGeneral, MENU_RADIO_SETUP, HEADER_LINE+ITEM_RADIO_SETUP_MAX, {
+  MENU(STR_MENURADIOSETUP, menuTabGeneral, MENU_RADIO_SETUP, HEADER_LINE+ITEM_RADIO_SETUP_MAX, {
     HEADER_LINE_COLUMNS CASE_RTCLOCK(2) CASE_RTCLOCK(2) CASE_BATTGRAPH(1)
     LABEL(SOUND), CASE_AUDIO(0)
     CASE_BUZZER(0)
@@ -288,7 +285,7 @@ void menuRadioSetup(event_t event)
 #if defined(VOICE)
       case ITEM_RADIO_SETUP_SPEAKER_VOLUME:
       {
-        lcdDrawText(INDENT_WIDTH, y, STR_VOLUME);
+        lcdDrawTextAlignedLeft(y, STR_SPEAKER_VOLUME);
         uint8_t b = g_eeGeneral.speakerVolume+VOLUME_LEVEL_DEF;
         drawSlider(RADIO_SETUP_2ND_COLUMN, y, LCD_W - 2 - RADIO_SETUP_2ND_COLUMN, b, VOLUME_LEVEL_MAX, attr);
         if (attr) {
@@ -302,28 +299,22 @@ void menuRadioSetup(event_t event)
 #endif
 
       case ITEM_RADIO_SETUP_BEEP_VOLUME:
-        lcdDrawTextAlignedLeft(y, STR_BEEP_VOLUME);
-        SLIDER_5POS(y, g_eeGeneral.beepVolume, event, attr);
+        SLIDER_5POS(y, g_eeGeneral.beepVolume, STR_BEEP_VOLUME, event, attr);
         break;
-
       case ITEM_RADIO_SETUP_WAV_VOLUME:
-        lcdDrawTextAlignedLeft(y, STR_WAV_VOLUME);
-        SLIDER_5POS(y, g_eeGeneral.wavVolume, event, attr);
+        SLIDER_5POS(y, g_eeGeneral.wavVolume, STR_WAV_VOLUME, event, attr);
         break;
-
       case ITEM_RADIO_SETUP_BACKGROUND_VOLUME:
-        lcdDrawTextAlignedLeft(y, STR_BG_VOLUME);
-        SLIDER_5POS(y, g_eeGeneral.backgroundVolume, event, attr);
+        SLIDER_5POS(y, g_eeGeneral.backgroundVolume, STR_BG_VOLUME, event, attr);
         break;
 
       case ITEM_RADIO_SETUP_BEEP_LENGTH:
-        lcdDrawText(INDENT_WIDTH, y, STR_BEEP_LENGTH);
-        SLIDER_5POS(y, g_eeGeneral.beepLength, event, attr);
+        SLIDER_5POS(y, g_eeGeneral.beepLength, STR_BEEP_LENGTH, event, attr);
         break;
 
 #if defined(AUDIO)
       case ITEM_RADIO_SETUP_SPEAKER_PITCH:
-        lcdDrawText(INDENT_WIDTH, y, STR_BEEP_PITCH);
+        lcdDrawTextAlignedLeft( y, STR_SPKRPITCH);
         lcdDrawChar(RADIO_SETUP_2ND_COLUMN, y, '+', attr);
         lcdDrawNumber(RADIO_SETUP_2ND_COLUMN+FW, y, g_eeGeneral.speakerPitch*15, attr|LEFT);
         lcdDrawText(lcdLastRightPos, y, "Hz", attr);
@@ -337,28 +328,23 @@ void menuRadioSetup(event_t event)
       case ITEM_RADIO_SETUP_VARIO_LABEL:
         lcdDrawTextAlignedLeft(y, STR_VARIO);
         break;
-
       case ITEM_RADIO_SETUP_VARIO_VOLUME:
-        lcdDrawText(INDENT_WIDTH, y, STR_VOLUME);
-        SLIDER_5POS(y, g_eeGeneral.varioVolume, event, attr);
+        SLIDER_5POS(y, g_eeGeneral.varioVolume, TR_SPEAKER_VOLUME, event, attr);
         break;
-
       case ITEM_RADIO_SETUP_VARIO_PITCH:
-        lcdDrawText(INDENT_WIDTH, y, STR_PITCH_AT_ZERO);
+        lcdDrawTextAlignedLeft(y, STR_PITCH_AT_ZERO);
         lcdDrawNumber(RADIO_SETUP_2ND_COLUMN, y, VARIO_FREQUENCY_ZERO+(g_eeGeneral.varioPitch*10), attr|LEFT);
         lcdDrawText(lcdLastRightPos, y, "Hz", attr);
         if (attr) CHECK_INCDEC_GENVAR(event, g_eeGeneral.varioPitch, -40, 40);
         break;
-
       case ITEM_RADIO_SETUP_VARIO_RANGE:
-        lcdDrawText(INDENT_WIDTH, y, STR_PITCH_AT_MAX);
+        lcdDrawTextAlignedLeft(y, STR_PITCH_AT_MAX);
         lcdDrawNumber(RADIO_SETUP_2ND_COLUMN, y, VARIO_FREQUENCY_ZERO+(g_eeGeneral.varioPitch*10)+VARIO_FREQUENCY_RANGE+(g_eeGeneral.varioRange*10), attr|LEFT);
         lcdDrawText(lcdLastRightPos, y, "Hz", attr);
         if (attr) CHECK_INCDEC_GENVAR(event, g_eeGeneral.varioRange, -80, 80);
         break;
-
       case ITEM_RADIO_SETUP_VARIO_REPEAT:
-        lcdDrawText(INDENT_WIDTH, y, STR_REPEAT_AT_ZERO);
+        lcdDrawTextAlignedLeft(y, STR_REPEAT_AT_ZERO);
         lcdDrawNumber(RADIO_SETUP_2ND_COLUMN, y, VARIO_REPEAT_ZERO+(g_eeGeneral.varioRepeat*10), attr|LEFT);
         lcdDrawText(lcdLastRightPos, y, STR_MS, attr);
         if (attr) CHECK_INCDEC_GENVAR(event, g_eeGeneral.varioRepeat, -30, 50);
@@ -375,13 +361,11 @@ void menuRadioSetup(event_t event)
         break;
 
       case ITEM_RADIO_SETUP_HAPTIC_LENGTH:
-        lcdDrawText(INDENT_WIDTH, y, STR_LENGTH);
-        SLIDER_5POS(y, g_eeGeneral.hapticLength, event, attr);
+        SLIDER_5POS(y, g_eeGeneral.hapticLength, STR_LENGTH, event, attr);
         break;
 
       case ITEM_RADIO_SETUP_HAPTIC_STRENGTH:
-        lcdDrawText(INDENT_WIDTH, y, STR_STRENGTH);
-        SLIDER_5POS(y, g_eeGeneral.hapticStrength, event, attr);
+        SLIDER_5POS(y, g_eeGeneral.hapticStrength, STR_HAPTICSTRENGTH, event, attr);
         break;
 #endif
 
@@ -429,32 +413,29 @@ void menuRadioSetup(event_t event)
         break;
 
       case ITEM_RADIO_SETUP_BATTERY_WARNING:
-        lcdDrawText(INDENT_WIDTH, y, STR_BATTERYWARNING);
+        lcdDrawTextAlignedLeft(y, STR_BATTERYWARNING);
         putsVolts(RADIO_SETUP_2ND_COLUMN, y, g_eeGeneral.vBatWarn, attr|LEFT);
-        if (attr) CHECK_INCDEC_GENVAR(event, g_eeGeneral.vBatWarn, 30, 120); //3-12V
+        if(attr) CHECK_INCDEC_GENVAR(event, g_eeGeneral.vBatWarn, 30, 120); //3-12V
         break;
 
       case ITEM_RADIO_SETUP_MEMORY_WARNING:
       {
-        lcdDrawText(INDENT_WIDTH, y, STR_MEMORYWARNING);
-        uint8_t b = 1 - g_eeGeneral.disableMemoryWarning;
-        g_eeGeneral.disableMemoryWarning = 1 - editCheckBox(b, RADIO_SETUP_2ND_COLUMN, y, nullptr, attr, event);
+        uint8_t b = 1-g_eeGeneral.disableMemoryWarning;
+        g_eeGeneral.disableMemoryWarning = 1 - editCheckBox(b, RADIO_SETUP_2ND_COLUMN, y, STR_MEMORYWARNING, attr, event);
         break;
       }
 
       case ITEM_RADIO_SETUP_ALARM_WARNING:
       {
-        lcdDrawText(INDENT_WIDTH, y, STR_ALARMWARNING);
         uint8_t b = 1 - g_eeGeneral.disableAlarmWarning;
-        g_eeGeneral.disableAlarmWarning = 1 - editCheckBox(b, RADIO_SETUP_2ND_COLUMN, y, nullptr, attr, event);
+        g_eeGeneral.disableAlarmWarning = 1 - editCheckBox(b, RADIO_SETUP_2ND_COLUMN, y, STR_ALARMWARNING, attr, event);
         break;
       }
 
       case ITEM_RADIO_SETUP_RSSI_POWEROFF_ALARM:
       {
-        lcdDrawText(INDENT_WIDTH, y, STR_RSSI_SHUTDOWN_ALARM);
         uint8_t b = 1 - g_eeGeneral.disableRssiPoweroffAlarm;
-        g_eeGeneral.disableRssiPoweroffAlarm = 1 - editCheckBox(b, RADIO_SETUP_2ND_COLUMN, y, nullptr, attr, event);
+        g_eeGeneral.disableRssiPoweroffAlarm = 1 - editCheckBox(b, RADIO_SETUP_2ND_COLUMN, y, STR_RSSISHUTDOWNALARM, attr, event);
         break;
       }
 
@@ -467,7 +448,7 @@ void menuRadioSetup(event_t event)
 #endif
 
       case ITEM_RADIO_SETUP_INACTIVITY_ALARM:
-        lcdDrawText(INDENT_WIDTH, y, STR_INACTIVITYALARM);
+        lcdDrawTextAlignedLeft(y, STR_INACTIVITYALARM);
         lcdDrawNumber(RADIO_SETUP_2ND_COLUMN, y, g_eeGeneral.inactivityTimer, attr|LEFT);
         lcdDrawChar(lcdLastRightPos, y, 'm');
         if(attr) g_eeGeneral.inactivityTimer = checkIncDec(event, g_eeGeneral.inactivityTimer, 0, 250, EE_GENERAL); //0..250minutes
@@ -479,24 +460,22 @@ void menuRadioSetup(event_t event)
         break;
 
       case ITEM_RADIO_SETUP_BACKLIGHT_MODE:
-        lcdDrawText(INDENT_WIDTH, y, STR_MODE);
-        g_eeGeneral.backlightMode = editChoice(RADIO_SETUP_2ND_COLUMN, y, nullptr, STR_VBLMODE, g_eeGeneral.backlightMode, e_backlight_mode_off, e_backlight_mode_on, attr, event);
+        g_eeGeneral.backlightMode = editChoice(RADIO_SETUP_2ND_COLUMN, y, INDENT TR_MODE, STR_VBLMODE, g_eeGeneral.backlightMode, e_backlight_mode_off, e_backlight_mode_on, attr, event);
         break;
 
       case ITEM_RADIO_SETUP_FLASH_BEEP:
-        lcdDrawText(INDENT_WIDTH, y, STR_ALARM);
-        g_eeGeneral.alarmsFlash = editCheckBox(g_eeGeneral.alarmsFlash, RADIO_SETUP_2ND_COLUMN, y, nullptr, attr, event ) ;
+        g_eeGeneral.alarmsFlash = editCheckBox(g_eeGeneral.alarmsFlash, RADIO_SETUP_2ND_COLUMN, y, STR_ALARM, attr, event ) ;
         break;
 
       case ITEM_RADIO_SETUP_BACKLIGHT_DELAY:
-        lcdDrawText(INDENT_WIDTH, y, STR_DURATION);
+        lcdDrawTextAlignedLeft(y, STR_BLDELAY);
         lcdDrawNumber(RADIO_SETUP_2ND_COLUMN, y, g_eeGeneral.lightAutoOff*5, attr|LEFT);
         lcdDrawChar(lcdLastRightPos, y, 's');
         if (attr) CHECK_INCDEC_GENVAR(event, g_eeGeneral.lightAutoOff, 0, 600/5);
         break;
 
       case ITEM_RADIO_SETUP_BRIGHTNESS:
-        lcdDrawText(INDENT_WIDTH, y, STR_BRIGHTNESS);
+        lcdDrawTextAlignedLeft(y, STR_BRIGHTNESS);
         lcdDrawNumber(RADIO_SETUP_2ND_COLUMN, y, 100-g_eeGeneral.backlightBright, attr|LEFT) ;
         if (attr) {
           uint8_t b = 100 - g_eeGeneral.backlightBright;
@@ -508,13 +487,13 @@ void menuRadioSetup(event_t event)
 
 #if defined(PWM_BACKLIGHT)
       case ITEM_RADIO_SETUP_BACKLIGHT_BRIGHTNESS_OFF:
-        lcdDrawText(INDENT_WIDTH, y, STR_BLOFFBRIGHTNESS);
+        lcdDrawTextAlignedLeft(y, STR_BLOFFBRIGHTNESS);
         lcdDrawNumber(RADIO_SETUP_2ND_COLUMN, y, g_eeGeneral.blOffBright, attr|LEFT);
         if (attr) CHECK_INCDEC_GENVAR(event, g_eeGeneral.blOffBright, 0, 15);
         break;
 
       case ITEM_RADIO_SETUP_BACKLIGHT_BRIGHTNESS_ON:
-        lcdDrawText(INDENT_WIDTH, y, STR_BLONBRIGHTNESS);
+        lcdDrawTextAlignedLeft(y, STR_BLONBRIGHTNESS);
         lcdDrawNumber(RADIO_SETUP_2ND_COLUMN, y, 15-g_eeGeneral.blOnBright, attr|LEFT);
         if (attr) g_eeGeneral.blOnBright = 15 - checkIncDecGen(event, 15-g_eeGeneral.blOnBright, 0, 15);
         break;
@@ -541,23 +520,24 @@ void menuRadioSetup(event_t event)
         lcdDrawTextAlignedLeft(y, STR_PWR_ON_DELAY);
         lcdDrawNumber(RADIO_SETUP_2ND_COLUMN, y, 2 - g_eeGeneral.pwrOnSpeed, attr|LEFT);
         lcdDrawChar(lcdLastRightPos, y, 's');
-        if (attr) CHECK_INCDEC_GENVAR(event, g_eeGeneral.pwrOnSpeed, -1, 2);
+        #if !defined(RADIO_T8)
+          if (attr) CHECK_INCDEC_GENVAR(event, g_eeGeneral.pwrOnSpeed, -1, 2);
+        #endif
         break;
 
       case ITEM_RADIO_SETUP_PWR_OFF_SPEED:
         lcdDrawTextAlignedLeft(y, STR_PWR_OFF_DELAY);
         lcdDrawNumber(RADIO_SETUP_2ND_COLUMN, y, 2 - g_eeGeneral.pwrOffSpeed, attr|LEFT);
         lcdDrawChar(lcdLastRightPos, y, 's');
-        if (attr) CHECK_INCDEC_GENVAR(event, g_eeGeneral.pwrOffSpeed, -1, 2);
+        #if !defined(RADIO_T8)
+          if (attr) CHECK_INCDEC_GENVAR(event, g_eeGeneral.pwrOffSpeed, -1, 2);
+        #endif
         break;
 #endif
-
+      
 #if defined(PXX2)
       case ITEM_RADIO_SETUP_OWNER_ID:
-        editSingleName(RADIO_SETUP_2ND_COLUMN, y, STR_OWNER_ID,
-                       g_eeGeneral.ownerRegistrationID,
-                       PXX2_LEN_REGISTRATION_ID, event, attr,
-                       old_editMode);
+        editSingleName(RADIO_SETUP_2ND_COLUMN, y, STR_OWNER_ID, g_eeGeneral.ownerRegistrationID, PXX2_LEN_REGISTRATION_ID, event, attr);
         break;
 #endif
 
@@ -569,24 +549,22 @@ void menuRadioSetup(event_t event)
         break;
 
       case ITEM_RADIO_SETUP_ADJUST_RTC:
-        lcdDrawTextAlignedLeft(y, STR_ADJUST_RTC);
-        g_eeGeneral.adjustRTC = editCheckBox(g_eeGeneral.adjustRTC, RADIO_SETUP_2ND_COLUMN, y, nullptr, attr, event);
+        g_eeGeneral.adjustRTC = editCheckBox(g_eeGeneral.adjustRTC, RADIO_SETUP_2ND_COLUMN, y, STR_ADJUST_RTC, attr, event);
         break;
 
       case ITEM_RADIO_SETUP_GPSFORMAT:
-        lcdDrawTextAlignedLeft(y, STR_GPS_COORDS_FORMAT);
-        g_eeGeneral.gpsFormat = editChoice(RADIO_SETUP_2ND_COLUMN, y, nullptr, STR_GPSFORMAT, g_eeGeneral.gpsFormat, 0, 1, attr, event);
+        g_eeGeneral.gpsFormat = editChoice(RADIO_SETUP_2ND_COLUMN, y, STR_GPSCOORD, STR_GPSFORMAT, g_eeGeneral.gpsFormat, 0, 1, attr, event);
         break;
 #endif
 
 #if defined(PXX1)
       case ITEM_RADIO_SETUP_COUNTRYCODE:
-        g_eeGeneral.countryCode = editChoice(RADIO_SETUP_2ND_COLUMN, y, STR_COUNTRY_CODE, STR_COUNTRY_CODES, g_eeGeneral.countryCode, 0, 2, attr, event);
+        g_eeGeneral.countryCode = editChoice(RADIO_SETUP_2ND_COLUMN, y, STR_COUNTRYCODE, STR_COUNTRYCODES, g_eeGeneral.countryCode, 0, 2, attr, event);
         break;
 #endif
 
       case ITEM_RADIO_SETUP_LANGUAGE:
-        lcdDrawTextAlignedLeft(y, STR_VOICE_LANGUAGE);
+        lcdDrawTextAlignedLeft(y, STR_VOICELANG);
         lcdDrawText(RADIO_SETUP_2ND_COLUMN, y, currentLanguagePack->name, attr);
         if (attr) {
           currentLanguagePackIdx = checkIncDec(event, currentLanguagePackIdx, 0, DIM(languagePacks)-2, EE_GENERAL);
@@ -598,7 +576,7 @@ void menuRadioSetup(event_t event)
         break;
 
       case ITEM_RADIO_SETUP_IMPERIAL:
-        g_eeGeneral.imperial = editChoice(RADIO_SETUP_2ND_COLUMN, y, STR_UNITS_SYSTEM, STR_VUNITSSYSTEM, g_eeGeneral.imperial, 0, 1, attr, event);
+        g_eeGeneral.imperial = editChoice(RADIO_SETUP_2ND_COLUMN, y, STR_UNITSSYSTEM, STR_VUNITSSYSTEM, g_eeGeneral.imperial, 0, 1, attr, event);
         break;
 
 #if defined(FAI_CHOICE)
@@ -629,7 +607,7 @@ void menuRadioSetup(event_t event)
 
 #if defined(JACK_DETECT_GPIO)
       case ITEM_RADIO_SETUP_JACK_MODE:
-        g_eeGeneral.jackMode = editChoice(RADIO_SETUP_2ND_COLUMN, y, STR_JACK_MODE, STR_JACK_MODES, g_eeGeneral.jackMode, JACK_UNSELECTED_MODE, JACK_MAX_MODE, attr, event);
+        g_eeGeneral.jackMode = editChoice(RADIO_SETUP_2ND_COLUMN, y, STR_JACKMODE, STR_JACKMODES, g_eeGeneral.jackMode, JACK_UNSELECTED_MODE, JACK_MAX_MODE, attr, event);
         break;
 #endif
 

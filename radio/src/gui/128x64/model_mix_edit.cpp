@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -104,8 +103,6 @@ void menuModelMixOne(event_t event)
 #endif
   MixData * md2 = mixAddress(s_currIdx) ;
   putsChn(PSIZE(TR_MIXES)*FW+FW, 0, md2->destCh+1,0);
-
-  uint8_t old_editMode = s_editMode;
   
   SUBMENU(STR_MIXES, MIX_FIELD_COUNT, {0, 0, 0, 0, 0, 1, CASE_FLIGHT_MODES((MAX_FLIGHT_MODES-1) | NAVIGATION_LINE_BY_LINE) 0, 0 /*, ...*/});
   
@@ -125,9 +122,7 @@ void menuModelMixOne(event_t event)
     LcdFlags attr = (sub==i ? (editMode>0 ? BLINK|INVERS : INVERS) : 0);
     switch(i) {
       case MIX_FIELD_NAME:
-        editSingleName(MIXES_2ND_COLUMN, y, STR_MIXNAME, md2->name,
-                       sizeof(md2->name), event, (attr != 0),
-                       old_editMode);
+        editSingleName(MIXES_2ND_COLUMN, y, STR_MIXNAME, md2->name, sizeof(md2->name), event, attr);
         break;
 
       case MIX_FIELD_SOURCE:
@@ -146,7 +141,7 @@ void menuModelMixOne(event_t event)
         lcdDrawTextAlignedLeft(y, STR_OFFSET);
         u_int8int16_t offset;
         MD_OFFSET_TO_UNION(md2, offset);
-        offset.word = GVAR_MENU_ITEM(MIXES_2ND_COLUMN, y, offset.word, MIX_OFFSET_MIN, MIX_OFFSET_MAX, attr|LEFT, 0, event);
+        offset.word = GVAR_MENU_ITEM(MIXES_2ND_COLUMN, y, offset.word, GV_RANGELARGE_OFFSET_NEG, GV_RANGELARGE_OFFSET, attr|LEFT, 0, event);
         MD_UNION_TO_OFFSET(offset, md2);
         drawOffsetBar(MIXES_2ND_COLUMN+22, y, md2);
         break;

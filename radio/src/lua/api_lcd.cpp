@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -54,7 +53,7 @@ static int luaLcdClear(lua_State *L)
 {
   if (luaLcdAllowed) {
 #if defined(COLORLCD)
-    LcdFlags color = luaL_optunsigned(L, 1, COLOR_THEME_SECONDARY3);
+    LcdFlags color = luaL_optunsigned(L, 1, TEXT_BGCOLOR);
     lcd->clear(color);
 #else
     lcdClear();
@@ -481,8 +480,8 @@ static int luaGetBitmapSize(lua_State * L)
 {
   const BitmapBuffer * b = checkBitmap(L, 1);
   if (b) {
-    lua_pushinteger(L, b->width());
-    lua_pushinteger(L, b->height());
+    lua_pushinteger(L, b->getWidth());
+    lua_pushinteger(L, b->getHeight());
   }
   else {
     lua_pushinteger(L, 0);
@@ -810,37 +809,34 @@ static int luaLcdDrawCombobox(lua_State *L)
 Set a color for specific area
 
 @param area (unsigned number) specific screen area in the list bellow
- * `CUSTOM_COLOR`
- * `COLOR_THEME_SECONDARY1`
- * `COLOR_THEME_SECONDARY3`
- * `COLOR_THEME_PRIMARY2`
- * `COLOR_THEME_FOCUS`
- * `COLOR_THEME_PRIMARY3`
- * `COLOR_THEME_FOCUS`
- * `COLOR_THEME_PRIMARY2`
- * `COLOR_THEME_SECONDARY1`
- * `COLOR_THEME_PRIMARY3`
- * `COLOR_THEME_SECONDARY1`
- * `COLOR_THEME_WARNING`
- * `COLOR_THEME_ACTIVE`
- * `COLOR_THEME_DISABLED`
- * `COLOR_THEME_SECONDARY1`
- * `COLOR_THEME_DISABLED`
- * `COLOR_THEME_WARNING`
- * `COLOR_THEME_SECONDARY1`
- * `COLOR_THEME_FOCUS`
- * `COLOR_THEME_PRIMARY1`
- * `COLOR_THEME_PRIMARY2`
- * `COLOR_THEME_SECONDARY1`
- * `COLOR_THEME_PRIMARY2`
- * `COLOR_THEME_SECONDARY1`
- * `COLOR_THEME_FOCUS`
- * `COLOR_THEME_PRIMARY2`
- * `COLOR_THEME_SECONDARY1`
- * `COLOR_THEME_PRIMARY1`
- * `COLOR_THEME_SECONDARY1`
- * `COLOR_THEME_SECONDARY2`
- * `COLOR_THEME_SECONDARY3`
+ * `TEXT_COLOR`
+ * `TEXT_BGCOLOR`
+ * `TEXT_INVERTED_COLOR`
+ * `TEXT_INVERTED_BGCOLOR`
+ * `LINE_COLOR`
+ * `SCROLLBOX_COLOR`
+ * `MENU_TITLE_BGCOLOR`
+ * `MENU_TITLE_COLOR`
+ * `MENU_TITLE_DISABLE_COLOR`
+ * `HEADER_COLOR`
+ * `ALARM_COLOR`
+ * `WARNING_COLOR`
+ * `TEXT_DISABLE_COLOR`
+ * `CURVE_AXIS_COLOR`
+ * `CURVE_COLOR`
+ * `CURVE_CURSOR_COLOR`
+ * `TITLE_BGCOLOR`
+ * `TRIM_BGCOLOR`
+ * `TRIM_SHADOW_COLOR`
+ * `HEADER_BGCOLOR`
+ * `HEADER_ICON_BGCOLOR`
+ * `HEADER_CURRENT_BGCOLOR`
+ * `MAINVIEW_PANES_COLOR`
+ * `MAINVIEW_GRAPHICS_COLOR`
+ * `OVERLAY_COLOR`
+ * `BARGRAPH1_COLOR`
+ * `BARGRAPH2_COLOR`
+ * `BARGRAPH_BGCOLOR`
  * `CUSTOM_COLOR`
 
 @param color (number) color in 5/6/5 rgb format. The following prefined colors are available

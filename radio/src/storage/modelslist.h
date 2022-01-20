@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -24,22 +23,13 @@
 
 #include <stdint.h>
 #include <list>
-
 #include "sdcard.h"
-#if !defined(SDCARD_YAML)
-#include "sdcard_raw.h"
-#endif
 
-#include "dataconstants.h"
-
-// #define MODELCELL_WIDTH                172
-// #define MODELCELL_HEIGHT               59
+#define MODELCELL_WIDTH                172
+#define MODELCELL_HEIGHT               59
 
 // modelXXXXXXX.bin F,FF F,3F,FF\r\n
 #define LEN_MODELS_IDX_LINE (LEN_MODEL_FILENAME + sizeof(" F,FF F,3F,FF\r\n")-1)
-
-struct ModelData;
-struct ModuleData;
 
 struct SimpleModuleData
 {
@@ -49,28 +39,30 @@ struct SimpleModuleData
 
 class ModelCell
 {
-  public:
-    char modelFilename[LEN_MODEL_FILENAME + 1];
-    char modelName[LEN_MODEL_NAME + 1] = {};
+public:
+  char modelFilename[LEN_MODEL_FILENAME + 1];
+  char modelName[LEN_MODEL_NAME + 1];
+  BitmapBuffer * buffer;
 
-    bool             valid_rfData;
-    uint8_t          modelId[NUM_MODULES];
-    SimpleModuleData moduleData[NUM_MODULES];
+  bool             valid_rfData;
+  uint8_t          modelId[NUM_MODULES];
+  SimpleModuleData moduleData[NUM_MODULES];
 
-    explicit ModelCell(const char * name);
-    explicit ModelCell(const char * name, uint8_t len);
-    ~ModelCell();
+  ModelCell(const char * name);
+  ~ModelCell();
 
-    void save(FIL * file);
+  void save(FIL * file);
 
-    void setModelName(char * name);
-    void setModelName(char* name, uint8_t len);
-    void setRfData(ModelData * model);
+  void setModelName(char * name);
+  void setRfData(ModelData * model);
 
-    void setModelId(uint8_t moduleIdx, uint8_t id);
-    void setRfModuleData(uint8_t moduleIdx, ModuleData* modData);
+  void setModelId(uint8_t moduleIdx, uint8_t id);
+  void setRfModuleData(uint8_t moduleIdx, ModuleData* modData);
 
-    bool  fetchRfData();
+  bool  fetchRfData();
+  void  loadBitmap();
+  const BitmapBuffer * getBuffer();
+  void  resetBuffer();
 };
 
 class ModelsCategory: public std::list<ModelCell *>
@@ -78,16 +70,12 @@ class ModelsCategory: public std::list<ModelCell *>
 public:
   char name[LEN_MODEL_FILENAME + 1];
 
-  explicit ModelsCategory(const char * name);
-  explicit ModelsCategory(const char * name, uint8_t len);
+  ModelsCategory(const char * name);
   ~ModelsCategory();
 
   ModelCell * addModel(const char * name);
   void removeModel(ModelCell * model);
   void moveModel(ModelCell * model, int8_t step);
-
-  int getModelIndex(const ModelCell* model);
-
   void save(FIL * file);
 };
 
@@ -103,21 +91,10 @@ class ModelsList
 
 public:
 
-  enum class Format {
-    txt,
-#if defined(SDCARD_YAML)
-    yaml,
-    yaml_txt,
-    load_default = yaml,
-#else
-    load_default = txt,
-#endif
-  };
-  
   ModelsList();
   ~ModelsList();
 
-  bool load(Format fmt = Format::load_default);
+  bool load();
   void save();
   void clear();
 
@@ -126,42 +103,29 @@ public:
     return categories;
   }
   
-  std::list<ModelsCategory *>& getCategories()
-  {
-    return categories;
-  }
-
   void setCurrentCategory(ModelsCategory * cat);
-
   ModelsCategory * getCurrentCategory() const
   {
     return currentCategory;
   }
-  int getCurrentCategoryIdx() const;
 
   void setCurrentModel(ModelCell * cell);
-
   ModelCell * getCurrentModel() const
   {
     return currentModel;
-  }
-
-  void incModelsCount() {
-    modelsCount++;
   }
 
   unsigned int getModelsCount() const
   {
     return modelsCount;
   }
-
+  
   bool readNextLine(char * line, int maxlen);
 
-  ModelsCategory * createCategory(bool save=true);
-  ModelsCategory * createCategory(const char * name, bool save=true);
+  ModelsCategory * createCategory();
   void removeCategory(ModelsCategory * category);
 
-  ModelCell * addModel(ModelsCategory * category, const char * name, bool save=true);
+  ModelCell * addModel(ModelsCategory * category, const char * name);
   void removeModel(ModelsCategory * category, ModelCell * model);
   void moveModel(ModelsCategory * category, ModelCell * model, int8_t step);
   void moveModel(ModelCell * model, ModelsCategory * previous_category, ModelsCategory * new_category);
@@ -173,11 +137,6 @@ public:
 
 protected:
   FIL file;
-
-  bool loadTxt();
-#if defined(SDCARD_YAML)
-  bool loadYaml();
-#endif
 };
 
 extern ModelsList modelslist;

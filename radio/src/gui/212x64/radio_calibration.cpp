@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -20,7 +19,6 @@
  */
 
 #include "opentx.h"
-#include "hal/adc_driver.h"
 
 #define XPOT_DELTA    10
 #define XPOT_DELAY    10 /* cycles */
@@ -34,7 +32,7 @@ void drawPotsBars()
     if (IS_POT_SLIDER_AVAILABLE(i)) {
       uint8_t len = ((calibratedAnalogs[i]+RESX)*BAR_HEIGHT/(RESX*2))+1l;  // calculate once per loop
       V_BAR(x, LCD_H-8, len);
-      drawStickName(x-2, LCD_H-6, i, TINSIZE);
+      putsStickName(x-2, LCD_H-6, i, TINSIZE);
     }
   }
 }

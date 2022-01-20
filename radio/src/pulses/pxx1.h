@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -25,7 +24,6 @@
 #include "pxx.h"
 #include "crc.h"
 
-#if defined(INTMODULE_HEARTBEAT_GPIO)
 struct HeartbeatCapture {
 #if !defined(INTMODULE_USART)
   uint32_t timestamp;
@@ -37,7 +35,6 @@ struct HeartbeatCapture {
 };
 
 extern volatile HeartbeatCapture heartbeatCapture;
-#endif
 
 class Pxx1CrcMixin {
   protected:

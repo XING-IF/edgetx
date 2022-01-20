@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -167,7 +166,7 @@ void convertModelData_218_to_219(ModelData &model)
   }
 
   for (uint8_t i=0; i<MAX_CURVES_218; i++) {
-    memmove(&newModel.curves[i], &oldModel.curves[i], sizeof(CurveHeader_v218));
+    memmove(&newModel.curves[i], &oldModel.curves[i], sizeof(CurveData_v218));
   }
 
   for (uint32_t i=0; i<MAX_CURVE_POINTS_218; i++) {
@@ -317,14 +316,13 @@ void convertModelData_218_to_219(ModelData &model)
 #endif
 
 #if defined(PCBHORUS)
-#if defined(FIXME) //TODO
   memcpy(newModel.screenData, oldModel.screenData,
          sizeof(newModel.screenData) +
          sizeof(newModel.topbarData));
 
   for (int screen=0; screen<MAX_CUSTOM_SCREENS; screen++) {
     CustomScreenData& screenData = g_model.screenData[screen];
-    if (screenData.LayoutId[0] == '\0')
+    if (screenData.layoutName[0] == '\0')
       continue;
     for (int zone=0; zone<MAX_LAYOUT_ZONES; zone++) {
       Layout::ZonePersistentData * zoneData = &screenData.layoutData.zones[zone];
@@ -337,14 +335,14 @@ void convertModelData_218_to_219(ModelData &model)
   }
 
   for (int zone=0; zone<MAX_LAYOUT_ZONES; zone++) {
-    TopBar::ZonePersistentData * zoneData = &g_model.topbarData.zones[zone];
+    Topbar::ZonePersistentData * zoneData = &g_model.topbarData.zones[zone];
     if (strcmp("Value", zoneData->widgetName))
       continue;
 
     ZoneOptionValue & option = zoneData->widgetData.options[0];
     option.unsignedValue = convertSource_218_to_219(option.unsignedValue);
   }
-#endif
+
 #else
   newModel.screensType = oldModel.frsky.screensType;
   memmove(&newModel.screens, &oldModel.frsky.screens, sizeof(newModel.screens));

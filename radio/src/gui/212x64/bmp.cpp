@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -30,28 +29,28 @@ uint8_t * lcdLoadBitmap(uint8_t * bmp, const char * filename, uint16_t width, ui
   uint8_t * buf = &bmpBuf[0];
 
   if (width > LCD_W) {
-    return nullptr;
+    return NULL;
   }
 
   FRESULT result = f_open(&bmpFile, filename, FA_OPEN_EXISTING | FA_READ);
   if (result != FR_OK) {
-    return nullptr;
+    return NULL;
   }
 
   if (f_size(&bmpFile) < 14) {
     f_close(&bmpFile);
-    return nullptr;
+    return NULL;
   }
 
   result = f_read(&bmpFile, buf, 14, &read);
   if (result != FR_OK || read != 14) {
     f_close(&bmpFile);
-    return nullptr;
+    return NULL;
   }
 
   if (buf[0] != 'B' || buf[1] != 'M') {
     f_close(&bmpFile);
-    return nullptr;
+    return NULL;
   }
 
   uint32_t fsize  = *((uint32_t *)&buf[2]);
@@ -61,7 +60,7 @@ uint8_t * lcdLoadBitmap(uint8_t * bmp, const char * filename, uint16_t width, ui
   result = f_read(&bmpFile, buf, len, &read);
   if (result != FR_OK || read != len) {
     f_close(&bmpFile);
-    return nullptr;
+    return NULL;
   }
 
   uint32_t ihsize = *((uint32_t *)&buf[0]); /* more header size */
@@ -69,7 +68,7 @@ uint8_t * lcdLoadBitmap(uint8_t * bmp, const char * filename, uint16_t width, ui
   /* invalid header size */
   if (ihsize + 14 > hsize) {
     f_close(&bmpFile);
-    return nullptr;
+    return NULL;
   }
 
   /* sometimes file size is set to some headers size, set a real size in that case */
@@ -79,7 +78,7 @@ uint8_t * lcdLoadBitmap(uint8_t * bmp, const char * filename, uint16_t width, ui
   /* declared file size less than header size */
   if (fsize <= hsize) {
     f_close(&bmpFile);
-    return nullptr;
+    return NULL;
   }
 
   uint32_t w, h;
@@ -101,17 +100,17 @@ uint8_t * lcdLoadBitmap(uint8_t * bmp, const char * filename, uint16_t width, ui
       break;
     default:
       f_close(&bmpFile);
-      return nullptr;
+      return NULL;
   }
 
   if (*((uint16_t *)&buf[0]) != 1) { /* planes */
     f_close(&bmpFile);
-    return nullptr;
+    return NULL;
   }
 
   if (w > width || h > height) {
     f_close(&bmpFile);
-    return nullptr;
+    return NULL;
   }
 
   uint16_t depth = *((uint16_t *)&buf[2]);
@@ -121,7 +120,7 @@ uint8_t * lcdLoadBitmap(uint8_t * bmp, const char * filename, uint16_t width, ui
   if (depth == 4) {
     if (f_lseek(&bmpFile, hsize-64) != FR_OK || f_read(&bmpFile, buf, 64, &read) != FR_OK || read != 64) {
       f_close(&bmpFile);
-      return nullptr;
+      return NULL;
     }
     for (uint8_t i=0; i<16; i++) {
       palette[i] = buf[4*i] >> 4;
@@ -130,7 +129,7 @@ uint8_t * lcdLoadBitmap(uint8_t * bmp, const char * filename, uint16_t width, ui
   else {
     if (f_lseek(&bmpFile, hsize) != FR_OK) {
       f_close(&bmpFile);
-      return nullptr;
+      return NULL;
     }
   }
 
@@ -150,7 +149,7 @@ uint8_t * lcdLoadBitmap(uint8_t * bmp, const char * filename, uint16_t width, ui
         result = f_read(&bmpFile, buf, rowSize*2, &read);
         if (result != FR_OK || read != rowSize*2) {
           f_close(&bmpFile);
-          return nullptr;
+          return NULL;
         }
 
         for (uint32_t j=0; j<w; j++) {
@@ -169,7 +168,7 @@ uint8_t * lcdLoadBitmap(uint8_t * bmp, const char * filename, uint16_t width, ui
         result = f_read(&bmpFile, buf, rowSize, &read);
         if (result != FR_OK || read != rowSize) {
           f_close(&bmpFile);
-          return nullptr;
+          return NULL;
         }
         uint8_t * dst = dest + (i/2)*w;
         for (uint32_t j=0; j<w; j++) {
@@ -182,7 +181,7 @@ uint8_t * lcdLoadBitmap(uint8_t * bmp, const char * filename, uint16_t width, ui
 
     default:
       f_close(&bmpFile);
-      return nullptr;
+      return NULL;
   }
 
   f_close(&bmpFile);
@@ -204,10 +203,6 @@ bool loadModelBitmap(char * name, uint8_t * bitmap)
   }
 
   // In all error cases, we set the default logo
-  RleBitmap pic(logo_taranis, 0);
-  *bitmap++ = pic.getWidth();
-  *bitmap++ = pic.getRawRows();
-  for(int i=0; i < MODEL_BITMAP_SIZE-2; i++)
-    *bitmap++ = pic.getNext();
+  memcpy(bitmap, logo_taranis, MODEL_BITMAP_SIZE);
   return false;
 }

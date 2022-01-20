@@ -5,11 +5,12 @@
 #ifndef _DISKIO_DEFINED
 #define _DISKIO_DEFINED
 
-#include "ff.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#include "integer.h"
+
 
 /* Status of Disk Functions */
 typedef BYTE	DSTATUS;
@@ -34,14 +35,6 @@ DRESULT disk_read (BYTE pdrv, BYTE* buff, DWORD sector, UINT count);
 DRESULT disk_write (BYTE pdrv, const BYTE* buff, DWORD sector, UINT count);
 DRESULT disk_ioctl (BYTE pdrv, BYTE cmd, void* buff);
 
-#if defined(DISK_CACHE)
-// #include "FatFs/diskio.h"
-DRESULT __disk_read(BYTE drv, BYTE * buff, DWORD sector, UINT count);
-DRESULT __disk_write(BYTE drv, const BYTE * buff, DWORD sector, UINT count);
-#else
-#define __disk_read                    disk_read
-#define __disk_write                   disk_write
-#endif
 
 /* Disk Status Bits (DSTATUS) */
 
@@ -53,11 +46,11 @@ DRESULT __disk_write(BYTE drv, const BYTE * buff, DWORD sector, UINT count);
 /* Command code for disk_ioctrl fucntion */
 
 /* Generic command (Used by FatFs) */
-#define CTRL_SYNC			0	/* Complete pending write process (needed at FF_FS_READONLY == 0) */
-#define GET_SECTOR_COUNT	1	/* Get media size (needed at FF_USE_MKFS == 1) */
-#define GET_SECTOR_SIZE		2	/* Get sector size (needed at FF_MAX_SS != FF_MIN_SS) */
-#define GET_BLOCK_SIZE		3	/* Get erase block size (needed at FF_USE_MKFS == 1) */
-#define CTRL_TRIM			4	/* Inform device that the data on the block of sectors is no longer used (needed at FF_USE_TRIM == 1) */
+#define CTRL_SYNC			0	/* Complete pending write process (needed at _FS_READONLY == 0) */
+#define GET_SECTOR_COUNT	1	/* Get media size (needed at _USE_MKFS == 1) */
+#define GET_SECTOR_SIZE		2	/* Get sector size (needed at _MAX_SS != _MIN_SS) */
+#define GET_BLOCK_SIZE		3	/* Get erase block size (needed at _USE_MKFS == 1) */
+#define CTRL_TRIM			4	/* Inform device that the data on the block of sectors is no longer used (needed at _USE_TRIM == 1) */
 
 /* Generic command (Not used by FatFs) */
 #define CTRL_POWER			5	/* Get/Set power status */

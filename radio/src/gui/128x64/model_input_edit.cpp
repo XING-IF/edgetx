@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -68,9 +67,7 @@ void menuModelExpoOne(event_t event)
 #endif
   ExpoData * ed = expoAddress(s_currIdx);
   drawSource(PSIZE(TR_MENUINPUTS)*FW+FW, 0, MIXSRC_FIRST_INPUT+ed->chn, 0);
-
-  uint8_t old_editMode = s_editMode;
-
+  
   SUBMENU(STR_MENUINPUTS, EXPO_FIELD_MAX, {0, 0, 0, ed->srcRaw >= MIXSRC_FIRST_TELEM ? (uint8_t)0 : (uint8_t)HIDDEN_ROW, 0, 0, LABEL(Curve), 1, CASE_FLIGHT_MODES(LABEL(Flight Mode)) CASE_FLIGHT_MODES((MAX_FLIGHT_MODES-1) | NAVIGATION_LINE_BY_LINE) 0 /*, ...*/});
 
   int8_t sub = menuVerticalPosition;
@@ -88,15 +85,11 @@ void menuModelExpoOne(event_t event)
 
     switch (i) {
       case EXPO_FIELD_INPUT_NAME:
-        editSingleName(EXPO_ONE_2ND_COLUMN - LEN_INPUT_NAME * FW, y,
-                       STR_INPUTNAME, g_model.inputNames[ed->chn],
-                       LEN_INPUT_NAME, event, (attr != 0), old_editMode);
+        editSingleName(EXPO_ONE_2ND_COLUMN-LEN_INPUT_NAME*FW, y, STR_INPUTNAME, g_model.inputNames[ed->chn], LEN_INPUT_NAME, event, attr);
         break;
 
       case EXPO_FIELD_LINE_NAME:
-        editSingleName(EXPO_ONE_2ND_COLUMN - LEN_EXPOMIX_NAME * FW, y,
-                       STR_EXPONAME, ed->name, LEN_EXPOMIX_NAME, event,
-                       (attr != 0), old_editMode);
+        editSingleName(EXPO_ONE_2ND_COLUMN-LEN_EXPOMIX_NAME*FW, y, STR_EXPONAME, ed->name, LEN_EXPOMIX_NAME, event, attr);
         break;
 
       case EXPO_FIELD_SOURCE:
@@ -115,7 +108,7 @@ void menuModelExpoOne(event_t event)
 
       case EXPO_FIELD_WEIGHT:
         lcdDrawTextAlignedLeft(y, STR_WEIGHT);
-        ed->weight = GVAR_MENU_ITEM(EXPO_ONE_2ND_COLUMN, y, ed->weight, -100, 100, RIGHT | attr, 0, event);
+        ed->weight = GVAR_MENU_ITEM(EXPO_ONE_2ND_COLUMN, y, ed->weight, MIN_EXPO_WEIGHT, 100, RIGHT | attr, 0, event);
         break;
 
       case EXPO_FIELD_OFFSET:

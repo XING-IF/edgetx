@@ -18,7 +18,8 @@
  * GNU General Public License for more details.
  */
 
-#pragma once
+#ifndef FILESYNCDIALOG_H
+#define FILESYNCDIALOG_H
 
 #include "process_sync.h"
 
@@ -29,7 +30,6 @@
 #include <QToolButton>
 
 class ProgressWidget;
-class AutoComboBox;
 
 class FileSyncDialog : public QDialog
 {
@@ -76,7 +76,6 @@ class FileSyncDialog : public QDialog
     void updateRunningState();
     void onStatusUpdate(const SyncProcess::SyncStatus & stat);
     void adjustSizeDelayed();
-    void setSyncDirList();
 
   private:
     SyncProcess::SyncOptions m_syncOptions;
@@ -92,5 +91,6 @@ class FileSyncDialog : public QDialog
     QToolButton * ui_btnStartStop;
     QToolButton * ui_btnClose;
     QLabel * ui_statusLabel;
-    AutoComboBox * ui_syncDir;
 };
+
+#endif // FILESYNCDIALOG_H

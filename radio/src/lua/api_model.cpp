@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -23,12 +22,7 @@
 #include <stdio.h>
 #include "opentx.h"
 #include "lua_api.h"
-#include "../timers.h"
-#include "model_init.h"
-
-#if defined(SDCARD_YAML)
-#include <storage/sdcard_yaml.h>
-#endif
+#include "timers.h"
 
 /*luadoc
 @function model.getInfo()
@@ -38,27 +32,16 @@ Get current Model information
 @retval table model information:
  * `name` (string) model name
  * `bitmap` (string) bitmap name (not present on X7)
- * `filename` (string) model filename
 
-@status current Introduced in 2.0.6, changed in 2.2.0, filename added in 2.6.0
+@status current Introduced in 2.0.6, changed in 2.2.0
 */
 static int luaModelGetInfo(lua_State *L)
 {
   lua_newtable(L);
-  lua_pushtablenstring(L, "name", g_model.header.name);
+  lua_pushtablezstring(L, "name", g_model.header.name);
 #if LCD_DEPTH > 1
-  lua_pushtablenstring(L, "bitmap", g_model.header.bitmap);
+  lua_pushtablenzstring(L, "bitmap", g_model.header.bitmap);
 #endif
-
-#if defined(STORAGE_MODELSLIST)
-  lua_pushtablenstring(L, "filename", g_eeGeneral.currModelFilename);
-#else
-  char fname[MODELIDX_STRLEN + sizeof(YAML_EXT)];
-  getModelNumberStr(g_eeGeneral.currModel, fname);
-  strcat(fname, YAML_EXT);
-  lua_pushtablenstring(L, "filename", fname);
-#endif
-
   return 1;
 }
 
@@ -82,7 +65,7 @@ static int luaModelSetInfo(lua_State *L)
     const char * key = luaL_checkstring(L, -2);
     if (!strcmp(key, "name")) {
       const char * name = luaL_checkstring(L, -1);
-      strncpy(g_model.header.name, name, sizeof(g_model.header.name));
+      str2zchar(g_model.header.name, name, sizeof(g_model.header.name));
 #if defined(EEPROM)
       memcpy(modelHeaders[g_eeGeneral.currModel].name, g_model.header.name, sizeof(g_model.header.name));
 #endif
@@ -158,7 +141,7 @@ static int luaModelGetModule(lua_State *L)
     if (module.type == MODULE_TYPE_MULTIMODULE) {
       int protocol = g_model.moduleData[idx].getMultiProtocol() + 1;
       int subprotocol = g_model.moduleData[idx].subType;
-      convertEtxProtocolToMulti(&protocol, &subprotocol); // Special treatment for the FrSky entry...
+      convertOtxProtocolToMulti(&protocol, &subprotocol); // Special treatment for the FrSky entry...
       lua_pushtableinteger(L, "protocol", protocol);
       lua_pushtableinteger(L, "subProtocol", subprotocol);
       if (getMultiModuleStatus(idx).isValid()) {
@@ -231,8 +214,8 @@ static int luaModelSetModule(lua_State *L)
 #endif
     }
 #if defined(MULTIMODULE)
-    if (protocol > 0 && subprotocol >= 0) {  // Both are needed to compute etx protocol
-      convertMultiProtocolToEtx(&protocol, &subprotocol);
+    if (protocol > 0 && subprotocol >= 0) {  // Both are needed to compute otx protocol
+      convertMultiProtocolToOtx(&protocol, &subprotocol);
       g_model.moduleData[idx].setMultiProtocol(protocol - 1);
       g_model.moduleData[idx].subType = subprotocol;
     }
@@ -274,7 +257,7 @@ static int luaModelGetTimer(lua_State *L)
     lua_pushtableinteger(L, "countdownBeep", timer.countdownBeep);
     lua_pushtableboolean(L, "minuteBeep", timer.minuteBeep);
     lua_pushtableinteger(L, "persistent", timer.persistent);
-    lua_pushtablenstring(L, "name", timer.name);
+    lua_pushtablezstring(L, "name", timer.name);
   }
   else {
     lua_pushnil(L);
@@ -326,7 +309,7 @@ static int luaModelSetTimer(lua_State *L)
       }
       if (!strcmp(key, "name")) {
         const char * name = luaL_checkstring(L, -1);
-        strncpy(timer.name, name, sizeof(timer.name));
+        str2zchar(timer.name, name, sizeof(timer.name));
       }
     }
     storageDirty(EE_MODEL);
@@ -440,7 +423,7 @@ static int luaModelGetFlightMode(lua_State * L)
   if (idx < MAX_FLIGHT_MODES) {
     FlightModeData * fm = flightModeAddress(idx);
     lua_newtable(L);
-    lua_pushtablenstring(L, "name", fm->name);
+    lua_pushtablezstring(L, "name", fm->name);
     lua_pushtableinteger(L, "switch", fm->swtch);
     lua_pushtableinteger(L, "fadeIn", fm->fadeIn);
     lua_pushtableinteger(L, "fadeOut", fm->fadeOut);
@@ -493,7 +476,7 @@ static int luaModelSetFlightMode(lua_State * L)
     const char * key = luaL_checkstring(L, -2);
     if (!strcmp(key, "name")) {
       const char * name = luaL_checkstring(L, -1);
-      strncpy(fm->name, name, sizeof(fm->name));
+      str2zchar(fm->name, name, sizeof(fm->name));
     }
     else if (!strcmp(key, "switch")) {
       fm->swtch = luaL_checkinteger(L, -1);
@@ -562,8 +545,8 @@ static int luaModelGetInput(lua_State *L)
   if (idx < count) {
     ExpoData * expo = expoAddress(first+idx);
     lua_newtable(L);
-    lua_pushtablenstring(L, "name", expo->name);
-    lua_pushtablenstring(L, "inputName", g_model.inputNames[chn]);
+    lua_pushtablezstring(L, "name", expo->name);
+    lua_pushtablezstring(L, "inputName", g_model.inputNames[chn]);
     lua_pushtableinteger(L, "source", expo->srcRaw);
     lua_pushtableinteger(L, "weight", expo->weight);
     lua_pushtableinteger(L, "offset", expo->offset);
@@ -603,11 +586,7 @@ static int luaModelInsertInput(lua_State *L)
   if (chn<MAX_INPUTS && getExposCount()<MAX_EXPOS && idx<=count) {
     idx = first + idx;
     s_currCh = chn + 1;
-#if defined(COLORLCD)
-    insertExpo(idx, chn);
-#else
     insertExpo(idx);
-#endif
     ExpoData * expo = expoAddress(idx);
     luaL_checktype(L, -1, LUA_TTABLE);
     for (lua_pushnil(L); lua_next(L, -2); lua_pop(L, 1)) {
@@ -615,11 +594,11 @@ static int luaModelInsertInput(lua_State *L)
       const char * key = luaL_checkstring(L, -2);
       if (!strcmp(key, "name")) {
         const char * name = luaL_checkstring(L, -1);
-        strncpy(expo->name, name, sizeof(expo->name));
+        str2zchar(expo->name, name, sizeof(expo->name));
       }
       else if (!strcmp(key, "inputName")) {
         const char * name = luaL_checkstring(L, -1);
-        strncpy(g_model.inputNames[chn], name, LEN_INPUT_NAME);
+        str2zchar(g_model.inputNames[chn], name, LEN_INPUT_NAME);
       }
       else if (!strcmp(key, "source")) {
         expo->srcRaw = luaL_checkinteger(L, -1);
@@ -699,8 +678,7 @@ Set all inputs to defaults
 */
 static int luaModelDefaultInputs(lua_State *L)
 {
-  clearInputs();
-  setDefaultInputs();
+  defaultInputs();
   return 0;
 }
 
@@ -789,7 +767,7 @@ static int luaModelGetMix(lua_State *L)
   if (idx < count) {
     MixData * mix = mixAddress(first+idx);
     lua_newtable(L);
-    lua_pushtablenstring(L, "name", mix->name);
+    lua_pushtablezstring(L, "name", mix->name);
     lua_pushtableinteger(L, "source", mix->srcRaw);
     lua_pushtableinteger(L, "weight", mix->weight);
     lua_pushtableinteger(L, "offset", mix->offset);
@@ -843,7 +821,7 @@ static int luaModelInsertMix(lua_State *L)
       const char * key = luaL_checkstring(L, -2);
       if (!strcmp(key, "name")) {
         const char * name = luaL_checkstring(L, -1);
-        strncpy(mix->name, name, sizeof(mix->name));
+        str2zchar(mix->name, name, sizeof(mix->name));
       }
       else if (!strcmp(key, "source")) {
         mix->srcRaw = luaL_checkinteger(L, -1);
@@ -1057,33 +1035,33 @@ static int luaModelGetCurve(lua_State *L)
 {
   unsigned int idx = luaL_checkunsigned(L, 1);
   if (idx < MAX_CURVES) {
-    CurveHeader & CurveHeader = g_model.curves[idx];
+    CurveData & curveData = g_model.curves[idx];
     lua_newtable(L);
-    lua_pushtablenstring(L, "name", CurveHeader.name);
-    lua_pushtableinteger(L, "type", CurveHeader.type);
-    lua_pushtableboolean(L, "smooth", CurveHeader.smooth);
-    lua_pushtableinteger(L, "points", CurveHeader.points + 5);
+    lua_pushtablezstring(L, "name", curveData.name);
+    lua_pushtableinteger(L, "type", curveData.type);
+    lua_pushtableboolean(L, "smooth", curveData.smooth);
+    lua_pushtableinteger(L, "points", curveData.points + 5);
     lua_pushstring(L, "y");
     lua_newtable(L);
     int8_t * point = curveAddress(idx);
-    for (int i=0; i < CurveHeader.points + 5; i++) {
+    for (int i=0; i < curveData.points + 5; i++) {
       lua_pushinteger(L, i);
       lua_pushinteger(L, *point++);
       lua_settable(L, -3);
     }
     lua_settable(L, -3);
-    if (CurveHeader.type == CURVE_TYPE_CUSTOM) {
+    if (curveData.type == CURVE_TYPE_CUSTOM) {
       lua_pushstring(L, "x");
       lua_newtable(L);
       lua_pushinteger(L, 0);
       lua_pushinteger(L, -100);
       lua_settable(L, -3);
-      for (int i=0; i < CurveHeader.points + 3; i++) {
+      for (int i=0; i < curveData.points + 3; i++) {
         lua_pushinteger(L, i+1);
         lua_pushinteger(L, *point++);
         lua_settable(L, -3);
       }
-      lua_pushinteger(L, CurveHeader.points + 4);
+      lua_pushinteger(L, curveData.points + 4);
       lua_pushinteger(L, 100);
       lua_settable(L, -3);
       lua_settable(L, -3);
@@ -1150,9 +1128,9 @@ static int luaModelSetCurve(lua_State *L)
   memset(yPoints, -127, sizeof(yPoints));
 
 
-  CurveHeader &destCurveHeader = g_model.curves[curveIdx];
-  CurveHeader newCurveHeader;
-  memclear(&newCurveHeader, sizeof(CurveHeader));
+  CurveData &destCurveData = g_model.curves[curveIdx];
+  CurveData newCurveData;
+  memclear(&newCurveData, sizeof(CurveData));
 
   luaL_checktype(L, -1, LUA_TTABLE);
   for (lua_pushnil(L); lua_next(L, -2); lua_pop(L, 1)) {
@@ -1160,18 +1138,18 @@ static int luaModelSetCurve(lua_State *L)
     const char *key = luaL_checkstring(L, -2);
     if (!strcmp(key, "name")) {
       const char *name = luaL_checkstring(L, -1);
-      strncpy(newCurveHeader.name, name, sizeof(newCurveHeader.name));
+      str2zchar(newCurveData.name, name, sizeof(newCurveData.name));
     }
     else if (!strcmp(key, "type")) {
-      newCurveHeader.type = luaL_checkinteger(L, -1);
+      newCurveData.type = luaL_checkinteger(L, -1);
     }
     else if (!strcmp(key, "smooth")) {
       // Earlier version of this api expected a 0/1 integer instead of a boolean
       // Still accept a 0/1 here
       if (lua_isboolean(L,-1))
-        newCurveHeader.smooth = lua_toboolean(L, -1);
+        newCurveData.smooth = lua_toboolean(L, -1);
       else
-        newCurveHeader.smooth = luaL_checkinteger(L, -1);
+        newCurveData.smooth = luaL_checkinteger(L, -1);
     }
     else if (!strcmp(key, "x") || !strcmp(key, "y")) {
       luaL_checktype(L, -1, LUA_TTABLE);
@@ -1200,14 +1178,14 @@ static int luaModelSetCurve(lua_State *L)
   do {
     numPoints++;
   } while (yPoints[numPoints]!=-127 && numPoints < MAX_POINTS_PER_CURVE);
-  newCurveHeader.points = numPoints - 5;
+  newCurveData.points = numPoints - 5;
 
   if (numPoints < MIN_POINTS_PER_CURVE || numPoints > MAX_POINTS_PER_CURVE) {
     lua_pushinteger(L, 1);
     return 1;
   }
 
-  if (newCurveHeader.type == CURVE_TYPE_CUSTOM) {
+  if (newCurveData.type == CURVE_TYPE_CUSTOM) {
 
     // The rest of the points are checked by the monotonic condition
     for (unsigned int i=numPoints; i < sizeof(xPoints);i++)
@@ -1220,7 +1198,7 @@ static int luaModelSetCurve(lua_State *L)
     }
 
     // Check first and last point
-    if (xPoints[0] != -100 || xPoints[newCurveHeader.points + 4] != 100) {
+    if (xPoints[0] != -100 || xPoints[newCurveData.points + 4] != 100) {
       lua_pushinteger(L, 5);
       return 1;
     }
@@ -1235,7 +1213,7 @@ static int luaModelSetCurve(lua_State *L)
   }
 
   // Check that ypoints have the right number of points set
-  for (int i=0; i <  5 + newCurveHeader.points;i++)
+  for (int i=0; i <  5 + newCurveData.points;i++)
   {
     if (yPoints[i] == -127)
     {
@@ -1246,19 +1224,19 @@ static int luaModelSetCurve(lua_State *L)
 
   // Calculate size of curve we replace
   int oldCurveMemSize;
-  if (destCurveHeader.type == CURVE_TYPE_STANDARD) {
-    oldCurveMemSize = 5 + destCurveHeader.points;
+  if (destCurveData.type == CURVE_TYPE_STANDARD) {
+    oldCurveMemSize = 5 + destCurveData.points;
   }
   else {
-    oldCurveMemSize = 8 + 2 * destCurveHeader.points;
+    oldCurveMemSize = 8 + 2 * destCurveData.points;
   }
 
   // Calculate own size
   int newCurveMemSize;
-  if (newCurveHeader.type == CURVE_TYPE_STANDARD)
-    newCurveMemSize = 5 + newCurveHeader.points;
+  if (newCurveData.type == CURVE_TYPE_STANDARD)
+    newCurveMemSize = 5 + newCurveData.points;
   else
-    newCurveMemSize = 8 + 2 * newCurveHeader.points;
+    newCurveMemSize = 8 + 2 * newCurveData.points;
 
   int shift = newCurveMemSize - oldCurveMemSize;
 
@@ -1270,15 +1248,15 @@ static int luaModelSetCurve(lua_State *L)
   }
 
   // Curve fits into mem, fill new curve
-  destCurveHeader = newCurveHeader;
+  destCurveData = newCurveData;
 
   int8_t *point = curveAddress(curveIdx);
-  for (int i = 0; i < destCurveHeader.points + 5; i++) {
+  for (int i = 0; i < destCurveData.points + 5; i++) {
     *point++ = yPoints[i];
   }
 
-  if (destCurveHeader.type == CURVE_TYPE_CUSTOM) {
-    for (int i = 1; i < destCurveHeader.points + 4; i++) {
+  if (destCurveData.type == CURVE_TYPE_CUSTOM) {
+    for (int i = 1; i < destCurveData.points + 4; i++) {
       *point++ = xPoints[i];
     }
   }
@@ -1317,7 +1295,7 @@ static int luaModelGetCustomFunction(lua_State *L)
     lua_pushtableinteger(L, "switch", CFN_SWITCH(cfn));
     lua_pushtableinteger(L, "func", CFN_FUNC(cfn));
     if (CFN_FUNC(cfn) == FUNC_PLAY_TRACK || CFN_FUNC(cfn) == FUNC_BACKGND_MUSIC || CFN_FUNC(cfn) == FUNC_PLAY_SCRIPT) {
-      lua_pushtablenstring(L, "name", cfn->play.name);
+      lua_pushtablenzstring(L, "name", cfn->play.name);
     }
     else {
       lua_pushtableinteger(L, "value", cfn->all.val);
@@ -1414,7 +1392,7 @@ static int luaModelGetOutput(lua_State *L)
   if (idx < MAX_OUTPUT_CHANNELS) {
     LimitData * limit = limitAddress(idx);
     lua_newtable(L);
-    lua_pushtablenstring(L, "name", limit->name);
+    lua_pushtablezstring(L, "name", limit->name);
     lua_pushtableinteger(L, "min", limit->min-1000);
     lua_pushtableinteger(L, "max", limit->max+1000);
     lua_pushtableinteger(L, "offset", limit->offset);
@@ -1456,7 +1434,7 @@ static int luaModelSetOutput(lua_State *L)
       const char * key = luaL_checkstring(L, -2);
       if (!strcmp(key, "name")) {
         const char * name = luaL_checkstring(L, -1);
-        strncpy(limit->name, name, sizeof(limit->name));
+        str2zchar(limit->name, name, sizeof(limit->name));
       }
       else if (!strcmp(key, "min")) {
         limit->min = luaL_checkinteger(L, -1)+1000;
@@ -1557,7 +1535,7 @@ Get Telemetry Sensor parameters
 @retval nil requested sensor does not exist
 
 @retval table with sensor data:
- * `type` (number) 0 = custom, 1 = calculated
+ * `type` (number) 0 = custom, 1 = calculated 
  * `name` (string) Name
  * `unit` (number) See list of units in the appendix of the OpenTX Lua Reference Guide
  * `prec` (number) Number of decimals
@@ -1574,7 +1552,7 @@ static int luaModelGetSensor(lua_State *L)
     TelemetrySensor & sensor = g_model.telemetrySensors[idx];
     lua_newtable(L);
     lua_pushtableinteger(L, "type", sensor.type);
-    lua_pushtablenstring(L, "name", sensor.label);
+    lua_pushtablezstring(L, "name", sensor.label);
     lua_pushtableinteger(L, "unit", sensor.unit);
     lua_pushtableinteger(L, "prec", sensor.prec);
     if (sensor.type == TELEM_TYPE_CUSTOM) {
@@ -1608,7 +1586,7 @@ static int luaModelResetSensor(lua_State *L)
   if (idx < MAX_TELEMETRY_SENSORS) {
     telemetryItems[idx].clear();
   }
-
+  
   lua_pushnil(L);
   return 1;
 }

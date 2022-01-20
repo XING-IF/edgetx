@@ -15,7 +15,6 @@ set(SIMU_SRC
   simueeprom.cpp
   simufatfs.cpp
   simudisk.cpp
-  simulcd.cpp
   )
 
 if(SIMU_DISKIO)
@@ -34,7 +33,7 @@ if(SIMU_LUA_COMPILER)
 endif()
 
 if(Qt5Widgets_FOUND)
-  set(SIMULATOR_FLAVOUR edgetx-${FLAVOUR})
+  set(SIMULATOR_FLAVOUR opentx-${FLAVOUR})
   set(SIMULATOR_TARGET ${SIMULATOR_FLAVOUR}-simulator)
   add_definitions(-DSIMULATOR_FLAVOUR="${SIMULATOR_FLAVOUR}")
   include_directories(${COMPANION_SRC_DIRECTORY} ${COMPANION_SRC_DIRECTORY}/simulation)
@@ -44,25 +43,6 @@ if(Qt5Widgets_FOUND)
   add_dependencies(${SIMULATOR_TARGET} ${RADIO_DEPENDENCIES})
   target_compile_definitions(${SIMULATOR_TARGET} PUBLIC ${APP_COMMON_DEFINES})  # set in top-level CMakeLists
   target_link_libraries(${SIMULATOR_TARGET} ${SDL_LIBRARY} Qt5::Core)
-
-  # Remove debug symbols on release builds
-  if(NOT CLANG)
-    if("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
-      add_custom_command(TARGET ${SIMULATOR_TARGET} POST_BUILD
-        COMMAND ${CMAKE_STRIP} $<TARGET_FILE:${SIMULATOR_TARGET}>)
-    endif()
-  endif()
-
-
-  # Introduced at 2.5 - TODO replace with a code change
-  # When compiled shared simulators using libopenui and Companion have classes named MainWindow
-  # When the simulator is launched from Companion the runtime dynamic linking can result in Companion overiding the simulator
-  # and crashing the simulator under some OSes
-  # The flag forces the runtime linker to always look for references in the simulator first
-  if (NOT CLANG)
-    target_link_options(${SIMULATOR_TARGET} PRIVATE "LINKER:-Bsymbolic")
-  endif()
-  #
   add_custom_target(libsimulator DEPENDS ${SIMULATOR_TARGET})
 
   # Prepare the "all-simu-libs" target to build simulator libraries for *every* supported PCB type (PCB_TYPES list)
@@ -90,9 +70,7 @@ endif()
 
 if(WIN32)
   include_directories(SYSTEM ${WIN_INCLUDE_DIRS})
-  if(Qt5Widgets_FOUND)
-    target_link_libraries(${SIMULATOR_TARGET} PRIVATE ${WIN_LINK_LIBRARIES})
-  endif()
+  target_link_libraries(${SIMULATOR_TARGET} PRIVATE ${WIN_LINK_LIBRARIES})
 endif(WIN32)
 
 if(MSVC)
@@ -118,13 +96,8 @@ if(FOX_FOUND)
   if(SIMU_DISKIO)
     set(SIMU_SRC ${SIMU_SRC} ${FATFS_DIR}/FatFs/ff.c ${FATFS_DIR}/option/ccsbcs.c)
   endif()
-
-  add_executable(simu WIN32
-    EXCLUDE_FROM_ALL
-    ${SIMU_SRC} ${RADIO_SRC_DIR}/simu.cpp)
-
+  add_executable(simu WIN32 ${SIMU_SRC} ${RADIO_SRC_DIRECTORY}/simu.cpp)
   add_dependencies(simu ${RADIO_DEPENDENCIES})
-
   target_include_directories(simu PUBLIC ${FOX_INCLUDE_DIR} )
   target_link_libraries(simu ${FOX_LIBRARY} pthread ${SDL_LIBRARY})
   target_compile_definitions(simu PUBLIC -DSIMU)

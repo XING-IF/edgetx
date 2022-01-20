@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -250,7 +249,7 @@ PACK(typedef struct {
   uint8_t smooth:1;
   int8_t  points:6;   // describes number of points - 5
   char name[LEN_CURVE_NAME_218];
-}) CurveHeader_v218;
+}) CurveData_v218;
 
 PACK(typedef struct {
   int16_t        calib[4];
@@ -398,12 +397,12 @@ PACK(struct TelemetrySensor_218 {
 
 #if defined(PCBHORUS)
   PACK(struct CustomScreenData_v218 {
-    char LayoutId[10];
-    LayoutPersistentData layoutData;
+    char layoutName[10];
+    Layout::PersistentData layoutData;
   });
   #define VIEW_DATA \
     CustomScreenData screenData[MAX_CUSTOM_SCREENS]; \
-    TopBarPersistentData topbarData; \
+    Topbar::PersistentData topbarData; \
     uint8_t view;
 #elif defined(PCBTARANIS)
   #define VIEW_DATA   uint8_t view;
@@ -448,7 +447,7 @@ PACK(struct ModelData_v218 {
   LimitData limitData[MAX_OUTPUT_CHANNELS_218];
   ExpoData_v218  expoData[MAX_EXPOS_218];
 
-  CurveHeader_v218 curves[MAX_CURVES_218];
+  CurveData_v218 curves[MAX_CURVES_218];
   int8_t    points[MAX_CURVE_POINTS_218];
 
   LogicalSwitchData_v218 logicalSw[MAX_LOGICAL_SWITCHES_218];
@@ -524,11 +523,11 @@ PACK(struct ModelData_v218 {
 #endif
 
 #if defined(COLORLCD)
-  #include "gui/colorlcd/theme.h"
+  #include "gui/480x272/theme.h"
   #define THEME_NAME_LEN 8
   #define THEME_DATA \
     char themeName[THEME_NAME_LEN]; \
-    OpenTxTheme::PersistentData themeData;
+    Theme::PersistentData themeData;
 #else
   #define THEME_DATA
 #endif
@@ -612,8 +611,7 @@ PACK(struct RadioData_v218 {
 static inline void check_struct_218()
 {
 #if defined(PCBHORUS)
-  // FIXME !!!
-  CHKSIZE(ModelData_v218, 10664);
+  CHKSIZE(ModelData_v218, 9380);
 #elif defined(PCBX9E)
   CHKSIZE(ModelData_v218, 6520);
 #elif defined(PCBX9D)

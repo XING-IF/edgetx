@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -23,10 +22,16 @@
 #include "modelslist.h"
 #include "conversions/conversions.h"
 
-const char *writeFileBin(const char *filename, const uint8_t *data,
-                         uint16_t size, uint8_t version)
+void getModelPath(char * path, const char * filename)
 {
-  TRACE("writeFileBin(%s)", filename);
+  strcpy(path, STR_MODELS_PATH);
+  path[sizeof(MODELS_PATH)-1] = '/';
+  strcpy(&path[sizeof(MODELS_PATH)], filename);
+}
+
+const char * writeFile(const char * filename, const uint8_t * data, uint16_t size)
+{
+  TRACE("writeFile(%s)", filename);
 
   FIL file;
   unsigned char buf[8];
@@ -37,8 +42,8 @@ const char *writeFileBin(const char *filename, const uint8_t *data,
     return SDCARD_ERROR(result);
   }
 
-  *(uint32_t*)&buf[0] = ETX_FOURCC;
-  buf[4] = version;
+  *(uint32_t*)&buf[0] = OTX_FOURCC;
+  buf[4] = EEPROM_VER;
   buf[5] = 'M';
   *(uint16_t*)&buf[6] = size;
 
@@ -58,31 +63,19 @@ const char *writeFileBin(const char *filename, const uint8_t *data,
   return NULL;
 }
 
-// TODO: move to "common"
-const char * writeModelBin()
+const char * writeModel()
 {
   char path[256];
   getModelPath(path, g_eeGeneral.currModelFilename);
-
-  sdCheckAndCreateDirectory(MODELS_PATH);
-  return writeFileBin(path, (uint8_t *)&g_model, sizeof(g_model));
+  return writeFile(path, (uint8_t *)&g_model, sizeof(g_model));
 }
 
-// TODO: move partly to common
-const char * openFile(const char * fullpath, FIL * file)
+const char * openFile(const char * fullpath, FIL * file, uint16_t * size, uint8_t * version)
 {
   FRESULT result = f_open(file, fullpath, FA_OPEN_EXISTING | FA_READ);
   if (result != FR_OK) {
     return SDCARD_ERROR(result);
   }
-
-  return nullptr;
-}
-
-const char* openFileBin(const char * fullpath, FIL * file, uint16_t * size, uint8_t * version)
-{
-  const char* err = openFile(fullpath, file);
-  if (err) return err;
 
   if (f_size(file) < 8) {
     f_close(file);
@@ -92,15 +85,14 @@ const char* openFileBin(const char * fullpath, FIL * file, uint16_t * size, uint
   UINT read;
   char buf[8];
 
-  FRESULT result = f_read(file, (uint8_t *)buf, sizeof(buf), &read);
+  result = f_read(file, (uint8_t *)buf, sizeof(buf), &read);
   if ((result != FR_OK) || (read != sizeof(buf))) {
     f_close(file);
     return SDCARD_ERROR(result);
   }
 
   *version = (uint8_t)buf[4];
-  if (*(uint32_t *)&buf[0] != ETX_FOURCC || *version < FIRST_CONV_EEPROM_VER ||
-      *version > EEPROM_VER || buf[5] != 'M') {
+  if (*(uint32_t*)&buf[0] != OTX_FOURCC || *version < FIRST_CONV_EEPROM_VER || *version > EEPROM_VER || buf[5] != 'M') {
     f_close(file);
     return STR_INCOMPATIBLE;
   }
@@ -109,16 +101,15 @@ const char* openFileBin(const char * fullpath, FIL * file, uint16_t * size, uint
   return nullptr;
 }
 
-const char *loadFileBin(const char *fullpath, uint8_t *data,
-                        uint16_t maxsize, uint8_t *version)
+const char * loadFile(const char * fullpath, uint8_t * data, uint16_t maxsize, uint8_t * version)
 {
   FIL      file;
   UINT     read;
   uint16_t size;
 
-  TRACE("loadFileBin(%s)", fullpath);
+  TRACE("loadFile(%s)", fullpath);
 
-  const char * err = openFileBin(fullpath, &file, &size, version);
+  const char * err = openFile(fullpath, &file, &size, version);
   if (err)
     return err;
 
@@ -133,65 +124,115 @@ const char *loadFileBin(const char *fullpath, uint8_t *data,
   return nullptr;
 }
 
-#if defined(SDCARD_RAW)
-const char* readModel(const char* filename, uint8_t* buffer, uint32_t size)
-{
-  uint8_t version = 0;
-  // Conversions from EEPROM are done in batch when converting the radio file.
-  // It is not supported on a model by model base when loaded.
-  const char *error = readModelBin(filename, buffer, size, &version);
-  if (error) return error;
-
-#if defined(STORAGE_CONVERSIONS)
-  if (version < EEPROM_VER) {
-    convertBinModelData(filename, version);
-    error = readModelBin(filename, buffer, size, &version);
-  }
-#endif
-
-  return error;
-}
-#endif
-
-const char *readModelBin(const char *filename, uint8_t *buffer, uint32_t size,
-                         uint8_t *version)
+const char * readModel(const char * filename, uint8_t * buffer, uint32_t size, uint8_t * version)
 {
   char path[256];
   getModelPath(path, filename);
-  return loadFileBin(path, buffer, size, version);
+  return loadFile(path, buffer, size, version);
 }
 
-const char * loadRadioSettingsBin(const char * path)
+const char * loadModel(const char * filename, bool alarms)
 {
   uint8_t version;
-  const char * error = loadFileBin(path, (uint8_t *)&g_eeGeneral, sizeof(g_eeGeneral), &version);
+
+  preModelLoad();
+
+  const char * error = readModel(filename, (uint8_t *)&g_model, sizeof(g_model), &version);
+  if (error) {
+    TRACE("loadModel error=%s", error);
+  }
+
+  if (error) {
+    modelDefault(0) ;
+    storageCheck(true);
+    alarms = false;
+  }
+  else if (version < EEPROM_VER) {
+    convertModelData(version);
+  }
+
+  postModelLoad(alarms);
+
+  return error;
+}
+
+const char * loadRadioSettings(const char * path)
+{
+  uint8_t version;
+  const char * error = loadFile(path, (uint8_t *)&g_eeGeneral, sizeof(g_eeGeneral), &version);
   if (error) {
     TRACE("loadRadioSettings error=%s", error);
     return error;
   }
 
-#if defined(STORAGE_CONVERSIONS)
   if (version < EEPROM_VER) {
-    convertBinRadioData(path, version);
+    convertRadioData(version);
   }
-#endif
 
   postRadioSettingsLoad();
 
   return nullptr;
 }
 
-const char * loadRadioSettingsBin()
+const char * loadRadioSettings()
 {
-  return loadRadioSettingsBin(RADIO_SETTINGS_PATH);
+  return loadRadioSettings(RADIO_SETTINGS_PATH);
 }
 
-const char * writeGeneralSettingsBin()
+const char * writeGeneralSettings()
 {
-  return writeFileBin(RADIO_SETTINGS_PATH, (uint8_t *)&g_eeGeneral, sizeof(g_eeGeneral));
+  return writeFile(RADIO_SETTINGS_PATH, (uint8_t *)&g_eeGeneral, sizeof(g_eeGeneral));
 }
 
-#if !defined(SDCARD_YAML)
+void storageCheck(bool immediately)
+{
+  if (storageDirtyMsk & EE_GENERAL) {
+    TRACE("Storage write general");
+    storageDirtyMsk -= EE_GENERAL;
+    const char * error = writeGeneralSettings();
+    if (error) {
+      TRACE("writeGeneralSettings error=%s", error);
+    }
+  }
+
+  if (storageDirtyMsk & EE_MODEL) {
+    TRACE("Storage write current model");
+    storageDirtyMsk -= EE_MODEL;
+    const char * error = writeModel();
+    if (error) {
+      TRACE("writeModel error=%s", error);
+    }
+  }
+}
+
+void storageReadAll()
+{
+  TRACE("storageReadAll");
+
+  if (loadRadioSettings() != nullptr) {
+    storageEraseAll(true);
+  }
+
+  for (uint8_t i = 0; languagePacks[i] != nullptr; i++) {
+    if (!strncmp(g_eeGeneral.ttsLanguage, languagePacks[i]->id, 2)) {
+      currentLanguagePackIdx = i;
+      currentLanguagePack = languagePacks[i];
+    }
+  }
+
+  if (loadModel(g_eeGeneral.currModelFilename, false) != nullptr) {
+    sdCheckAndCreateDirectory(MODELS_PATH);
+    createModel();
+  }
+
+  // Wipe models list in case
+  // it's being reloaded after USB connection
+  modelslist.clear();
+
+  // and reload the list
+  modelslist.load();
+}
+
 void storageCreateModelsList()
 {
   FIL file;
@@ -202,4 +243,54 @@ void storageCreateModelsList()
     f_close(&file);
   }
 }
+
+void storageFormat()
+{
+  sdCheckAndCreateDirectory(RADIO_PATH);
+  sdCheckAndCreateDirectory(MODELS_PATH);
+  storageCreateModelsList();
+}
+
+const char * createModel()
+{
+  preModelLoad();
+
+  char filename[LEN_MODEL_FILENAME+1];
+  memset(filename, 0, sizeof(filename));
+  strcpy(filename, "model.bin");
+
+  int index = findNextFileIndex(filename, LEN_MODEL_FILENAME, MODELS_PATH);
+  if (index > 0) {
+    modelDefault(index);
+    memcpy(g_eeGeneral.currModelFilename, filename, sizeof(g_eeGeneral.currModelFilename));
+    storageDirty(EE_GENERAL);
+    storageDirty(EE_MODEL);
+    storageCheck(true);
+  }
+  postModelLoad(false);
+
+  return g_eeGeneral.currModelFilename;
+}
+
+void storageEraseAll(bool warn)
+{
+  TRACE("storageEraseAll");
+
+#if defined(COLORLCD)
+  // the theme has not been loaded before
+  theme->load();
 #endif
+
+  generalDefault();
+  modelDefault(1);
+
+  if (warn) {
+    ALERT(STR_STORAGE_WARNING, STR_BAD_RADIO_DATA, AU_BAD_RADIODATA);
+  }
+
+  RAISE_ALERT(STR_STORAGE_WARNING, STR_STORAGE_FORMAT, NULL, AU_NONE);
+
+  storageFormat();
+  storageDirty(EE_GENERAL|EE_MODEL);
+  storageCheck(true);
+}

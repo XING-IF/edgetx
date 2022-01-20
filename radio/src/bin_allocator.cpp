@@ -1,9 +1,8 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
- *   th9x - http://code.google.com/p/th9x
+ *   th9x - http://code.google.com/p/th9x 
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
  *
@@ -25,8 +24,8 @@
 #include "bin_allocator.h"
 
 
-BinAllocator_slots1 slots1 __SDRAM;
-BinAllocator_slots2 slots2 __SDRAM;
+BinAllocator_slots1 slots1;
+BinAllocator_slots2 slots2;
 
 #if defined(DEBUG)
 int SimulateMallocFailure = 0;    //set this to simulate allocation failure

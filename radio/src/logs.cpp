@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -22,17 +21,13 @@
 #include "opentx.h"
 #include "ff.h"
 
-#if defined(LIBOPENUI)
-  #include "libopenui.h"
-#endif
-
 FIL g_oLogFile __DMA;
 const char * g_logError = nullptr;
 uint8_t logDelay;
 
 void writeHeader();
 
-#if defined(PCBFRSKY) || defined(PCBNV14)
+#if defined(PCBTARANIS) || defined(PCBHORUS)
   int getSwitchState(uint8_t swtch) {
     int value = getValue(MIXSRC_FIRST_SWITCH + swtch);
     return (value == 0) ? 0 : (value < 0) ? -1 : +1;
@@ -51,9 +46,7 @@ const char * logsOpen()
 {
   // Determine and set log file filename
   FRESULT result;
-
-  // /LOGS/modelnamexxxxxx_YYYY-MM-DD-HHMMSS.log
-  char filename[sizeof(LOGS_PATH) + LEN_MODEL_NAME + 18 + 4 + 1];
+  char filename[sizeof(LOGS_PATH) + LEN_MODEL_NAME + 16]; // /LOGS/modelnamexxxxxx_2013-01-01.log
 
   if (!sdMounted())
     return STR_NO_SDCARD;
@@ -78,7 +71,9 @@ const char * logsOpen()
     if (!len && filename[i])
       len = i+1;
     if (len) {
-      if (!filename[i])
+      if (filename[i])
+        filename[i] = zchar2char(filename[i]);
+      else
         filename[i] = '_';
     }
     i--;
@@ -100,7 +95,7 @@ const char * logsOpen()
   char * tmp = &filename[len];
 
 #if defined(RTCLOCK)
-  tmp = strAppendDate(tmp, true);
+  tmp = strAppendDate(&filename[len]);
 #endif
 
   strcpy(tmp, STR_LOGS_EXT);
@@ -146,7 +141,7 @@ void writeHeader()
       TelemetrySensor & sensor = g_model.telemetrySensors[i];
       if (sensor.logs) {
         memset(label, 0, sizeof(label));
-        strncpy(label, sensor.label, TELEM_LABEL_LEN);
+        zchar2str(label, sensor.label, TELEM_LABEL_LEN);
         uint8_t unit = sensor.unit;
         if (unit == UNIT_CELLS ) unit = UNIT_VOLTS;
         if (UNIT_RAW < unit && unit < UNIT_FIRST_VIRTUAL) {
@@ -160,7 +155,7 @@ void writeHeader()
     }
   }
 
-#if defined(PCBFRSKY) || defined(PCBNV14)
+#if defined(PCBTARANIS) || defined(PCBHORUS)
   for (uint8_t i=1; i<NUM_STICKS+NUM_POTS+NUM_SLIDERS+1; i++) {
     const char * p = STR_VSRCRAW + i * STR_VSRCRAW[0] + 2;
     for (uint8_t j=0; j<STR_VSRCRAW[0]-1; ++j) {
@@ -278,7 +273,7 @@ void logsWrite()
         f_printf(&g_oLogFile, "%d,", calibratedAnalogs[i]);
       }
 
-#if defined(PCBFRSKY) || defined(PCBFLYSKY)
+#if defined(PCBTARANIS) || defined(PCBHORUS)
       for (uint8_t i=0; i<NUM_SWITCHES; i++) {
         if (SWITCH_EXISTS(i)) {
           f_printf(&g_oLogFile, "%d,", getSwitchState(i));

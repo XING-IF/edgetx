@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -28,7 +27,7 @@ const unsigned char ASTERISK_BITMAP[]  = {
 void drawAlertBox(const char * title, const char * text, const char * action)
 {
   lcdClear();
-  lcdDrawRleBitmap(0, 0, ASTERISK_BITMAP);
+  lcdDrawBitmap(0, 0, ASTERISK_BITMAP);
 
 #define MESSAGE_LCD_OFFSET   60
 

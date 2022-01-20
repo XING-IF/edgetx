@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -244,8 +243,9 @@ const char * const debugTimerNames[DEBUG_TIMERS_COUNT] = {
   ,"perMain dur"   // debugTimerPerMain,
   ," perMain s1"   // debugTimerPerMain1,
   ," guiMain   "   // debugTimerGuiMain,
-  ,"  LUA      "   // debugTimerLua,
+  ,"  LUA bg   "   // debugTimerLuaBg,
   ,"  LCD wait "   // debugTimerLcdRefreshWait,
+  ,"  LUA fg   "   // debugTimerLuaFg,
   ,"  LCD refr."   // debugTimerLcdRefresh,
   ,"  Menus    "   // debugTimerMenus,
   ,"   Menu hnd"   // debugTimerMenuHandlers,

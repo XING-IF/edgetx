@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -23,8 +22,7 @@
 #include <inttypes.h>
 #include <string.h>
 #include "opentx.h"
-#include "../timers.h"
-#include "model_init.h"
+#include "timers.h"
 
 void eeLoadModel(uint8_t index)
 {
@@ -47,12 +45,43 @@ void eeLoadModel(uint8_t index)
 
     bool alarms = true;
     if (size < EEPROM_MIN_MODEL_SIZE) { // if not loaded a fair amount
-      setModelDefaults(index);
+      modelDefault(index) ;
       storageCheck(true);
       alarms = false;
     }
 
     postModelLoad(alarms);
+  }
+}
+
+uint8_t eeFindEmptyModel(uint8_t id, bool down)
+{
+  uint8_t i = id;
+  for (;;) {
+    i = (MAX_MODELS + (down ? i+1 : i-1)) % MAX_MODELS;
+    if (!eeModelExists(i)) break;
+    if (i == id) return 0xff; // no free space in directory left
+  }
+  return i;
+}
+
+void selectModel(uint8_t sub)
+{
+#if !defined(COLORLCD)
+  showMessageBox(STR_LOADINGMODEL);
+#endif
+  storageFlushCurrentModel();
+  storageCheck(true); // force writing of current model data before this is changed
+  g_eeGeneral.currModel = sub;
+  storageDirty(EE_GENERAL);
+  eeLoadModel(sub);
+}
+
+ModelHeader modelHeaders[MAX_MODELS];
+void eeLoadModelHeaders()
+{
+  for (uint32_t i=0; i<MAX_MODELS; i++) {
+    eeLoadModelHeader(i, &modelHeaders[i]);
   }
 }
 
@@ -71,7 +100,7 @@ bool storageReadRadioSettings(bool allowFixes)
     storageEraseAll(true);
   }
   else {
-    loadModelHeaders();
+    eeLoadModelHeaders();
   }
 
   for (uint8_t i=0; languagePacks[i]; i++) {
@@ -102,7 +131,7 @@ void storageEraseAll(bool warn)
   TRACE("storageEraseAll");
 
   generalDefault();
-  setModelDefaults();
+  modelDefault(0);
 
   if (warn) {
     ALERT(STR_STORAGE_WARNING, STR_BAD_RADIO_DATA, AU_BAD_RADIODATA);
@@ -113,50 +142,4 @@ void storageEraseAll(bool warn)
   storageFormat();
   storageDirty(EE_GENERAL|EE_MODEL);
   storageCheck(true);
-}
-
-void checkModelIdUnique(uint8_t index, uint8_t module)
-{
-  if (isModuleXJTD8(module))
-    return;
-
-  uint8_t modelId = g_model.header.modelId[module];
-  uint8_t additionalOnes = 0;
-  char * name = reusableBuffer.moduleSetup.msg;
-
-  memset(reusableBuffer.moduleSetup.msg, 0, sizeof(reusableBuffer.moduleSetup.msg));
-
-  if (modelId != 0) {
-    for (uint8_t i = 0; i < MAX_MODELS; i++) {
-      if (i != index) {
-        if (modelId == modelHeaders[i].modelId[module]) {
-          if ((WARNING_LINE_LEN - 4 - (name - reusableBuffer.moduleSetup.msg)) > (signed)(modelHeaders[i].name[0] ? zlen(modelHeaders[i].name, LEN_MODEL_NAME) : sizeof(TR_MODEL) + 2)) { // you cannot rely exactly on WARNING_LINE_LEN so using WARNING_LINE_LEN-2 (-2 for the ",")
-            if (reusableBuffer.moduleSetup.msg[0] != '\0') {
-              name = strAppend(name, ", ");
-            }
-            if (modelHeaders[i].name[0] == 0) {
-              name = strAppend(name, STR_MODEL);
-              name = strAppendUnsigned(name+strlen(name), i + 1, 2);
-            }
-            else {
-              name = strAppend(name, modelHeaders[i].name, LEN_MODEL_NAME);
-            }
-          }
-          else {
-            additionalOnes++;
-          }
-        }
-      }
-    }
-  }
-
-  if (additionalOnes) {
-    name = strAppend(name, " (+");
-    name = strAppendUnsigned(name, additionalOnes);
-    strAppend(name, ")");
-  }
-
-  if (reusableBuffer.moduleSetup.msg[0]) {
-    POPUP_WARNING(STR_MODELIDUSED, reusableBuffer.moduleSetup.msg);
-  }
 }

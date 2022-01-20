@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -20,13 +19,7 @@
  */
 
 #include "opentx.h"
-
-#if defined(MULTIMODULE)
-  #include "pulses/multi.h"
-  #if defined(MULTI_PROTOLIST)
-    #include "io/multi_protolist.h"
-  #endif
-#endif
+#include "pulses/multi.h"
 
 uint8_t   storageDirtyMsk;
 tmr10ms_t storageDirtyTime10ms;
@@ -65,14 +58,9 @@ void preModelLoad()
 #endif
 #if defined(HARDWARE_EXTERNAL_MODULE)
   stopPulsesExternalModule();
-  RTOS_WAIT_MS(200);
 #endif
 
   stopTrainer();
-
-#if defined(COLORLCD)
-  deleteCustomScreens();
-#endif
 }
 
 void postRadioSettingsLoad()
@@ -114,23 +102,15 @@ void checkExternalAntenna()
     }
     else if (g_eeGeneral.antennaMode == ANTENNA_MODE_PER_MODEL && g_model.moduleData[INTERNAL_MODULE].pxx.antennaMode == ANTENNA_MODE_EXTERNAL) {
       if (!globalData.externalAntennaEnabled) {
-#if defined(COLORLCD)
-#warning "Antenna confirmation dialog needed"
-#else
         POPUP_CONFIRMATION(STR_ANTENNACONFIRM1, onAntennaSwitchConfirm);
         SET_WARNING_INFO(STR_ANTENNACONFIRM2, sizeof(TR_ANTENNACONFIRM2), 0);
-#endif
       }
     }
     else if (g_eeGeneral.antennaMode == ANTENNA_MODE_ASK || (g_eeGeneral.antennaMode == ANTENNA_MODE_PER_MODEL && g_model.moduleData[INTERNAL_MODULE].pxx.antennaMode == ANTENNA_MODE_ASK)) {
       globalData.externalAntennaEnabled = false;
-#if defined(COLORLCD)
-#warning "Antenna confirmation dialog needed"
-#else
       POPUP_MENU_ADD_ITEM(STR_USE_INTERNAL_ANTENNA);
       POPUP_MENU_ADD_ITEM(STR_USE_EXTERNAL_ANTENNA);
       POPUP_MENU_START(onAntennaSelection);
-#endif
     }
     else {
       globalData.externalAntennaEnabled = false;
@@ -166,9 +146,6 @@ void postModelLoad(bool alarms)
 #if defined(MULTIMODULE)
   else if (isModuleMultimodule(EXTERNAL_MODULE))
     multiPatchCustom(EXTERNAL_MODULE);
-#if defined(MULTI_PROTOLIST)
-  MultiRfProtocols::removeInstance(EXTERNAL_MODULE);
-#endif
 #endif
 
   AUDIO_FLUSH();
@@ -189,7 +166,7 @@ void postModelLoad(bool alarms)
     }
   }
 
-  loadCurves();
+  LOAD_MODEL_CURVES();
 
   resumeMixerCalculations();
   if (pulsesStarted()) {
@@ -206,7 +183,7 @@ void postModelLoad(bool alarms)
   referenceModelAudioFiles();
 #endif
 
-#if defined(COLORLCD)
+#if defined(PCBHORUS)
   loadCustomScreens();
 #endif
 
@@ -237,66 +214,3 @@ void storageFlushCurrentModel()
     storageDirty(EE_MODEL);
   }
 }
-
-#if !defined(STORAGE_MODELSLIST)
-void selectModel(uint8_t idx)
-{
-#if !defined(COLORLCD)
-  showMessageBox(STR_LOADINGMODEL);
-#endif
-  storageFlushCurrentModel();
-  storageCheck(true); // force writing of current model data before this is changed
-  g_eeGeneral.currModel = idx;
-  storageDirty(EE_GENERAL);
-  loadModel(idx);
-}
-
-uint8_t findEmptyModel(uint8_t id, bool down)
-{
-  uint8_t i = id;
-  for (;;) {
-    i = (MAX_MODELS + (down ? i+1 : i-1)) % MAX_MODELS;
-    if (!modelExists(i)) break;
-    if (i == id) return 0xff; // no free space in directory left
-  }
-  return i;
-}
-
-ModelHeader modelHeaders[MAX_MODELS];
-
-void loadModelHeaders()
-{
-  for (uint32_t i=0; i<MAX_MODELS; i++) {
-    loadModelHeader(i, &modelHeaders[i]);
-  }
-}
-
-uint8_t findNextUnusedModelId(uint8_t index, uint8_t module)
-{
-  uint8_t usedModelIds[(MAX_RXNUM + 7) / 8];
-  memset(usedModelIds, 0, sizeof(usedModelIds));
-
-  for (uint8_t modelIndex = 0; modelIndex < MAX_MODELS; modelIndex++) {
-    if (modelIndex == index)
-      continue;
-
-    uint8_t id = modelHeaders[modelIndex].modelId[module];
-    if (id == 0)
-      continue;
-
-    uint8_t mask = 1u << (id & 7u);
-    usedModelIds[id >> 3u] |= mask;
-  }
-
-  for (uint8_t id = 1; id <= getMaxRxNum(module); id++) {
-    uint8_t mask = 1u << (id & 7u);
-    if (!(usedModelIds[id >> 3u] & mask)) {
-      // found free ID
-      return id;
-    }
-  }
-
-  // failed finding something...
-  return 0;
-}
-#endif

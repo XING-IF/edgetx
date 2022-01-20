@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -22,8 +21,6 @@
 #ifndef _MODULES_CONSTANTS_H_
 #define _MODULES_CONSTANTS_H_
 
-#include "storage/yaml/yaml_defs.h"
-
 enum ModuleType {
   MODULE_TYPE_NONE = 0,
   MODULE_TYPE_PPM,
@@ -40,9 +37,9 @@ enum ModuleType {
   MODULE_TYPE_R9M_LITE_PRO_PXX2,
   MODULE_TYPE_SBUS,
   MODULE_TYPE_XJT_LITE_PXX2,
-  MODULE_TYPE_FLYSKY, //no more protocols possible because of 4 bits value
-  MODULE_TYPE_COUNT SKIP,
-  MODULE_TYPE_MAX SKIP = MODULE_TYPE_COUNT - 1
+  MODULE_TYPE_AFHDS3, //no more protocols possible because of 4 bits value
+  MODULE_TYPE_COUNT,
+  MODULE_TYPE_MAX = MODULE_TYPE_COUNT - 1
 };
 
 /* FrSky XJT / ISRM */
@@ -189,7 +186,11 @@ enum ModuleSubtypeMulti {
   MODULE_SUBTYPE_MULTI_JOYSWAY,
   MODULE_SUBTYPE_MULTI_E016H,
   MODULE_SUBTYPE_MULTI_CONFIG,
-  MODULE_SUBTYPE_MULTI_LAST = MODULE_SUBTYPE_MULTI_CONFIG
+  MODULE_SUBTYPE_MULTI_IKEAANSLUTA,
+  MODULE_SUBTYPE_MULTI_WILLIFM,  //85
+  MODULE_SUBTYPE_MULTI_LOSI,
+  MODULE_SUBTYPE_MULTI_MOULDKG,
+  MODULE_SUBTYPE_MULTI_LAST = MODULE_SUBTYPE_MULTI_MOULDKG
 };
 
 enum MMDSM2Subtypes {
@@ -225,18 +226,13 @@ enum ModuleSubtypeDSM2 {
   DSM2_PROTO_DSMX,
 };
 
-enum ModuleSubtypeFlysky {
-  FLYSKY_SUBTYPE_AFHDS3=0,
-  FLYSKY_SUBTYPE_AFHDS2A
-};
-
 enum FailsafeModes {
   FAILSAFE_NOT_SET,
   FAILSAFE_HOLD,
   FAILSAFE_CUSTOM,
   FAILSAFE_NOPULSES,
   FAILSAFE_RECEIVER,
-  FAILSAFE_LAST SKIP = FAILSAFE_RECEIVER
+  FAILSAFE_LAST = FAILSAFE_RECEIVER
 };
 
 enum AntennaModes {
@@ -244,8 +240,8 @@ enum AntennaModes {
   ANTENNA_MODE_ASK = -1,
   ANTENNA_MODE_PER_MODEL = 0,
   ANTENNA_MODE_EXTERNAL = 1,
-  ANTENNA_MODE_FIRST SKIP = ANTENNA_MODE_INTERNAL,
-  ANTENNA_MODE_LAST SKIP = ANTENNA_MODE_EXTERNAL
+  ANTENNA_MODE_FIRST = ANTENNA_MODE_INTERNAL,
+  ANTENNA_MODE_LAST = ANTENNA_MODE_EXTERNAL
 };
 
 enum AfhdsModes {

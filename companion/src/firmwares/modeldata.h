@@ -34,8 +34,6 @@
 #include "sensordata.h"
 #include "telem_data.h"
 #include "timerdata.h"
-#include "customisation_data.h"
-#include "generalsettings.h"
 
 #include <QtCore>
 
@@ -44,8 +42,6 @@ class RadioDataConversionState;
 class AbstractStaticItemModel;
 
 constexpr char AIM_MODELDATA_TRAINERMODE[]  {"modeldata.trainermode"};
-constexpr char AIM_MODELDATA_FUNCSWITCHCONFIG[]  {"modeldata.funcswitchconfig"};
-constexpr char AIM_MODELDATA_FUNCSWITCHSTART[]  {"modeldata.funcswitchstart"};
 
 #define CHAR_FOR_NAMES " ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-."
 #define CHAR_FOR_NAMES_REGEX "[ A-Za-z0-9_.-,]*"
@@ -63,6 +59,8 @@ class RSSIAlarmData {
     }
 };
 
+#define CPN_MAX_SCRIPTS       9
+#define CPN_MAX_SCRIPT_INPUTS 10
 class ScriptData {
   public:
     ScriptData() { clear(); }
@@ -72,9 +70,35 @@ class ScriptData {
     void clear() { memset(reinterpret_cast<void *>(this), 0, sizeof(ScriptData)); }
 };
 
+/*
+ * TODO ...
+ */
+#if 0
+class CustomScreenOptionData {
+  public:
+
+};
+
+class CustomScreenZoneData {
+  public:
+    char widgetName[10+1];
+    WidgetOptionData widgetOptions[5];
+};
+
+class CustomScreenData {
+  public:
+    CustomScreenData();
+
+    char layoutName[10+1];
+    CustomScreenZoneData zones[];
+    CustomScreenOptionData options[];
+};
+#else
+typedef char CustomScreenData[610+1];
+typedef char TopbarData[216+1];
+#endif
+
 enum TrainerMode {
-  TRAINER_MODE_OFF,
-  TRAINER_MODE_FIRST = TRAINER_MODE_OFF,
   TRAINER_MODE_MASTER_JACK,
   TRAINER_MODE_SLAVE_JACK,
   TRAINER_MODE_MASTER_SBUS_EXTERNAL_MODULE,
@@ -83,11 +107,10 @@ enum TrainerMode {
   TRAINER_MODE_MASTER_BLUETOOTH,
   TRAINER_MODE_SLAVE_BLUETOOTH,
   TRAINER_MODE_MULTI,
-  TRAINER_MODE_LAST = TRAINER_MODE_MULTI
+  TRAINER_MODE_COUNT
 };
 
 #define INPUT_NAME_LEN 4
-#define CPN_MAX_BITMAP_LEN 14
 
 class ModelData {
   Q_DECLARE_TR_FUNCTIONS(ModelData)
@@ -143,10 +166,9 @@ class ModelData {
     unsigned int switchWarningEnable;
     unsigned int thrTrimSwitch;
     unsigned int potsWarningMode;
-    bool potsWarnEnabled[CPN_MAX_POTS + CPN_MAX_SLIDERS];
-    int potsWarnPosition[CPN_MAX_POTS + CPN_MAX_SLIDERS];
+    bool potsWarnEnabled[CPN_MAX_POTS];
+    int potsWarnPosition[CPN_MAX_POTS];
     bool displayChecklist;
-
     GVarData gvarData[CPN_MAX_GVARS];
     MavlinkData mavlink;
     unsigned int telemetryProtocol;
@@ -154,11 +176,11 @@ class ModelData {
     unsigned int  rssiSource;
     RSSIAlarmData rssiAlarms;
 
-    char bitmap[CPN_MAX_BITMAP_LEN + 1];
+    char bitmap[10+1];
 
     unsigned int trainerMode;  // TrainerMode
 
-    ModuleData moduleData[CPN_MAX_MODULES + 1/*trainer*/];
+    ModuleData moduleData[CPN_MAX_MODULES+1/*trainer*/];
 
     ScriptData scriptData[CPN_MAX_SCRIPTS];
 
@@ -166,40 +188,16 @@ class ModelData {
 
     unsigned int toplcdTimer;
 
-    RadioLayout::CustomScreens customScreens;
-    TopBarPersistentData topBarData;
-    unsigned int view;
+    CustomScreenData customScreenData[5];
+
+    TopbarData topbarData;
 
     char registrationId[8+1];
-
-    enum FunctionSwitchConfig {
-      FUNC_SWITCH_CONFIG_NONE,
-      FUNC_SWITCH_CONFIG_FIRST = FUNC_SWITCH_CONFIG_NONE,
-      FUNC_SWITCH_CONFIG_TOGGLE,
-      FUNC_SWITCH_CONFIG_2POS,
-      FUNC_SWITCH_CONFIG_LAST = FUNC_SWITCH_CONFIG_2POS
-    };
-
-    enum FunctionSwitchStart {
-      FUNC_SWITCH_START_INACTIVE,
-      FUNC_SWITCH_START_FIRST = FUNC_SWITCH_START_INACTIVE,
-      FUNC_SWITCH_START_ACTIVE,
-      FUNC_SWITCH_START_PREVIOUS,
-      FUNC_SWITCH_START_LAST = FUNC_SWITCH_START_PREVIOUS
-    };
-
-    // Function switches
-    unsigned int functionSwitchConfig;
-    unsigned int functionSwitchGroup;
-    unsigned int functionSwitchStartConfig;
-    unsigned int functionSwitchLogicalState;
-    char functionSwitchNames[CPN_MAX_FUNCTION_SWITCHES][HARDWARE_NAME_LEN + 1];
 
     void clear();
     bool isEmpty() const;
     void setDefaultInputs(const GeneralSettings & settings);
     void setDefaultMixes(const GeneralSettings & settings);
-    void setDefaultFunctionSwitches(int functionSwitchCount);
     void setDefaultValues(unsigned int id, const GeneralSettings & settings);
 
     int getTrimValue(int phaseIdx, int trimIdx);
@@ -284,12 +282,6 @@ class ModelData {
     static QString trainerModeToString(const int value);
     static bool isTrainerModeAvailable(const GeneralSettings & generalSettings, const Firmware * firmware, const int value);
     static AbstractStaticItemModel * trainerModeItemModel(const GeneralSettings & generalSettings, const Firmware * firmware);
-    QString funcSwitchConfigToString(const int index) const;
-    static QString funcSwitchConfigToString(const int index, const int value);
-    static AbstractStaticItemModel * funcSwitchConfigItemModel();
-    QString funcSwitchStartToString(const int index) const;
-    static QString funcSwitchStartToString(const int index, const int value);
-    static AbstractStaticItemModel * funcSwitchStartItemModel();
 
   protected:
     void removeGlobalVar(int & var);

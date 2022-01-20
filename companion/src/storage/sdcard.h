@@ -41,7 +41,6 @@ class SdcardFormat : public CategorizedStorageFormat
   protected:
     virtual bool loadFile(QByteArray & fileData, const QString & fileName);
     virtual bool writeFile(const QByteArray & fileData, const QString & fileName);
-    virtual bool getFileList(std::list<std::string>& filelist);
 };
 
 class SdcardStorageFactory : public DefaultStorageFactory<SdcardFormat>

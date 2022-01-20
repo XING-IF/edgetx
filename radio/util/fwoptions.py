@@ -105,6 +105,7 @@ options_taranis_x7 = {
     "nooverridech": ("OVERRIDE_CHANNEL_FUNCTION", "NO", "YES"),
     "eu": ("MODULE_PROTOCOL_D8", "NO", "YES"),
     "flexr9m": ("MODULE_PROTOCOL_FLEX", "YES", None),
+    "afhds3": ("AFHDS3", "YES", "NO")
 }
 
 options_taranis_x9lite = {
@@ -216,6 +217,7 @@ options_jumper_tlite = {
     "faichoice": ("FAI", "CHOICE", None),
     "nooverridech": ("OVERRIDE_CHANNEL_FUNCTION", "NO", "YES"),
     "flexr9m": ("MODULE_PROTOCOL_FLEX", "YES", None),
+    "afhds3": ("AFHDS3", "YES", "NO")
 }
 
 
@@ -269,19 +271,6 @@ options_radiomaster_tx12 = {
     "nooverridech": ("OVERRIDE_CHANNEL_FUNCTION", "NO", "YES"),
     "flexr9m": ("MODULE_PROTOCOL_FLEX", "YES", None),
     "afhds3": ("AFHDS3", "YES", "NO")
-}
-
-options_radiomaster_zorro = {
-    "noheli": ("HELI", "NO", "YES"),
-    "ppmus": ("PPM_UNIT", "US", "PERCENT_PREC1"),
-    "lua": ("LUA", "YES", "NO_MODEL_SCRIPTS"),
-    "nogvars": ("GVARS", "NO", "YES"),
-    "faimode": ("FAI", "YES", None),
-    "faichoice": ("FAI", "CHOICE", None),
-    "nooverridech": ("OVERRIDE_CHANNEL_FUNCTION", "NO", "YES"),
-    "flexr9m": ("MODULE_PROTOCOL_FLEX", "YES", None),
-    "afhds3": ("AFHDS3", "YES", "NO"),
-    "internalelrs": ("INTERNAL_MODULE_ELRS", "YES", "NO"),
 }
 
 options_radiomaster_t8 = {

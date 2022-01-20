@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -20,8 +19,9 @@
  */
 
 #include "opentx.h"
-#include "x12s_adc_driver.h"
 
+uint16_t adcValues[NUM_ANALOGS] __DMA;
+uint16_t rtcBatteryVoltage;
 
 #define ADC_CS_HIGH()                  (ADC_SPI_GPIO->BSRRL = ADC_SPI_PIN_CS)
 #define ADC_CS_LOW()                   (ADC_SPI_GPIO->BSRRH = ADC_SPI_PIN_CS)
@@ -100,7 +100,7 @@ static void ADS7952_Init()
   ADC_CS_HIGH();
 }
 
-static bool x12s_adc_init()
+void adcInit()
 {
   ADS7952_Init();
 
@@ -128,8 +128,8 @@ static bool x12s_adc_init()
   ADC_DMA_Stream->NDTR = 2;
   ADC_DMA_Stream->FCR = DMA_SxFCR_DMDIS | DMA_SxFCR_FTH_0;
 
-  ADC->CCR = ADC_CCR_VBATE; // Enable RTC coin cell sampling bridge
-  
+  ADC->CCR = ADC_CCR_VBATE; // Enable vbat sensor
+
   ADC1->CR1 = ADC_CR1_SCAN;
   ADC1->CR2 = ADC_CR2_ADON | ADC_CR2_DMA | ADC_CR2_DDS;
   ADC1->SQR1 = (1 - 1) << 20;
@@ -137,8 +137,11 @@ static bool x12s_adc_init()
   ADC1->SQR3 = (ADC_Channel_Vbat << 0);
   ADC1->SMPR1 = (ADC_SAMPTIME << 0) + (ADC_SAMPTIME << 3) + (ADC_SAMPTIME << 6) + (ADC_SAMPTIME << 9) + (ADC_SAMPTIME << 12) + (ADC_SAMPTIME << 15) + (ADC_SAMPTIME << 18) + (ADC_SAMPTIME << 21) + (ADC_SAMPTIME << 24);
   ADC1->SMPR2 = (ADC_SAMPTIME << 0) + (ADC_SAMPTIME << 3) + (ADC_SAMPTIME << 6) + (ADC_SAMPTIME << 9) + (ADC_SAMPTIME << 12) + (ADC_SAMPTIME << 15) + (ADC_SAMPTIME << 18) + (ADC_SAMPTIME << 21) + (ADC_SAMPTIME << 24) + (ADC_SAMPTIME << 27);
+}
 
-  return true;
+uint16_t getRTCBatteryVoltage()
+{
+  return (rtcBatteryVoltage * 2 * ADC_VREF_PREC2) / 2048;
 }
 
 const uint16_t adcCommands[MOUSE1+2] =
@@ -224,9 +227,7 @@ bool adcOnChipReadFinished()
   return (ADC_DMA->LISR & DMA_LISR_TCIF0);
 }
 
-// Re-declare adcRead()
-// (takes precedence over hal/adc_driver.cpp)
-bool adcRead()
+void adcRead()
 {
   uint16_t temp[NUM_ANALOGS-MOUSE1] = { 0 };
   uint8_t noInternalReads = 0;
@@ -265,17 +266,16 @@ bool adcRead()
   if (isVBatBridgeEnabled()) {
     rtcBatteryVoltage = ADC1->DR;
   }
-
-  return true;
 }
 
-//TODO: implement these based on stm32_hal_adc.cpp
-//static bool x12s_adc_init();
-//static bool x12s_adc_start_read();
-//static void x12s_adc_wait_completion();
+#if !defined(SIMU)
+const int8_t ana_direction[NUM_ANALOGS] = {1,-1,1,-1,  -1,1,-1,  -1,-1,  -1,1, 0,0,0};
 
-const etx_hal_adc_driver_t x12s_adc_driver = {
-  x12s_adc_init,
-  nullptr,//x12s_adc_start_read,
-  nullptr,//x12s_adc_wait_completion
-};
+uint16_t getAnalogValue(uint8_t index)
+{
+  if (ana_direction[index] < 0)
+    return 4095 - adcValues[index];
+  else
+    return adcValues[index];
+}
+#endif // #if !defined(SIMU)

@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -56,10 +55,6 @@ const uint8_t bootloaderVersion[] __attribute__ ((section(".version"), used)) =
 volatile rotenc_t rotencValue = 0;
 #endif
 
-#if defined(DEBUG)
-volatile tmr10ms_t g_tmr10ms;
-#endif
-
 uint32_t firmwareSize;
 uint32_t firmwareAddress = FIRMWARE_ADDRESS;
 uint32_t firmwareWritten = 0;
@@ -78,15 +73,12 @@ void interrupt10ms()
 {
   tenms |= 1u; // 10 mS has passed
 
-#if defined(DEBUG)
-  g_tmr10ms++;
-#endif
-  
   uint8_t index = 0;
-  uint32_t in = readKeys();
-
-  for (int i = 0; i < TRM_BASE; i++) {
-    keys[index++].input(in & (1 << i));
+  uint8_t in = readKeys();
+  for (uint8_t i = 1; i != uint8_t(1u << TRM_BASE); i <<= 1) {
+    uint8_t value = (in & i);
+    keys[index].input(value);
+    ++index;
   }
 
 #if defined(ROTARY_ENCODER_NAVIGATION)
@@ -96,7 +88,7 @@ void interrupt10ms()
   int8_t scrollRE = reNewValue - rePreviousValue;
   if (scrollRE) {
     rePreviousValue = reNewValue;
-    pushEvent(scrollRE < 0 ? EVT_KEY_FIRST(KEY_UP) : EVT_KEY_FIRST(KEY_DOWN));
+    putEvent(scrollRE < 0 ? EVT_KEY_FIRST(KEY_UP) : EVT_KEY_FIRST(KEY_DOWN));
   }
 #endif
 }
@@ -206,11 +198,11 @@ int main()
   RCC_AHB1PeriphClockCmd(PWR_RCC_AHB1Periph | KEYS_RCC_AHB1Periph |
                          LCD_RCC_AHB1Periph | BACKLIGHT_RCC_AHB1Periph |
                          AUX_SERIAL_RCC_AHB1Periph | AUX2_SERIAL_RCC_AHB1Periph |
-                         I2C_B1_RCC_AHB1Periph | KEYS_BACKLIGHT_RCC_AHB1Periph |
+                         I2C_RCC_AHB1Periph | KEYS_BACKLIGHT_RCC_AHB1Periph |
                          SD_RCC_AHB1Periph, ENABLE);
 
   RCC_APB1PeriphClockCmd(ROTARY_ENCODER_RCC_APB1Periph | LCD_RCC_APB1Periph | BACKLIGHT_RCC_APB1Periph |
-                         INTERRUPT_xMS_RCC_APB1Periph | I2C_B1_RCC_APB1Periph |
+                         INTERRUPT_xMS_RCC_APB1Periph | I2C_RCC_APB1Periph |
                          AUX_SERIAL_RCC_APB1Periph | AUX2_SERIAL_RCC_APB1Periph |
                          SD_RCC_APB1Periph, ENABLE);
 
@@ -276,6 +268,7 @@ int main()
 
   // init screen
   bootloaderInitScreen();
+  lcdSetRefVolt(24);
 
 #if defined(PWR_BUTTON_PRESS)
   // wait until power button is released
@@ -290,7 +283,7 @@ int main()
     if (tenms) {
       tenms = 0;
 
-      if (state != ST_USB && state != ST_FLASHING && state != ST_FLASH_DONE) {
+      if (state != ST_USB) {
         if (usbPlugged()) {
           state = ST_USB;
           if (!unlocked) {
@@ -323,11 +316,11 @@ int main()
         bootloaderDrawScreen(state, vpos);
 
         if (event == EVT_KEY_FIRST(KEY_DOWN)) {
-          if (vpos < MAIN_MENU_LEN - 1) { vpos++; }
+          vpos = (vpos + 1) % MAIN_MENU_LEN;
           continue;
         }
         else if (event == EVT_KEY_FIRST(KEY_UP)) {
-          if (vpos > 0) { vpos--; }
+          vpos = (vpos + MAIN_MENU_LEN - 1) % MAIN_MENU_LEN;
           continue;
         }
         else if (event == EVT_KEY_BREAK(KEY_ENTER)) {
@@ -443,6 +436,7 @@ int main()
           state = ST_FLASHING;
         }
       }
+
       else if (state == ST_FLASHING) {
         // commit to flashing
         if (!unlocked && (memoryType == MEM_FLASH)) {
@@ -514,9 +508,22 @@ int main()
         boardOff();
       }
     }
-
-    if (state == ST_REBOOT) {
+// #define FW                             6
+// #define FWNUM                          5
+// #define FH                             8
+    // lcdDrawText(3*FW, 2*FH, "Write Firmware", opt == 0 ? INVERS : 0);
+    // lcdDrawText(3*FW, 3*FH, "Restore EEPROM", opt == 1 ? INVERS : 0);
+    // lcdDrawText(3*FW, 4*FH, "Exit", opt == 2 ? INVERS : 0);
+  //     lcdDrawText(LCD_W / 2, 0, BOOTLOADER_TITLE, CENTERED);
+  // lcdInvertLine(0);
+    if (state == ST_REBOOT) 
+    {
       lcdClear();
+      // lcdDrawText(0, 16,"  Please short press");
+      lcdDrawText(2, 22,"Press the power button.");
+      lcdDrawText(2, 33,"Exit the flashing mode.");
+      //lcdInvertLine(32);
+      //lcdDrawSolidFilledRect(0, 32, 128, 2, TEXT_COLOR);
       lcdRefresh();
       lcdRefreshWait();
 
@@ -524,14 +531,14 @@ int main()
       rtcInit();
       RTC->BKP0R = SOFTRESET_REQUEST;
 #endif
-
-      NVIC_SystemReset();
+      while(1);
+     //NVIC_SystemReset();
     }
   }
 
   return 0;
 }
 
-#if defined(PCBHORUS) || defined(PCBNV14)
+#if defined(PCBHORUS)
 void *__dso_handle = nullptr;
 #endif

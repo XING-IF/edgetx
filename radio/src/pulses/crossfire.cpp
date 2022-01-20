@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -70,36 +69,26 @@ uint8_t createCrossfireChannelsFrame(uint8_t * frame, int16_t * pulses)
   return buf - frame;
 }
 
-static void setupPulsesCrossfire(uint8_t idx, CrossfirePulsesData* p_data,
-                                 uint8_t endpoint)
+void setupPulsesCrossfire()
 {
+  if (telemetryProtocol == PROTOCOL_TELEMETRY_CROSSFIRE) {
+    uint8_t * pulses = extmodulePulsesData.crossfire.pulses;
 #if defined(LUA)
-  if (outputTelemetryBuffer.destination == endpoint) {
-    memcpy(p_data->pulses, outputTelemetryBuffer.data,
-           outputTelemetryBuffer.size);
-    p_data->length = outputTelemetryBuffer.size;
-    outputTelemetryBuffer.reset();
-  } else
-#endif
-  {
-    if (moduleState[idx].counter == CRSF_FRAME_MODELID) {
-      p_data->length = createCrossfireModelIDFrame(p_data->pulses);
-      moduleState[idx].counter = CRSF_FRAME_MODELID_SENT;
-    } else {
-      p_data->length = createCrossfireChannelsFrame(
-          p_data->pulses,
-          &channelOutputs[g_model.moduleData[idx].channelsStart]);
+    if (outputTelemetryBuffer.destination == TELEMETRY_ENDPOINT_SPORT) {
+      memcpy(pulses, outputTelemetryBuffer.data, outputTelemetryBuffer.size);
+      extmodulePulsesData.crossfire.length = outputTelemetryBuffer.size;
+      outputTelemetryBuffer.reset();
     }
-  }
-}
-
-void setupPulsesCrossfire(uint8_t idx)
-{
-  if (idx == INTERNAL_MODULE) {
-    auto* p_data = &intmodulePulsesData.crossfire;
-    setupPulsesCrossfire(idx, p_data, 0);
-  } else if (telemetryProtocol == PROTOCOL_TELEMETRY_CROSSFIRE) {
-    auto* p_data = &extmodulePulsesData.crossfire;
-    setupPulsesCrossfire(idx, p_data, TELEMETRY_ENDPOINT_SPORT);
+    else
+#endif
+    {
+      if (moduleState[EXTERNAL_MODULE].counter == CRSF_FRAME_MODELID) {
+        extmodulePulsesData.crossfire.length = createCrossfireModelIDFrame(pulses);
+        moduleState[EXTERNAL_MODULE].counter = CRSF_FRAME_MODELID_SENT;
+      }
+      else {
+        extmodulePulsesData.crossfire.length = createCrossfireChannelsFrame(pulses, &channelOutputs[g_model.moduleData[EXTERNAL_MODULE].channelsStart]);
+      }
+    }
   }
 }

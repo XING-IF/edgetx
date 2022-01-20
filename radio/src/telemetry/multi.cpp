@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -21,9 +20,8 @@
 #include "opentx.h"
 #include "telemetry.h"
 #include "multi.h"
-#include "io/multi_protolist.h"
 
-constexpr int32_t MULTI_DESIRED_VERSION = (1 << 24) | (3 << 16) | (3 << 8)  | 0;
+constexpr int32_t MULTI_DESIRED_VERSION = (1 << 24) | (3 << 16) | (1 << 8)  | 69;
 #define MULTI_CHAN_BITS 11
 
 extern uint8_t g_moduleIdx;
@@ -45,8 +43,7 @@ enum MultiPacketTypes : uint8_t
   MultiRxChannels,
   HottTelemetry,
   MLinkTelemetry,
-  ConfigTelemetry,
-  MultiProtoDef
+  ConfigTelemetry
 };
 
 enum MultiBufferState : uint8_t
@@ -68,7 +65,7 @@ enum MultiBufferState : uint8_t
 #if defined(INTERNAL_MODULE_MULTI)
 
 static MultiModuleStatus multiModuleStatus[NUM_MODULES] = {MultiModuleStatus(), MultiModuleStatus()};
-static uint8_t multiBindStatus[NUM_MODULES] = {MULTI_BIND_NONE, MULTI_BIND_NONE};
+static uint8_t multiBindStatus[NUM_MODULES] = {MULTI_NORMAL_OPERATION, MULTI_NORMAL_OPERATION};
 
 static MultiBufferState multiTelemetryBufferState[NUM_MODULES];
 static uint16_t multiTelemetryLastRxTS[NUM_MODULES];
@@ -103,10 +100,14 @@ static uint16_t& getMultiTelemetryLastRxTS(uint8_t module)
   return multiTelemetryLastRxTS[module];
 }
 
+// Use additional telemetry buffer
+uint8_t intTelemetryRxBuffer[TELEMETRY_RX_PACKET_SIZE];
+uint8_t intTelemetryRxBufferCount;
+
 #else // !INTERNAL_MODULE_MULTI
 
 static MultiModuleStatus multiModuleStatus;
-static uint8_t multiBindStatus = MULTI_BIND_NONE;
+static uint8_t multiBindStatus = MULTI_NORMAL_OPERATION;
 
 static MultiBufferState multiTelemetryBufferState;
 static uint16_t multiTelemetryLastRxTS;
@@ -143,10 +144,6 @@ uint16_t& getMultiTelemetryLastRxTS(uint8_t module)
 
 #endif // INTERNAL_MODULE_MULTI
 
-bool isMultiModeScanning(uint8_t module)
-{
-  return getModuleMode(module) == MODULE_MODE_GET_HARDWARE_INFO;
-}
 
 static MultiBufferState guessProtocol(uint8_t module)
 {
@@ -165,10 +162,10 @@ static MultiBufferState guessProtocol(uint8_t module)
     return FrskyTelemetryFallback;
 }
 
-static void processMultiScannerPacket(const uint8_t *data, const uint8_t moduleIdx)
+static void processMultiScannerPacket(const uint8_t *data)
 {
   uint8_t cur_channel = data[0];
-  if (moduleState[moduleIdx].mode == MODULE_MODE_SPECTRUM_ANALYSER) {
+  if (moduleState[g_moduleIdx].mode == MODULE_MODE_SPECTRUM_ANALYSER) {
     for (uint8_t channel = 0; channel <5; channel++) {
       uint8_t power = max<int>(0,(data[channel+1] - 34) >> 1); // remove everything below -120dB
 
@@ -210,6 +207,7 @@ static void processMultiStatusPacket(const uint8_t * data, uint8_t module, uint8
   // At least two status packets without bind flag
   bool wasBinding = status.isBinding();
 
+  status.lastUpdate = get_tmr10ms();
   status.flags = data[0];
   status.major = data[1];
   status.minor = data[2];
@@ -234,17 +232,14 @@ static void processMultiStatusPacket(const uint8_t * data, uint8_t module, uint8
       status.protocolName[0] = 0;
     }
   }
-
-  if (!getMultiModuleStatus(module).failsafeChecked) {
-    getMultiModuleStatus(module).requiresFailsafeCheck = true;
-    getMultiModuleStatus(module).failsafeChecked = true;
+  if (getMultiModuleStatus(module).requiresFailsafeCheck) {
+    getMultiModuleStatus(module).requiresFailsafeCheck = false;
+    if (getMultiModuleStatus(module).supportsFailsafe() &&  g_model.moduleData[module].failsafeMode == FAILSAFE_NOT_SET)
+      POPUP_WARNING(STR_NO_FAILSAFE);
   }
-  
+
   if (wasBinding && !status.isBinding() && getMultiBindStatus(module) == MULTI_BIND_INITIATED)
     setMultiBindStatus(module, MULTI_BIND_FINISHED);
-
-  // update timestamp last to avoid race conditions
-  status.lastUpdate = get_tmr10ms();
 }
 
 static void processMultiSyncPacket(const uint8_t * data, uint8_t module)
@@ -265,7 +260,7 @@ static void processMultiRxChannels(const uint8_t * data, uint8_t len)
 {
   if (g_model.trainerData.mode != TRAINER_MODE_MULTI)
     return;
-
+  
   //uint8_t pps  = data[0];
   //uint8_t rssi = data[1];
   int ch    = max(data[2], (uint8_t)0);
@@ -322,28 +317,6 @@ static void processConfigPacket(const uint8_t * packet, uint8_t len)
 }
 #endif
 
-#if defined(MULTI_PROTOLIST)
-static void processMultiProtoDef(uint8_t module, const uint8_t * packet, uint8_t len)
-{
-  /*
-    data[0]     = protocol number, 0xFF is an invalid list entry
-                  (Option value too large) and nothing sent after
-    data[1..n]  = protocol name null terminated
-    data[n+1]   = flags
-                   flags>>4 Option text number to be displayed
-                            (check multi status for description)
-                   flags&0x01 failsafe supported
-                   flags&0x02 Channel Map Disabled supported
-    data[n+2]   = number of sub protocols
-    data[n+3]   = sub protocols text length, only sent if nbr_sub != 0
-    data[n+4..] = sub protocol names, only sent if nbr_sub != 0
-   */
-
-  MultiRfProtocols::instance(module)->scanReply(packet, len);
-}
-#endif
-
- 
 static void processMultiTelemetryPaket(const uint8_t * packet, uint8_t module)
 {
   uint8_t type = packet[0];
@@ -463,7 +436,7 @@ static void processMultiTelemetryPaket(const uint8_t * packet, uint8_t module)
 #endif
     case SpectrumScannerPacket:
       if (len == 6)
-        processMultiScannerPacket(data, module);
+        processMultiScannerPacket(data);
       else
         TRACE("[MP] Received spectrum scanner len %d != 6", len);
       break;
@@ -476,14 +449,7 @@ static void processMultiTelemetryPaket(const uint8_t * packet, uint8_t module)
         TRACE("[MP] Received RX channels len %d < 4", len);
       break;
 #endif
-
-#if defined(MULTI_PROTOLIST)
-    case MultiProtoDef:
-      if (len >= 1)
-        processMultiProtoDef(module, data, len);
-      break;
-#endif
-
+      
     default:
       TRACE("[MP] Unkown multi packet type 0x%02X, len %d", type, len);
       break;
@@ -493,7 +459,7 @@ static void processMultiTelemetryPaket(const uint8_t * packet, uint8_t module)
 void MultiModuleStatus::getStatusString(char * statusText) const
 {
   if (!isValid()) {
-#if defined(PCBFRSKY)
+#if defined(PCBTARANIS) || defined(PCBHORUS)
 #if !defined(INTERNAL_MODULE_MULTI)
     if (isSportLineUsedByInternalModule())
       strcpy(statusText, STR_DISABLE_INTERNAL);
@@ -552,10 +518,28 @@ void MultiModuleStatus::getStatusString(char * statusText) const
   }
 }
 
+static uint8_t * getRxBuffer(uint8_t moduleIdx)
+{
+#if defined(INTERNAL_MODULE_MULTI)
+  if (moduleIdx == INTERNAL_MODULE)
+    return intTelemetryRxBuffer;
+#endif
+  return telemetryRxBuffer;
+}
+
+static uint8_t &getRxBufferCount(uint8_t moduleIdx)
+{
+#if defined(INTERNAL_MODULE_MULTI)
+  if (moduleIdx == INTERNAL_MODULE)
+    return intTelemetryRxBufferCount;
+#endif
+  return telemetryRxBufferCount;
+}
+
 static void processMultiTelemetryByte(const uint8_t data, uint8_t module)
 {
-  uint8_t * rxBuffer = getTelemetryRxBuffer(module);
-  uint8_t &rxBufferCount = getTelemetryRxBufferCount(module);
+  uint8_t * rxBuffer = getRxBuffer(module);
+  uint8_t &rxBufferCount = getRxBufferCount(module);
 
   if (rxBufferCount < TELEMETRY_RX_PACKET_SIZE) {
     rxBuffer[rxBufferCount++] = data;
@@ -585,8 +569,8 @@ static void processMultiTelemetryByte(const uint8_t data, uint8_t module)
 
 void processMultiTelemetryData(uint8_t data, uint8_t module)
 {
-  uint8_t * rxBuffer = getTelemetryRxBuffer(module);
-  uint8_t &rxBufferCount = getTelemetryRxBufferCount(module);
+  uint8_t * rxBuffer = getRxBuffer(module);
+  uint8_t &rxBufferCount = getRxBufferCount(module);
 
   uint16_t &lastRxTS = getMultiTelemetryLastRxTS(module);
   uint16_t nowMs = (uint16_t)RTOS_GET_MS();
@@ -708,21 +692,3 @@ void processMultiTelemetryData(uint8_t data, uint8_t module)
   }
 }
 
-bool isMultiTelemReceiving(uint8_t module)
-{
-  return getMultiTelemetryBufferState(module) != NoProtocolDetected;
-}
-
-void checkFailsafeMulti()
-{
-  for (int i=0; i<NUM_MODULES; i++) {
-    if (isModuleMultimodule(i) &&
-        getMultiModuleStatus(i).requiresFailsafeCheck) {
-      getMultiModuleStatus(i).requiresFailsafeCheck = false;
-      if (getMultiModuleStatus(i).supportsFailsafe() &&
-          g_model.moduleData[i].failsafeMode == FAILSAFE_NOT_SET) {
-        ALERT(STR_FAILSAFEWARN, STR_NO_FAILSAFE, AU_ERROR);
-      }
-    }
-  }
-}

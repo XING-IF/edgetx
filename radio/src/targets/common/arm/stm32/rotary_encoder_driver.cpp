@@ -1,9 +1,8 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
- *   th9x - http://code.google.com/p/th9x
+ *   th9x - http://code.google.com/p/th9x 
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
  *
@@ -73,44 +72,32 @@ void rotaryEncoderInit()
 void rotaryEncoderCheck()
 {
 #if (defined(RADIO_FAMILY_T16) && !defined(RADIO_T18)) || defined(RADIO_TX12)
-  static uint8_t state = 0;
+  static uint8_t  state = 0;
   uint8_t pins = ROTARY_ENCODER_POSITION();
 
   if (pins != (state & 0x03) && !(readKeys() & (1 << KEY_ENTER))) {
-	if ((pins ^ (state & 0x03)) == 0x03)
-	{
-		if (pins == 3)
-		{
-			rotencValue += 2;
-		}
-		else
-		{
-			rotencValue -= 2;
-		}
-	}
-	else
-	{
-		if ((state & 0x01) ^ ((pins & 0x02) >> 1))
-		{
-			rotencValue -= 1;
-		}
-		else
-		{
-			rotencValue += 1;
-		}
-	}
-    state &= ~0x03;
-    state |= pins;
+    if ((pins & 0x01) ^ ((pins & 0x02) >> 1)) {
+      if ((state & 0x03) == 3)
+        ++rotencValue;
+      else
+        --rotencValue;
+    }
+    else
+    {
+      if ((state & 0x03) == 3)
+         --rotencValue;
+      else if ((state & 0x03) == 0)
+         ++rotencValue;
+    }
+    state &= ~0x03 ;
+    state |= pins ;
 #else
   uint8_t newPosition = ROTARY_ENCODER_POSITION();
   if (newPosition != rotencPosition && !(readKeys() & (1 << KEY_ENTER))) {
-#if defined(ROTARY_ENCODER_INVERT)
-    if (!((rotencPosition & 0x01) ^ ((newPosition & 0x02) >> 1))) {
-#else
     if ((rotencPosition & 0x01) ^ ((newPosition & 0x02) >> 1)) {
-#endif
       --rotencValue;
-    } else {
+    }
+    else {
       ++rotencValue;
     }
     rotencPosition = newPosition;
@@ -131,6 +118,11 @@ void rotaryEncoderStartDelay()
 
 extern "C" void ROTARY_ENCODER_EXTI_IRQHandler1(void)
 {
+  // Check as first because it is the most critical one
+#if !defined(BOOT) && defined(TELEMETRY_EXTI_REUSE_INTERRUPT_ROTARY_ENCODER)
+  check_telemetry_exti();
+#endif
+
   if (EXTI_GetITStatus(ROTARY_ENCODER_EXTI_LINE1) != RESET) {
     rotaryEncoderStartDelay();
     EXTI_ClearITPendingBit(ROTARY_ENCODER_EXTI_LINE1);
@@ -145,10 +137,6 @@ extern "C" void ROTARY_ENCODER_EXTI_IRQHandler1(void)
 
 #if !defined(BOOT) && defined(INTMODULE_HEARTBEAT_REUSE_INTERRUPT_ROTARY_ENCODER)
   check_intmodule_heartbeat();
-#endif
-
-#if !defined(BOOT) && defined(TELEMETRY_EXTI_REUSE_INTERRUPT_ROTARY_ENCODER)
-  check_telemetry_exti();
 #endif
 }
 

@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -24,17 +23,17 @@
 
 #include <keys.h>
 
-#define MESSAGEBOX_X                   8
-#define MESSAGEBOX_Y                   8
-#define MESSAGEBOX_W                   (LCD_W - 15)
+#define MESSAGEBOX_X                   10
+#define MESSAGEBOX_Y                   16
+#define MESSAGEBOX_W                   (LCD_W - 19)
 
 #define MENU_X                         MESSAGEBOX_X
 #define MENU_Y                         MESSAGEBOX_Y
 #define MENU_W                         MESSAGEBOX_W
 
-#define WARNING_LINE_LEN               24
-#define WARNING_LINE_X                 12
-#define WARNING_LINE_Y                 MESSAGEBOX_Y + 2
+#define WARNING_LINE_LEN               20
+#define WARNING_LINE_X                 16
+#define WARNING_LINE_Y                 3*FH
 
 #define POPUP_MENU_MAX_LINES         12
 #define MENU_MAX_DISPLAY_LINES       6

@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -22,11 +21,10 @@
 #ifndef _MIXER_SCHEDULER_H_
 #define _MIXER_SCHEDULER_H_
 
-#define MIXER_SCHEDULER_DEFAULT_PERIOD_US  4000u // 4ms
-#define MIXER_SCHEDULER_JOYSTICK_PERIOD_US 2000u // 2ms
+#define MIXER_SCHEDULER_DEFAULT_PERIOD_US 4000u // 4ms
 
 #define MIN_REFRESH_RATE      1750 /* us */
-#define MAX_REFRESH_RATE     50000 /* us */
+#define MAX_REFRESH_RATE     25000 /* us */
 
 #if !defined(SIMU)
 
@@ -46,6 +44,7 @@ void mixerSchedulerResetTimer();
 void mixerSchedulerSetPeriod(uint8_t moduleIdx, uint16_t periodUs);
 
 // Clear the flag before waiting
+void mixerSchedulerClearTrigger();
 
 // Wait for the scheduler timer to trigger
 // returns true if timeout, false otherwise

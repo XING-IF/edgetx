@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -20,11 +19,6 @@
  */
 
 #include "opentx.h"
-#include "hal/adc_driver.h"
-
-#if defined(LIBOPENUI)
-  #include "libopenui.h"
-#endif
 
 uint8_t currentSpeakerVolume = 255;
 uint8_t requiredSpeakerVolume = 255;
@@ -32,56 +26,7 @@ uint8_t currentBacklightBright = 0;
 uint8_t requiredBacklightBright = 0;
 uint8_t mainRequestFlags = 0;
 
-static bool _usbDisabled = false;
-
-#if defined(LIBOPENUI)
-static Menu* _usbMenu = nullptr;
-
-void closeUsbMenu()
-{
-  if (_usbMenu && !usbPlugged()) {
-
-    // USB has been unplugged meanwhile
-    _usbMenu->deleteLater();
-  }
-}
-
-void openUsbMenu()
-{
-  if (_usbMenu || _usbDisabled) return;
-  
-  _usbMenu = new Menu(MainWindow::instance());
-
-  _usbMenu->setCloseHandler([]() {
-    _usbMenu = nullptr;
-  });
-
-  _usbMenu->setCancelHandler([]() {
-    if (usbPlugged() && (getSelectedUsbMode() == USB_UNSELECTED_MODE)) {
-      TRACE("disable USB");
-      _usbDisabled = true;
-    }
-  });
-
-  _usbMenu->setTitle("USB");
-  _usbMenu->addLine(STR_USB_JOYSTICK, [] {
-    TRACE("USB set joystick");
-    setSelectedUsbMode(USB_JOYSTICK_MODE);
-  });
-  _usbMenu->addLine(STR_USB_MASS_STORAGE, [] {
-    TRACE("USB mass storage");
-    setSelectedUsbMode(USB_MASS_STORAGE_MODE);
-  });
-#if defined(USB_SERIAL)
-  _usbMenu->addLine(STR_USB_SERIAL, [] {
-    TRACE("USB serial");
-    setSelectedUsbMode(USB_SERIAL_MODE);
-  });
-#endif
-}
-
-#elif defined(STM32)
-
+#if defined(STM32)
 void onUSBConnectMenu(const char *result)
 {
   if (result == STR_USB_MASS_STORAGE) {
@@ -93,80 +38,42 @@ void onUSBConnectMenu(const char *result)
   else if (result == STR_USB_SERIAL) {
     setSelectedUsbMode(USB_SERIAL_MODE);
   }
-  else if (result == STR_EXIT) {
-    _usbDisabled = true;
-  }
 }
-
-void openUsbMenu()
-{
-  if (popupMenuHandler != onUSBConnectMenu) {
-    POPUP_MENU_ADD_ITEM(STR_USB_JOYSTICK);
-    POPUP_MENU_ADD_ITEM(STR_USB_MASS_STORAGE);
-#if defined(USB_SERIAL)
-    POPUP_MENU_ADD_ITEM(STR_USB_SERIAL);
-#endif
-    POPUP_MENU_TITLE(STR_SELECT_MODE);
-    POPUP_MENU_START(onUSBConnectMenu);
-  }
-}
-
-void closeUsbMenu()
-{
-}
-
 #endif
 
 void handleUsbConnection()
 {
 #if defined(STM32) && !defined(SIMU)
-
-  static bool _pluggedUsb = false;
-
-  if (_pluggedUsb && !usbPlugged()) {
-    TRACE("USB unplugged");
-    closeUsbMenu();
-    _pluggedUsb = false;
-  }
-  else if (!_pluggedUsb && usbPlugged()) {
-    TRACE("USB plugged");
-    _pluggedUsb = true;
-    _usbDisabled = false;
-  }
-  
-  if (!_usbDisabled && !usbStarted() && usbPlugged()) {
-
+  if (!usbStarted() && usbPlugged()) {
     if (getSelectedUsbMode() == USB_UNSELECTED_MODE) {
-      if (g_eeGeneral.USBMode == USB_UNSELECTED_MODE) {
-        openUsbMenu();
+      if (g_eeGeneral.USBMode == USB_UNSELECTED_MODE && popupMenuItemsCount == 0) {
+        POPUP_MENU_ADD_ITEM(STR_USB_JOYSTICK);
+        POPUP_MENU_ADD_ITEM(STR_USB_MASS_STORAGE);
+#if defined(DEBUG)
+        POPUP_MENU_ADD_ITEM(STR_USB_SERIAL);
+#endif
+        POPUP_MENU_TITLE(STR_SELECT_MODE);
+        POPUP_MENU_START(onUSBConnectMenu);
       }
       else {
         setSelectedUsbMode(g_eeGeneral.USBMode);
       }
     }
-
-    // Mode might have been selected in previous block
-    // so re-evaluate the condition
-    if (getSelectedUsbMode() != USB_UNSELECTED_MODE) {
-
+    else {
       if (getSelectedUsbMode() == USB_MASS_STORAGE_MODE) {
         opentxClose(false);
         usbPluggedIn();
       }
-
       usbStart();
-      TRACE("USB started");
     }
   }
 
   if (usbStarted() && !usbPlugged()) {
     usbStop();
-    TRACE("USB stopped");
     if (getSelectedUsbMode() == USB_MASS_STORAGE_MODE) {
       opentxResume();
-      pushEvent(EVT_ENTRY);
+      putEvent(EVT_ENTRY);
     }
-    TRACE("reset selected USB mode");
     setSelectedUsbMode(USB_UNSELECTED_MODE);
   }
 #endif // defined(STM32) && !defined(SIMU)
@@ -265,9 +172,8 @@ void checkEeprom()
 {
 #if defined(RTC_BACKUP_RAM) && !defined(SIMU)
   if (TIME_TO_BACKUP_RAM()) {
-    if (!globalData.unexpectedShutdown) {
+    if (!globalData.unexpectedShutdown)
       rambackupWrite();
-    }
     rambackupDirtyMsk = 0;
   }
 #endif
@@ -345,6 +251,7 @@ void periodicTick()
 #if defined(GUI) && defined(COLORLCD)
 void guiMain(event_t evt)
 {
+  bool refreshNeeded = false;
 
 #if defined(LUA)
   uint32_t t0 = get_tmr10ms();
@@ -355,60 +262,142 @@ void guiMain(event_t evt)
     maxLuaInterval = interval;
   }
 
-  DEBUG_TIMER_START(debugTimerLua);
+  // run Lua scripts that don't use LCD (to use CPU time while LCD DMA is running)
+  DEBUG_TIMER_START(debugTimerLuaBg);
+  luaTask(0, RUN_MIX_SCRIPT | RUN_FUNC_SCRIPT | RUN_TELEM_BG_SCRIPT, false);
+  DEBUG_TIMER_STOP(debugTimerLuaBg);
+  // wait for LCD DMA to finish before continuing, because code from this point
+  // is allowed to change the contents of LCD buffer
+  //
+  // WARNING: make sure no code above this line does any change to the LCD display buffer!
+  //
+  DEBUG_TIMER_START(debugTimerLcdRefreshWait);
+  lcdRefreshWait();
+  DEBUG_TIMER_STOP(debugTimerLcdRefreshWait);
 
-  // Run Lua scripts first that don't use LCD
-  luaTask(  0, false);
+  // draw LCD from menus or from Lua script
+  // run Lua scripts that use LCD
 
-  // This is run from StandaloneLuaWindow::checkEvents()
-  // luaTask(evt, RUN_STNDAL_SCRIPT, true);
-
-  // TODO: Telemetry scripts are run from Window::checkEvents()
-  // luaTask(  0, RUN_TELEM_BG_SCRIPT, false/* NO LCD */);
-  // luaTask(evt, RUN_TELEM_FG_SCRIPT, true/* LCD YES */);
-  DEBUG_TIMER_STOP(debugTimerLua);
+  DEBUG_TIMER_START(debugTimerLuaFg);
+  refreshNeeded = luaTask(evt, RUN_STNDAL_SCRIPT, true);
+  if (!refreshNeeded) {
+    refreshNeeded = luaTask(evt, RUN_TELEM_FG_SCRIPT, true);
+  }
+  DEBUG_TIMER_STOP(debugTimerLuaFg);
 
   t0 = get_tmr10ms() - t0;
   if (t0 > maxLuaDuration) {
     maxLuaDuration = t0;
   }
+#else
+  lcdRefreshWait();   // WARNING: make sure no code above this line does any change to the LCD display buffer!
 #endif
-#if defined(HARDWARE_TOUCH)
-  MainWindow* mainWin = MainWindow::instance();
-  mainWin->setTouchEnabled(!isFunctionActive(FUNCTION_DISABLE_TOUCH) && isBacklightEnabled());
-#endif
-  MainWindow::instance()->run();
 
   bool screenshotRequested = (mainRequestFlags & (1u << REQUEST_SCREENSHOT));
+
+  if (!refreshNeeded) {
+    DEBUG_TIMER_START(debugTimerMenus);
+    while (true) {
+      // normal GUI from menus
+      const char * warn = warningText;
+      uint8_t menu = popupMenuItemsCount;
+      static bool popupDisplayed = false;
+      if (warn || menu) {
+        if (popupDisplayed == false) {
+          menuHandlers[menuLevel](EVT_REFRESH);
+          lcdDrawBlackOverlay();
+          TIME_MEASURE_START(storebackup);
+          lcdStoreBackupBuffer();
+          TIME_MEASURE_STOP(storebackup);
+        }
+        if (popupDisplayed == false || evt || screenshotRequested) {
+          popupDisplayed = lcdRestoreBackupBuffer();
+          if (warn) {
+            DISPLAY_WARNING(evt);
+          }
+          if (menu) {
+            const char * result = runPopupMenu(evt);
+            if (result) {
+              TRACE("popupMenuHandler(%s)", result);
+              auto handler = popupMenuHandler;
+              if (result != STR_UPDATE_LIST)
+                CLEAR_POPUP();
+              handler(result);
+              if (menuEvent == 0) {
+                evt = EVT_REFRESH;
+                continue;
+              }
+            }
+          }
+          refreshNeeded = true;
+        }
+      }
+      else {
+        if (popupDisplayed) {
+          if (evt == 0) {
+            evt = EVT_REFRESH;
+          }
+          popupDisplayed = false;
+        }
+        DEBUG_TIMER_START(debugTimerMenuHandlers);
+        refreshNeeded = menuHandlers[menuLevel](evt);
+        DEBUG_TIMER_STOP(debugTimerMenuHandlers);
+      }
+
+      if (menuEvent == EVT_ENTRY) {
+        menuVerticalPosition = 0;
+        menuHorizontalPosition = 0;
+        evt = menuEvent;
+        menuEvent = 0;
+      }
+      else if (menuEvent == EVT_ENTRY_UP) {
+        menuVerticalPosition = menuVerticalPositions[menuLevel];
+        menuHorizontalPosition = 0;
+        evt = menuEvent;
+        menuEvent = 0;
+      }
+      else {
+        break;
+      }
+    }
+    DEBUG_TIMER_STOP(debugTimerMenus);
+  }
+
   if (screenshotRequested) {
     writeScreenshot();
     mainRequestFlags &= ~(1u << REQUEST_SCREENSHOT);
   }
+
+  if (refreshNeeded) {
+    DEBUG_TIMER_START(debugTimerLcdRefresh);
+    lcdRefresh();
+    DEBUG_TIMER_STOP(debugTimerLcdRefresh);
+  }
 }
 #elif defined(GUI)
-
-bool handleGui(event_t event) {
-  bool refreshNeeded;
+void handleGui(event_t event) {
+  // if Lua standalone, run it and don't clear the screen (Lua will do it)
+  // else if Lua telemetry view, run it and don't clear the screen
+  // else clear scren and show normal menus
 #if defined(LUA)
-  refreshNeeded = luaTask(event, true);
-  if (menuHandlers[menuLevel] == menuViewTelemetry && TELEMETRY_SCREEN_TYPE(s_frsky_view) == TELEMETRY_SCREEN_TYPE_SCRIPT) {
-      menuHandlers[menuLevel](event);
+  if (luaTask(event, RUN_STNDAL_SCRIPT, true)) {
+    // standalone script is active
   }
-  else if (scriptInternalData[0].reference != SCRIPT_STANDALONE)
+  else if (luaTask(event, RUN_TELEM_FG_SCRIPT, true)) {
+    // the telemetry screen is active
+    menuHandlers[menuLevel](event);
+  }
+  else
 #endif
-// No foreground Lua script is running - clear the screen show normal menu
   {
     lcdClear();
     menuHandlers[menuLevel](event);
     drawStatusLine();
-    refreshNeeded = true;
   }
-  return refreshNeeded;
 }
 
 void guiMain(event_t evt)
 {
-  bool refreshNeeded = menuEvent || warningText || (popupMenuItemsCount > 0);
 #if defined(LUA)
   // TODO better lua stopwatch
   uint32_t t0 = get_tmr10ms();
@@ -420,7 +409,7 @@ void guiMain(event_t evt)
   }
 
   // run Lua scripts that don't use LCD (to use CPU time while LCD DMA is running)
-  luaTask(0, false);
+  luaTask(0, RUN_MIX_SCRIPT | RUN_FUNC_SCRIPT | RUN_TELEM_BG_SCRIPT, false);
 
   t0 = get_tmr10ms() - t0;
   if (t0 > maxLuaDuration) {
@@ -444,10 +433,10 @@ void guiMain(event_t evt)
   }
 
   if (isEventCaughtByPopup()) {
-    refreshNeeded |= handleGui(0);
+    handleGui(0);
   }
   else {
-    refreshNeeded |= handleGui(evt);
+    handleGui(evt);
     evt = 0;
   }
 
@@ -467,8 +456,8 @@ void guiMain(event_t evt)
     }
   }
 
-  if (refreshNeeded) lcdRefresh();
-  
+  lcdRefresh();
+
   if (mainRequestFlags & (1u << REQUEST_SCREENSHOT)) {
     writeScreenshot();
     mainRequestFlags &= ~(1u << REQUEST_SCREENSHOT);
@@ -486,7 +475,7 @@ void perMain()
 
   checkSpeakerVolume();
 
-  if (!usbPlugged() || (getSelectedUsbMode() == USB_UNSELECTED_MODE)) {
+  if (!usbPlugged()) {
     checkEeprom();
     logsWrite();
   }
@@ -509,9 +498,7 @@ void perMain()
 
   checkBacklight();
 
-#if !defined(LIBOPENUI)
   event_t evt = getEvent(false);
-#endif
 
 #if defined(RTC_BACKUP_RAM)
   if (globalData.unexpectedShutdown) {
@@ -521,57 +508,36 @@ void perMain()
 #endif
 
 #if defined(STM32)
-  if ((!usbPlugged() || (getSelectedUsbMode() == USB_UNSELECTED_MODE))
-      && SD_CARD_PRESENT() && !sdMounted()) {
+  if (!usbPlugged() && SD_CARD_PRESENT() && !sdMounted()) {
     sdMount();
   }
 #endif
 
 #if !defined(EEPROM)
   // In case the SD card is removed during the session
-  if ((!usbPlugged() || (getSelectedUsbMode() == USB_UNSELECTED_MODE))
-      && !SD_CARD_PRESENT() && !globalData.unexpectedShutdown) {
-
-    // TODO: implement for b/w
-#if defined(COLORLCD)
+  if (!usbPlugged() && !SD_CARD_PRESENT() && !globalData.unexpectedShutdown) {
     drawFatalErrorScreen(STR_NO_SDCARD);
     return;
-#endif
   }
 #endif
 
 #if defined(STM32)
   if (usbPlugged() && getSelectedUsbMode() == USB_MASS_STORAGE_MODE) {
-#if defined(LIBOPENUI)
-    // draw some image showing USB
-    lcd->reset();
-    OpenTxTheme::instance()->drawUsbPluggedScreen(lcd);
-    lcdRefresh();
-#else
     // disable access to menus
     lcdClear();
     menuMainView(0);
     lcdRefresh();
-#endif
     return;
   }
 #endif
 
-#if defined(MULTIMODULE)
-  checkFailsafeMulti();
-#endif
-  
 #if defined(KEYS_GPIO_REG_BIND) && defined(BIND_KEY)
   bindButtonHandler(evt);
 #endif
 
 #if defined(GUI)
   DEBUG_TIMER_START(debugTimerGuiMain);
-#if defined(LIBOPENUI)
-  guiMain(0);
-#else
   guiMain(evt);
-#endif
   DEBUG_TIMER_STOP(debugTimerGuiMain);
 #endif
 

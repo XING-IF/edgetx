@@ -2,6 +2,7 @@ set(GUI_SRC
   ${GUI_SRC}
   lcd.cpp
   splash.cpp
+  fonts.cpp
   popups.cpp
   widgets.cpp
   startup_shutdown.cpp
@@ -28,7 +29,7 @@ if(FLIGHT_MODES)
     )
 endif()
 
-if(LUA_MIXER)
+if(LUA STREQUAL YES)
   set(GUI_SRC
     ${GUI_SRC}
     model_custom_scripts.cpp

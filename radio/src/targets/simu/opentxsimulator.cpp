@@ -1,13 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Author - Bertrand Songis <bsongis@gmail.com>
  *
- * Based on code named
- *   opentx - https://github.com/opentx/opentx
- *   th9x - http://code.google.com/p/th9x
- *   er9x - http://code.google.com/p/er9x
- *   gruvin9x - http://code.google.com/p/gruvin9x
- *
- * License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html
+ * Based on th9x -> http://code.google.com/p/th9x/
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -17,6 +11,7 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
  */
 
 #include "opentxsimulator.h"
@@ -32,17 +27,10 @@
 
 #define GET_SWITCH_BOOL(sw__)    getSwitch((sw__), 0);
 
-#define ETXS_DBG    qDebug() << "(" << simuTimerMicros() << "us)"
+#define OTXS_DBG    qDebug() << "(" << simuTimerMicros() << "us)"
 
 int16_t g_anas[Analogs::NUM_ANALOGS];
 QVector<QIODevice *> OpenTxSimulator::tracebackDevices;
-
-#if defined(HARDWARE_TOUCH)
-  tmr10ms_t downTime = 0;
-  tmr10ms_t tapTime = 0;
-  short tapCount = 0;
-  #define TAP_TIME 25
-#endif
 
 uint16_t anaIn(uint8_t chan)
 {
@@ -106,7 +94,7 @@ void OpenTxSimulator::init()
   if (isRunning())
     return;
 
-  ETXS_DBG;
+  OTXS_DBG;
 
   if (!m_timer10ms) {
     // make sure we create & control the timer from current thread
@@ -134,13 +122,13 @@ void OpenTxSimulator::start(const char * filename, bool tests)
 {
   if (isRunning())
     return;
-  ETXS_DBG << "file:" << filename << "tests:" << tests;
+  OTXS_DBG << "file:" << filename << "tests:" << tests;
 
   QMutexLocker lckr(&m_mtxSimuMain);
   QMutexLocker slckr(&m_mtxSettings);
-  startEepromThread(filename);
-  startAudioThread(volumeGain);
-  simuStart(tests, simuSdDirectory.toLatin1().constData(), simuSettingsDirectory.toLatin1().constData());
+  StartEepromThread(filename);
+  StartAudioThread(volumeGain);
+  StartSimu(tests, simuSdDirectory.toLatin1().constData(), simuSettingsDirectory.toLatin1().constData());
 
   emit started();
   QTimer::singleShot(0, this, SLOT(run()));  // old style for Qt < 5.4
@@ -150,14 +138,14 @@ void OpenTxSimulator::stop()
 {
   if (!isRunning())
     return;
-  ETXS_DBG;
+  OTXS_DBG;
 
   setStopRequested(true);
 
   QMutexLocker lckr(&m_mtxSimuMain);
-  simuStop();
-  stopAudioThread();
-  stopEepromThread();
+  StopSimu();
+  StopAudioThread();
+  StopEepromThread();
 
   emit stopped();
 }
@@ -286,13 +274,13 @@ void OpenTxSimulator::rotaryEncoderEvent(int steps)
     key = KEY_DOWN;
   else if (steps < 0)
     key = KEY_UP;
-#elif defined(KEYS_GPIO_REG_PLUS) && defined(KEYS_GPIO_REG_MINUS)
+#else
   if (steps > 0)
     key = KEY_MINUS;
   else if (steps < 0)
     key = KEY_PLUS;
-  else
 #endif
+  else
     // Should not happen but Clang complains that key is unset otherwise
     return;
 
@@ -311,68 +299,6 @@ void OpenTxSimulator::rotaryEncoderEvent(int steps)
 #endif  // defined(ROTARY_ENCODER_NAVIGATION)
 }
 
-void OpenTxSimulator::touchEvent(int type, int x, int y)
-{
-  #if defined(HARDWARE_TOUCH)
-    tmr10ms_t now = get_tmr10ms();
-    simTouchState.tapCount = 0;
-  #endif
-
-  switch (type) {
-    case TouchDown:
-      TRACE_WINDOWS("[Mouse Press] %d %d", x, y);
-
-#if defined(HARDWARE_TOUCH)
-      simTouchState.event = TE_DOWN;
-      simTouchState.startX = simTouchState.x = x;
-      simTouchState.startY = simTouchState.y = y;
-      downTime = now;
-#endif
-      break;
-
-    case TouchUp:
-      TRACE_WINDOWS("[Mouse Release] %d %d", x, y);
-
-#if defined(HARDWARE_TOUCH)
-      if (simTouchState.event == TE_DOWN) {
-        simTouchState.event = TE_UP;
-        simTouchState.x = simTouchState.startX;
-        simTouchState.y = simTouchState.startY;
-        if (now - downTime <= TAP_TIME) {
-          if (now - tapTime > TAP_TIME)
-            tapCount = 1;
-          else
-            tapCount++;
-          simTouchState.tapCount = tapCount;
-          tapTime = now;
-        }
-      } else {
-        simTouchState.event = TE_SLIDE_END;
-      }
-#endif
-      break;
-
-    case TouchSlide:
-      TRACE_WINDOWS("[Mouse Move] %d %d", x, y);
-
-#if defined(HARDWARE_TOUCH)
-      simTouchState.deltaX += x - simTouchState.x;
-      simTouchState.deltaY += y - simTouchState.y;
-      if (simTouchState.event == TE_SLIDE ||
-          abs(simTouchState.deltaX) >= SLIDE_RANGE ||
-          abs(simTouchState.deltaY) >= SLIDE_RANGE) {
-        simTouchState.event = TE_SLIDE;
-        simTouchState.x = x;
-        simTouchState.y = y;
-      }
-#endif
-      break;
-  }
-#if defined(HARDWARE_TOUCH)
-  simTouchOccured=true;
-#endif
-}
-
 void OpenTxSimulator::setTrainerTimeout(uint16_t ms)
 {
   ppmInputValidityTimer = ms;
@@ -380,7 +306,7 @@ void OpenTxSimulator::setTrainerTimeout(uint16_t ms)
 
 void OpenTxSimulator::sendTelemetry(const QByteArray data)
 {
-  //ETXS_DBG << data;
+  //OTXS_DBG << data;
   sportProcessTelemetryPacket((uint8_t *)data.constData());
 }
 
@@ -677,8 +603,6 @@ class OpenTxSimulatorFactory: public SimulatorFactory
       return Board::BOARD_TARANIS_X9LITES;
 #elif defined(PCBX9LITE)
       return Board::BOARD_TARANIS_X9LITE;
-#elif defined(PCBNV14)
-      return Board::BOARD_FLYSKY_NV14;
 #else
       return Board::BOARD_TARANIS_X9D;
 #endif

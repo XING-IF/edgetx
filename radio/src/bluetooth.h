@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -49,26 +48,14 @@ enum BluetoothStates {
 #define MAX_BLUETOOTH_DISTANT_ADDR      6
 #define BLUETOOTH_PACKET_SIZE           14
 #define BLUETOOTH_LINE_LENGTH           32
-#define BLUETOOTH_TRAINER_CHANNELS      8
 
 #if defined(LOG_BLUETOOTH)
   #define BLUETOOTH_TRACE(...)  \
     f_printf(&g_bluetoothFile, __VA_ARGS__); \
     TRACE_NOCRLF(__VA_ARGS__);
 #else
-#if defined(DEBUG_BLUETOOTH)
-  #define BLUETOOTH_TRACE(...)  TRACE_NOCRLF(__VA_ARGS__);
-  #define BLUETOOTH_TRACE_TIMESTAMP(f_, ...)  debugPrintf((TRACE_TIME_FORMAT f_), TRACE_TIME_VALUE, ##__VA_ARGS__)
-#if defined(DEBUG_BLUETOOTH_VERBOSE)
-  #define BLUETOOTH_TRACE_VERBOSE(...) TRACE_NOCRLF(__VA_ARGS__);
-#else
-  #define BLUETOOTH_TRACE_VERBOSE(...)
-#endif
-#else
-  #define BLUETOOTH_TRACE(...)
-  #define BLUETOOTH_TIMESTAMP(f_, ...)
-  #define BLUETOOTH_TRACE_VERBOSE(...)
-#endif
+  #define BLUETOOTH_TRACE(...)  \
+    TRACE_NOCRLF(__VA_ARGS__);
 #endif
 
 class Bluetooth
@@ -80,7 +67,7 @@ class Bluetooth
 
     void forwardTelemetry(const uint8_t * packet);
     void wakeup();
-    const char * flashFirmware(const char * filename, ProgressHandler progressHandler);
+    const char * flashFirmware(const char * filename);
 
     volatile uint8_t state;
     char localAddr[LEN_BLUETOOTH_ADDR+1];
@@ -107,7 +94,7 @@ class Bluetooth
     const char * bootloaderEraseFlash(uint32_t start, uint32_t size);
     const char * bootloaderStartWriteFlash(uint32_t start, uint32_t size);
     const char * bootloaderWriteFlash(const uint8_t * data, uint32_t size);
-    const char * doFlashFirmware(const char * filename, ProgressHandler progressHandler);
+    const char * doFlashFirmware(const char * filename);
 
     uint8_t buffer[BLUETOOTH_LINE_LENGTH+1];
     uint8_t bufferIndex = 0;

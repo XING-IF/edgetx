@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -42,7 +41,7 @@ void eepromReadBlock (uint8_t * buffer, size_t address, size_t size)
     if (fread(buffer, size, 1, fp) <= 0)
       perror("error in fread");
   }
-  else if (eeprom) {
+  else {
     memcpy(buffer, &eeprom[address], size);
   }
 }
@@ -58,7 +57,7 @@ void eepromSimuWriteBlock(uint8_t * buffer, size_t address, size_t size)
     if (fwrite(buffer, size, 1, fp) <= 0)
       perror("error in fwrite");
   }
-  else if (eeprom) {
+  else {
     memcpy(&eeprom[address], buffer, size);
   }
 }
@@ -140,7 +139,7 @@ void eepromWriteBlock(uint8_t * buffer, size_t address, size_t size)
 
 pthread_t eeprom_thread_pid;
 
-void startEepromThread(const char * filename)
+void StartEepromThread(const char * filename)
 {
   eepromFile = filename;
   if (eepromFile) {
@@ -161,7 +160,7 @@ void startEepromThread(const char * filename)
   RTOS_CREATE_TASK(eeprom_thread_pid, eeprom_thread_function, "eeprom");
 }
 
-void stopEepromThread()
+void StopEepromThread()
 {
   eeprom_thread_running = false;
   sem_post(eeprom_write_sem);

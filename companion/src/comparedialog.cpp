@@ -24,8 +24,8 @@
 #include "helpers.h"
 #include "modelslist.h"
 #include "styleeditdialog.h"
-#include <QtPrintSupport/QPrinter>
-#include <QtPrintSupport/QPrintDialog>
+#include <QPrinter>
+#include <QPrintDialog>
 
 CompareDialog::CompareDialog(QWidget * parent, Firmware * firmware):
   QDialog(parent, Qt::Window),

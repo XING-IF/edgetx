@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -22,13 +21,7 @@
 #include "opentx.h"
 #include "multi.h"
 #include "pulses/afhds3.h"
-#include "pulses/flysky.h"
 #include "mixer_scheduler.h"
-#include "io/multi_protolist.h"
-
-#if defined(LIBOPENUI)
-  #include "libopenui.h"
-#endif
 
 uint8_t telemetryStreaming = 0;
 uint8_t telemetryRxBuffer[TELEMETRY_RX_PACKET_SIZE];   // Receive buffer. 9 bytes (full packet), worst case 18 bytes with byte-stuffing (+1)
@@ -40,34 +33,15 @@ TelemetryData telemetryData;
 
 uint8_t telemetryProtocol = 255;
 
-#if defined(INTERNAL_MODULE_SERIAL_TELEMETRY)
-uint8_t intTelemetryRxBuffer[TELEMETRY_RX_PACKET_SIZE];
-uint8_t intTelemetryRxBufferCount;
+#if defined(PCBSKY9X) && defined(REVX)
+uint8_t serialInversion = 0;
 #endif
-
-uint8_t * getTelemetryRxBuffer(uint8_t moduleIdx)
-{
-#if defined(INTERNAL_MODULE_SERIAL_TELEMETRY)
-  if (moduleIdx == INTERNAL_MODULE)
-    return intTelemetryRxBuffer;
-#endif
-  return telemetryRxBuffer;
-}
-
-uint8_t &getTelemetryRxBufferCount(uint8_t moduleIdx)
-{
-#if defined(INTERNAL_MODULE_SERIAL_TELEMETRY)
-  if (moduleIdx == INTERNAL_MODULE)
-    return intTelemetryRxBufferCount;
-#endif
-  return telemetryRxBufferCount;
-}
 
 void processTelemetryData(uint8_t data)
 {
 #if defined(CROSSFIRE)
   if (telemetryProtocol == PROTOCOL_TELEMETRY_CROSSFIRE) {
-    processCrossfireTelemetryData(data, EXTERNAL_MODULE);
+    processCrossfireTelemetryData(data);
     return;
   }
 #endif
@@ -90,13 +64,6 @@ void processTelemetryData(uint8_t data)
   }
   if (telemetryProtocol == PROTOCOL_TELEMETRY_MULTIMODULE) {
     processMultiTelemetryData(data, EXTERNAL_MODULE);
-    return;
-  }
-#endif
-
-#if defined(AFHDS2)
-  if(telemetryProtocol == PROTOCOL_TELEMETRY_FLYSKY_NV14) {
-    processInternalFlySkyTelemetryData(data);
     return;
   }
 #endif
@@ -125,138 +92,68 @@ inline bool isBadAntennaDetected()
   return false;
 }
 
-#if defined(INTERNAL_MODULE_PXX2)
-static void pollIntPXX2()
+void telemetryWakeup()
 {
+  uint8_t requiredTelemetryProtocol = modelTelemetryProtocol();
+  uint8_t data;
+
+#if defined(REVX)
+  uint8_t requiredSerialInversion = g_model.moduleData[EXTERNAL_MODULE].invertedSerial;
+  if (telemetryProtocol != requiredTelemetryProtocol || serialInversion != requiredSerialInversion) {
+    serialInversion = requiredSerialInversion;
+    telemetryInit(requiredTelemetryProtocol);
+  }
+#else
+  if (telemetryProtocol != requiredTelemetryProtocol) {
+    telemetryInit(requiredTelemetryProtocol);
+  }
+#endif
+
+#if defined(INTERNAL_MODULE_PXX2) || defined(EXTMODULE_USART)
   uint8_t frame[PXX2_FRAME_MAXLENGTH];
 
+  #if defined(INTERNAL_MODULE_PXX2)
   while (intmoduleFifo.getFrame(frame)) {
     processPXX2Frame(INTERNAL_MODULE, frame);
   }
-}
-#endif  
+  #endif
 
-#if defined(PXX2) && defined(EXTMODULE_USART)
-static void pollExtPXX2()
-{
-  uint8_t frame[PXX2_FRAME_MAXLENGTH];
-
-  while (extmoduleFifo.getFrame(frame)) {
+  #if defined(EXTMODULE_USART)
+  while (isModulePXX2(EXTERNAL_MODULE) && extmoduleFifo.getFrame(frame)) {
     processPXX2Frame(EXTERNAL_MODULE, frame);
   }
-}
-#endif  
-
-#if defined(MULTI_PROTOLIST)
-static inline void pollMultiProtolist(uint8_t idx)
-{
-  if ((moduleState[idx].protocol == PROTOCOL_CHANNELS_MULTIMODULE) &&
-      MultiRfProtocols::instance(idx)->isScanning()) {
-    MultiRfProtocols::instance(idx)->scanReply();
-  }
-}
+  #endif
 #endif
 
-static inline void pollIntTelemetry(void (*processData)(uint8_t,uint8_t))
-{
-  uint8_t data;
+#if defined(INTERNAL_MODULE_MULTI)
   if (intmoduleFifo.pop(data)) {
     LOG_TELEMETRY_WRITE_START();
     do {
-      processData(data, INTERNAL_MODULE);
+      processMultiTelemetryData(data, INTERNAL_MODULE);
       LOG_TELEMETRY_WRITE_BYTE(data);
     } while (intmoduleFifo.pop(data));
-  }  
-}
-
-#if defined(INTERNAL_MODULE_MULTI)
-static void pollIntMulti()
-{
-  pollIntTelemetry(processMultiTelemetryData);
-#if defined(MULTI_PROTOLIST)
-  pollMultiProtolist(INTERNAL_MODULE);
-#endif
-}
+  }
 #endif
 
-#if defined(INTERNAL_MODULE_CRSF)
-static void pollIntCrossfire()
-{
-  pollIntTelemetry(processCrossfireTelemetryData);
-}
-#endif
-
-#if defined(PCBNV14)
-static void processFlySkyTelemetryData(uint8_t data, uint8_t idx)
-{
-  (void)idx;
-  processInternalFlySkyTelemetryData(data);
-}
-
-static void pollIntAFHDS2A()
-{
-  pollIntTelemetry(processFlySkyTelemetryData);
-}
-#endif
-
-static void pollExtTelemetry()
-{
-  uint8_t data;
+#if defined(STM32)
   if (telemetryGetByte(&data)) {
     LOG_TELEMETRY_WRITE_START();
     do {
       processTelemetryData(data);
       LOG_TELEMETRY_WRITE_BYTE(data);
     } while (telemetryGetByte(&data));
-  }  
-#if defined(MULTI_PROTOLIST)
-  if (isModuleMultimodule(EXTERNAL_MODULE)) {
-    pollMultiProtolist(EXTERNAL_MODULE);
+  }
+#elif defined(PCBSKY9X)
+  if (telemetryProtocol == PROTOCOL_TELEMETRY_FRSKY_D_SECONDARY) {
+    while (telemetrySecondPortReceive(data)) {
+      processTelemetryData(data);
+    }
+  }
+  else {
+    // Receive serial data here
+    rxPdcUsart(processTelemetryData);
   }
 #endif
-#if defined(PXX2) && defined(EXTMODULE_USART)
-  if (isModulePXX2(EXTERNAL_MODULE)) {
-    pollExtPXX2();
-  }
-#endif
-}
-
-// TODO: this needs to be rewritten completely
-//   - telemetry polling needs to happen for each enabled module
-void telemetryWakeup()
-{
-  uint8_t requiredTelemetryProtocol = modelTelemetryProtocol();
-
-  if (telemetryProtocol != requiredTelemetryProtocol) {
-    telemetryInit(requiredTelemetryProtocol);
-  }
-
-  // Poll internal modules
-#if defined(INTERNAL_MODULE_PXX2)
-  if (isModuleISRM(INTERNAL_MODULE)) {
-    pollIntPXX2();
-  }
-#endif
-#if defined(INTERNAL_MODULE_MULTI)
-  if (isModuleMultimodule(INTERNAL_MODULE)) {
-    pollIntMulti();
-  }
-#endif
-#if defined(INTERNAL_MODULE_CRSF)
-  if (isModuleCrossfire(INTERNAL_MODULE)) {
-    pollIntCrossfire();
-  }
-#endif
-#if defined(PCBNV14)
-  //! moduleUpdateActive(INTERNAL_MODULE) &&
-  if (isModuleAFHDS2A(INTERNAL_MODULE)) {
-    pollIntAFHDS2A();
-  }
-#endif
-
-  // Poll external / S.PORT telemetry
-  // TODO: how to switch this OFF ???
-  pollExtTelemetry();
 
   for (int i=0; i<MAX_TELEMETRY_SENSORS; i++) {
     const TelemetrySensor & sensor = g_model.telemetrySensors[i];
@@ -295,10 +192,12 @@ void telemetryWakeup()
       audioEvent(AU_SENSOR_LOST);
     }
 
-#if defined(PCBFRSKY)
+#if defined(PCBTARANIS) || defined(PCBHORUS)
     if (isBadAntennaDetected()) {
       AUDIO_RAS_RED();
-      POPUP_WARNING(STR_WARNING, STR_ANTENNAPROBLEM);
+      POPUP_WARNING(STR_WARNING);
+      const char * w = STR_ANTENNAPROBLEM;
+      SET_WARNING_INFO(w, strlen(w), 0);
       SCHEDULE_NEXT_ALARMS_CHECK(10/*seconds*/);
     }
 #endif
@@ -434,13 +333,6 @@ void telemetryInit(uint8_t protocol)
   }
 #endif
 
-#if defined(AFHDS2)
-  else if (protocol == PROTOCOL_TELEMETRY_FLYSKY_NV14) {
-    telemetryPortInit(INTMODULE_USART_AFHDS2_BAUDRATE, TELEMETRY_SERIAL_DEFAULT);
-    telemetryPortSetDirectionInput();
-  }
-#endif
-
   else {
     telemetryPortInit(FRSKY_SPORT_BAUDRATE, TELEMETRY_SERIAL_WITHOUT_DMA);
 #if defined(LUA)
@@ -521,14 +413,7 @@ void ModuleSyncStatus::update(uint16_t newRefreshRate, int16_t newInputLag)
   currentLag  = newInputLag;
   lastUpdate  = get_tmr10ms();
 
-#if 0
   TRACE("[SYNC] update rate = %dus; lag = %dus",refreshRate,currentLag);
-#endif
-}
-
-void ModuleSyncStatus::invalidate() {
-  //make invalid after use
-  currentLag = 0;
 }
 
 uint16_t ModuleSyncStatus::getAdjustedRefreshRate()
@@ -550,9 +435,7 @@ uint16_t ModuleSyncStatus::getAdjustedRefreshRate()
   }
 
   currentLag -= newRefreshRate - refreshRate;
-#if 0
   TRACE("[SYNC] mod rate = %dus; lag = %dus",newRefreshRate,currentLag);
-#endif
   
   return (uint16_t)newRefreshRate;
 }

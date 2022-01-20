@@ -118,7 +118,7 @@ RawSourceItemModel::RawSourceItemModel(const GeneralSettings * const generalSett
   addItems(SOURCE_TYPE_CYC,            RawSource::SourcesGroup,  CPN_MAX_CYC);
   addItems(SOURCE_TYPE_PPM,            RawSource::SourcesGroup,  firmware->getCapability(TrainerInputs));
   addItems(SOURCE_TYPE_CH,             RawSource::SourcesGroup,  firmware->getCapability(Outputs));
-  addItems(SOURCE_TYPE_SPECIAL,        RawSource::TelemGroup,    SOURCE_TYPE_SPECIAL_COUNT);
+  addItems(SOURCE_TYPE_SPECIAL,        RawSource::TelemGroup,    5);
   addItems(SOURCE_TYPE_TELEMETRY,      RawSource::TelemGroup,    firmware->getCapability(Sensors) * 3);
   addItems(SOURCE_TYPE_GVAR,           RawSource::GVarsGroup,    firmware->getCapability(Gvars));
 }
@@ -176,6 +176,7 @@ RawSwitchItemModel::RawSwitchItemModel(const GeneralSettings * const generalSett
   addItems(SWITCH_TYPE_SWITCH,         -board->getCapability(Board::SwitchPositions));
 
   // Ascending switch direction (including zero)
+  addItems(SWITCH_TYPE_TIMER_MODE, 5);
   addItems(SWITCH_TYPE_NONE, 1);
   addItems(SWITCH_TYPE_SWITCH,         board->getCapability(Board::SwitchPositions));
   addItems(SWITCH_TYPE_MULTIPOS_POT,   board->getCapability(Board::MultiposPots) * board->getCapability(Board::MultiposPotsPositions));
@@ -211,6 +212,14 @@ void RawSwitchItemModel::addItems(const RawSwitchType & type, int count)
     case SWITCH_TYPE_VIRTUAL:
     case SWITCH_TYPE_SENSOR:
       context &= ~RawSwitch::GlobalFunctionsContext;
+      break;
+
+    case SWITCH_TYPE_TIMER_MODE:
+      context = RawSwitch::TimersContext;
+      break;
+
+    case SWITCH_TYPE_NONE:
+      context &= ~RawSwitch::TimersContext;
       break;
 
     case SWITCH_TYPE_ON:

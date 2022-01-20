@@ -38,34 +38,33 @@
 #include <QSettings>
 #include <QStandardPaths>
 
-//! CPN_SETTINGS_REVISION is used to track settings changes independently of EdgeTX version. It should be reset to zero whenever settings are migrated to new COMPANY or PRODUCT.
+//! CPN_SETTINGS_REVISION is used to track settings changes independently of OpenTX version. It should be reset to zero whenever settings are migrated to new COMPANY or PRODUCT.
 //! \note !! Increment this value if properties are removed or refactored. It will trigger a conversion/cleanup of any stored settings. \sa AppData::convertSettings()
-#define CPN_SETTINGS_REVISION       1 // Note: bumped to ensure 2.7 Nightly version users also get upgraded
+#define CPN_SETTINGS_REVISION       0
 
 //! CPN_SETTINGS_VERSION is used for settings data version tracking.
 #define CPN_SETTINGS_VERSION        ((VERSION_NUMBER << 8) | CPN_SETTINGS_REVISION)
 
-#define COMPANY                     QStringLiteral("EdgeTX")
-#define COMPANY_DOMAIN              QStringLiteral("edgetx.org")
-#define PRODUCT_NO_VERS             QStringLiteral("Companion")
+#define COMPANY                     QStringLiteral("OpenTX")
+#define COMPANY_DOMAIN              QStringLiteral("open-tx.org")
 #define PRODUCT                     QStringLiteral("Companion " QT_STRINGIFY(VERSION_MAJOR) "." QT_STRINGIFY(VERSION_MINOR))
-#define APP_COMPANION               QStringLiteral("EdgeTX Companion")
-#define APP_SIMULATOR               QStringLiteral("EdgeTX Simulator")
+#define APP_COMPANION               QStringLiteral("OpenTX Companion")
+#define APP_SIMULATOR               QStringLiteral("OpenTX Simulator")
 
-//! Default location for EdgeTX-related user documents (settigns, logs, etc)
+//! Default location for OpenTX-related user documents (settigns, logs, etc)
 #define CPN_DOCUMENTS_LOCATION      QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation) % "/" % COMPANY
 //! Location for settings backup files. TODO: make option or remember last location.
 #define CPN_SETTINGS_BACKUP_DIR     CPN_DOCUMENTS_LOCATION % "/backup"
 #define CPN_SETTINGS_INI_FILE       QString(PRODUCT % " " % QCoreApplication::translate("Companion", "settings") % " %1.ini")
 #define CPN_SETTINGS_INI_PATH       QString(CPN_SETTINGS_BACKUP_DIR % "/" % CPN_SETTINGS_INI_FILE)
 
-#define CPN_URL_DOWNLOAD           "https://downloads.edgetx.org/"
+#define CPN_URL_DOWNLOAD           "https://downloads.open-tx.org/"
 #define CPN_URL_DOWNLOAD_CUR_VERS  CPN_URL_DOWNLOAD QT_STRINGIFY(VERSION_MAJOR) "." QT_STRINGIFY(VERSION_MINOR) "/"
 #define CPN_URL_DOWNLOAD_CUR_REL   CPN_URL_DOWNLOAD_CUR_VERS "release/"
 #define CPN_URL_DOWNLOAD_CUR_RC    CPN_URL_DOWNLOAD_CUR_VERS "rc/"
 #define CPN_URL_DOWNLOAD_CUR_UNST  CPN_URL_DOWNLOAD_CUR_VERS "nightlies/"
 
-#define MAX_PROFILES 20
+#define MAX_PROFILES 15
 #define MAX_JOYSTICKS 8
 
 // It important that these function names are consistent everywhere.
@@ -380,7 +379,6 @@ class Profile: public CompStoreObj
     PROPERTYSTR(sdPath)
     PROPERTYSTR(pBackupDir)
 
-    PROPERTY (int, defaultInternalModule, 0)
     PROPERTY4(int, channelOrder, "default_channel_order",  0)
     PROPERTY4(int, defaultMode,  "default_mode",           1)
     PROPERTY (int, volumeGain,   10)
@@ -575,8 +573,8 @@ class AppData: public CompStoreObj
     PROPERTY4(bool, jsSupport,       "js_support",              false)
     PROPERTY4(bool, showSplash,      "show_splash",             true)
     PROPERTY4(bool, snapToClpbrd,    "snapshot_to_clipboard",   false)
-    PROPERTY4(bool, autoCheckApp,    "startup_check_companion", false)
-    PROPERTY4(bool, autoCheckFw,     "startup_check_fw",        false)
+    PROPERTY4(bool, autoCheckApp,    "startup_check_companion", true)
+    PROPERTY4(bool, autoCheckFw,     "startup_check_fw",        true)
     PROPERTY4(bool, promptProfile,   "startup_prompt_profile",  false)
 
     PROPERTY(bool, enableBackup,               false)
@@ -594,9 +592,6 @@ class AppData: public CompStoreObj
     PROPERTY(int, backLight,       0)
     PROPERTY(int, simuLastProfId, -1)
     PROPERTY(bool, simuSW,      true)
-
-    // Message box confirmations
-    PROPERTY(bool, confirmWriteModelsAndSettings, true)
 
     bool firstUse;
     QString upgradeFromVersion;

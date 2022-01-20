@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -22,13 +21,10 @@
 #ifndef _SIMULCD_H_
 #define _SIMULCD_H_
 
-#include "opentx_types.h"
 #include "lcd.h"
 
 extern int g_snapshot_idx;
 extern bool simuLcdRefresh;
-
-extern pixel_t simuLcdBuf[DISPLAY_BUFFER_SIZE];
-extern pixel_t displayBuf[DISPLAY_BUFFER_SIZE];
+extern display_t simuLcdBuf[DISPLAY_BUFFER_SIZE];
 
 #endif // _SIMULCD_H_

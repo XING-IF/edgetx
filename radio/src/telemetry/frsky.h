@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -260,10 +259,9 @@ inline uint8_t TELEMETRY_RSSI()
   return telemetryData.rssi.value();
 }
 
-constexpr uint8_t START_STOP    = 0x7E;
-constexpr uint8_t BYTE_STUFF    = 0x7D;
-constexpr uint8_t STUFF_MASK    = 0x20;
-constexpr uint8_t TRAINER_FRAME = 0x80;
+constexpr uint8_t START_STOP = 0x7E;
+constexpr uint8_t BYTE_STUFF = 0x7D;
+constexpr uint8_t STUFF_MASK = 0x20;
 
 typedef enum {
   TS_IDLE = 0,  // waiting for 0x5e frame marker

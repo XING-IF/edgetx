@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -19,15 +18,7 @@
  * GNU General Public License for more details.
  */
 
-#include <stdio.h>
 #include "opentx.h"
-#include "bootloader_flash.h"
-
-#if defined(LIBOPENUI)
-  #include "libopenui.h"
-#else
-  #include "libopenui/src/libopenui_file.h"
-#endif
 
 bool isBootloader(const char * filename)
 {
@@ -43,7 +34,7 @@ bool isBootloader(const char * filename)
   return isBootloaderStart(buffer);
 }
 
-void BootloaderFirmwareUpdate::flashFirmware(const char * filename, ProgressHandler progressHandler)
+void bootloaderFlash(const char * filename)
 {
   FIL file;
   uint8_t buffer[1024];
@@ -59,22 +50,9 @@ void BootloaderFirmwareUpdate::flashFirmware(const char * filename, ProgressHand
     unlockFlash();
   }
 
-  UINT flash_size = file.obj.objsize;
-  if (flash_size > BOOTLOADER_SIZE) {
-    flash_size = BOOTLOADER_SIZE;
-  }
-  
   for (int i = 0; i < BOOTLOADER_SIZE; i += 1024) {
-
     watchdogSuspend(1000/*10s*/);
-    memset(buffer, 0xFF, sizeof(buffer));
-
-    if (f_read(&file, buffer, sizeof(buffer), &count) != FR_OK) {
-      POPUP_WARNING(STR_SDCARD_ERROR);
-      break;
-    }
-    if (count != sizeof(buffer)
-        && !f_eof(&file)) {
+    if (f_read(&file, buffer, sizeof(buffer), &count) != FR_OK || count != sizeof(buffer)) {
       POPUP_WARNING(STR_SDCARD_ERROR);
       break;
     }
@@ -82,22 +60,16 @@ void BootloaderFirmwareUpdate::flashFirmware(const char * filename, ProgressHand
       POPUP_WARNING(STR_INCOMPATIBLE);
       break;
     }
-    for (UINT j = 0; j < count; j += FLASH_PAGESIZE) {
+    for (int j = 0; j < 1024; j += FLASH_PAGESIZE) {
       flashWrite(CONVERT_UINT_PTR(FIRMWARE_ADDRESS + i + j), CONVERT_UINT_PTR(buffer + j));
     }
-    progressHandler("Bootloader", STR_WRITING, i, flash_size);
-
-    // Reached end-of-file
-    if (f_eof(&file)) break;
-
+    drawProgressScreen("Bootloader", STR_WRITING, i, BOOTLOADER_SIZE);
 #if defined(SIMU)
     // add an artificial delay and check for simu quit
     if (SIMU_SLEEP_OR_EXIT_MS(30))
       break;
 #endif
   }
-
-  POPUP_INFORMATION(STR_FIRMWARE_UPDATE_SUCCESS);
 
   watchdogSuspend(0);
   WDG_RESET();

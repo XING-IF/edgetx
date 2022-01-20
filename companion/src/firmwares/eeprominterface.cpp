@@ -178,9 +178,3 @@ void Firmware::addOptionsGroup(const OptionsGroup & options)
 {
   this->opts.append(options);
 }
-
-QString Firmware::getFlavour()
-{
-  QStringList strl = id.split("-");
-  return strl.count() >= 2 ? strl.at(1) : QString();
-}

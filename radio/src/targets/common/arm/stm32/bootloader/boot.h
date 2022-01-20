@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -27,7 +26,7 @@
 #if LCD_W < 212
   #define BOOTLOADER_TITLE               " Bootloader - " VERSION
 #else
-  #define BOOTLOADER_TITLE               " EdgeTX Bootloader - " VERSION
+  #define BOOTLOADER_TITLE               " OpenTX Bootloader - " VERSION
 #endif
 
 #define DISPLAY_CHAR_WIDTH             (LCD_COLS+4)

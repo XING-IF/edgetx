@@ -54,6 +54,7 @@ endif()
 set(BOOTLOADER_SRC
   ${BOOTLOADER_SRC}
   ../../../../../gui/${GUI_DIR}/lcd.cpp
+  ../../../../../gui/${GUI_DIR}/fonts.cpp
   ../../../../../keys.cpp
   ../../../../../strhelpers.cpp
   ../../../../../stamp.cpp
@@ -68,7 +69,7 @@ set(BOOTLOADER_SRC
   ../../../../../${STM32USB_DIR}/STM32_USB_Device_Library/Class/msc/src/usbd_msc_bot.c
   ../../../../../${STM32USB_DIR}/STM32_USB_Device_Library/Class/msc/src/usbd_msc_core.c
   ../../../../../${FATFS_DIR}/ff.c
-  ../../../../../${FATFS_DIR}/ffunicode.c
+  ../../../../../${FATFS_DIR}/option/ccsbcs.c
   ../../../../../targets/${TARGET_DIR}/${LCD_DRIVER}
   ../../../../../targets/${TARGET_DIR}/backlight_driver.cpp
   ../../../../../targets/${TARGET_DIR}/keys_driver.cpp
@@ -78,7 +79,7 @@ set(BOOTLOADER_SRC
   ../../../../../targets/${TARGET_DIR}/bootloader/boot_menu.cpp
   ../usbd_usr.cpp
   ../usbd_storage_msd.cpp
-  ../delays_driver.cpp
+  ../delays.cpp
   ../usbd_desc.c
   ../usb_bsp.c
   ../usb_driver.cpp
@@ -102,42 +103,27 @@ if(BLUETOOTH)
     )
 endif()
 
-if(NOT (PCB STREQUAL X10 OR PCB STREQUAL X12S OR PCB STREQUAL NV14))
+if(PCB STREQUAL X10 OR PCB STREQUAL X12S)
   set(BOOTLOADER_SRC
     ${BOOTLOADER_SRC}
-    ../../../../../targets/${TARGET_DIR}/i2c_driver.cpp
-    )
-endif()
-
-if(PCB STREQUAL X10 OR PCB STREQUAL X12S OR PCB STREQUAL NV14)
-  set(BOOTLOADER_SRC
-    ${BOOTLOADER_SRC}
-    ../../../../../gui/colorlcd/fonts.cpp
-    ../../../../../gui/colorlcd/colors.cpp
-    ../../../../../thirdparty/libopenui/src/bitmapbuffer.cpp
-    ../../../../../thirdparty/libopenui/src/libopenui_globals.cpp
     ../../../../../targets/${TARGET_DIR}/sdram_driver.c
     ../../../../../targets/common/arm/stm32/sdio_sd.c
     ../../../../../targets/common/arm/stm32/rtc_driver.cpp
     ../../../../../targets/${TARGET_DIR}/haptic_driver.cpp
+    ../../../../../gui/${GUI_DIR}/bitmapbuffer.cpp
+    ../../../../../gui/${GUI_DIR}/rle.cpp
+
     ../../../../../syscalls.c
     )
 
-  if(USB_CHARGER)
-    set(BOOTLOADER_SRC
-      ${BOOTLOADER_SRC}
-      ../../../../../targets/${TARGET_DIR}/usb_charger_driver.cpp
-      ../../../../../targets/${TARGET_DIR}/led_driver.cpp
-      )
+if(USB_CHARGER)
+  set(BOOTLOADER_SRC
+    ${BOOTLOADER_SRC}
+    ../../../../../targets/${TARGET_DIR}/usb_charger_driver.cpp
+    ../../../../../targets/${TARGET_DIR}/led_driver.cpp
+    )
   endif()
 
-  if(PCB STREQUAL NV14)
-    set(BOOTLOADER_SRC
-      ${BOOTLOADER_SRC}
-      ../../../../../targets/${TARGET_DIR}/extmodule_helper.cpp
-      )
-  endif()
-  
   if(DEBUG)
     set(BOOTLOADER_SRC
       ${BOOTLOADER_SRC}
@@ -149,7 +135,6 @@ if(PCB STREQUAL X10 OR PCB STREQUAL X12S OR PCB STREQUAL NV14)
 else()
   set(BOOTLOADER_SRC
     ${BOOTLOADER_SRC}
-    ../../../../../gui/common/stdlcd/fonts.cpp
     ../../../../../targets/${TARGET_DIR}/i2c_driver.cpp
     )
   remove_definitions(-DDEBUG)
@@ -164,28 +149,21 @@ remove_definitions(-DWATCHDOG)
 
 add_definitions(-DBOOT)
 
-set(CMAKE_EXE_LINKER_FLAGS "-mcpu=${MCU} -mthumb -nostartfiles -lm -T${RADIO_SRC_DIR}/targets/${TARGET_DIR}/stm32_ramboot.ld -Wl,-Map=bootloader.map,--cref,--no-warn-mismatch,--gc-sections")
+set(CMAKE_EXE_LINKER_FLAGS "-mcpu=${MCU} -mthumb -nostartfiles -lm -T${RADIO_SRC_DIRECTORY}/targets/${TARGET_DIR}/stm32_ramboot.ld -Wl,-Map=bootloader.map,--cref,--no-warn-mismatch,--gc-sections")
 # use smaller nano libc
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --specs=nano.specs")
 
-add_executable(bootloader EXCLUDE_FROM_ALL
-  ${BOOTLOADER_SRC}
-  )
-add_dependencies(bootloader ${BITMAPS_TARGET} radio_translations)
-
-if(PCB STREQUAL X10 OR PCB STREQUAL X12S OR PCB STREQUAL NV14)
-  add_dependencies(bootloader truetype_fonts)
-endif()
+add_executable(bootloader ${BOOTLOADER_SRC})
+add_dependencies(bootloader ${BITMAPS_TARGET} firmware_translations)
 
 add_custom_command(
   TARGET bootloader POST_BUILD
-  COMMAND ${FIRMWARE_OBJCOPY} -O binary bootloader.elf ${CMAKE_BINARY_DIR}/bootloader.bin
+  COMMAND arm-none-eabi-objcopy -O binary bootloader.elf bootloader.bin
 )
-
 if(PYTHONINTERP_FOUND)
   add_custom_command(
     TARGET bootloader POST_BUILD
-    COMMAND ${PYTHON_EXECUTABLE} ${RADIO_DIRECTORY}/util/bin2lbm.py ${CMAKE_BINARY_DIR}/bootloader.bin bootloader.lbm
+    COMMAND ${PYTHON_EXECUTABLE} ${RADIO_DIRECTORY}/util/bin2lbm.py bootloader.bin bootloader.lbm
   )
 endif()
 

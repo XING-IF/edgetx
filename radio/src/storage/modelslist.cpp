@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -22,67 +21,32 @@
 #include "modelslist.h"
 using std::list;
 
-#if defined(SDCARD_YAML)
-#include "yaml/yaml_parser.h"
-#include "yaml/yaml_modelslist.h"
-#endif
-
-#include "myeeprom.h"
-#include "datastructs.h"
-#include "pulses/modules_helpers.h"
-#include "strhelpers.h"
-
-#include <cstring>
-
 ModelsList modelslist;
 
-ModelCell::ModelCell(const char* name) : valid_rfData(false)
+ModelCell::ModelCell(const char * name)
+  : buffer(NULL), valid_rfData(false)
 {
-  strncpy(modelFilename, name, sizeof(modelFilename)-1);
-  modelFilename[sizeof(modelFilename)-1] = '\0';
-}
-
-ModelCell::ModelCell(const char* name, uint8_t len) : valid_rfData(false)
-{
-  if (len > sizeof(modelFilename) - 1) len = sizeof(modelFilename) - 1;
-
-  memcpy(modelFilename, name, len);
-  modelFilename[len] = '\0';
+  strncpy(modelFilename, name, sizeof(modelFilename));
+  memset(modelName, 0, sizeof(modelName));
 }
 
 ModelCell::~ModelCell()
 {
+  resetBuffer();
 }
 
-void ModelCell::setModelName(char * name)
+void ModelCell::setModelName(char* name)
 {
-  strncpy(modelName, name, LEN_MODEL_NAME);
-  modelName[LEN_MODEL_NAME] = '\0';
-
-  if (modelName[0] == '\0') {
-    char * tmp;
-    strncpy(modelName, modelFilename, LEN_MODEL_NAME);
-    tmp = (char *) memchr(modelName, '.',  LEN_MODEL_NAME);
-    if (tmp != nullptr)
-      *tmp = 0;
-  }
-}
-
-void ModelCell::setModelName(char* name, uint8_t len)
-{
-  if (len > LEN_MODEL_NAME-1)
-    len = LEN_MODEL_NAME-1;
-
-  memcpy(modelName, name, len);
-  modelName[len] = '\0';
-
+  zchar2str(modelName, name, LEN_MODEL_NAME);
   if (modelName[0] == 0) {
     char * tmp;
     strncpy(modelName, modelFilename, LEN_MODEL_NAME);
     tmp = (char *) memchr(modelName, '.',  LEN_MODEL_NAME);
-    if (tmp != nullptr)
+    if (tmp != NULL)
       *tmp = 0;
   }
+
+  resetBuffer();
 }
 
 void ModelCell::setModelId(uint8_t moduleIdx, uint8_t id)
@@ -90,21 +54,88 @@ void ModelCell::setModelId(uint8_t moduleIdx, uint8_t id)
   modelId[moduleIdx] = id;
 }
 
+void ModelCell::resetBuffer()
+{
+  if (buffer) {
+    delete buffer;
+    buffer = NULL;
+  }
+}
+
+const BitmapBuffer * ModelCell::getBuffer()
+{
+  if (!buffer) {
+    loadBitmap();
+  }
+  return buffer;
+}
+
+void ModelCell::loadBitmap()
+{
+  uint8_t version;
+
+  PACK(struct {
+    ModelHeader header;
+    TimerData timers[MAX_TIMERS];
+  }) partialmodel;
+  const char * error = NULL;
+
+  if (strncmp(modelFilename, g_eeGeneral.currModelFilename, LEN_MODEL_FILENAME) == 0) {
+    memcpy(&partialmodel.header, &g_model.header, sizeof(partialmodel));
+  }
+  else {
+    error = readModel(modelFilename, (uint8_t *)&partialmodel.header, sizeof(partialmodel), &version);
+    // LEN_BITMAP_NAME has now 4 bytes more
+    if (version <= 218) {
+      memmove(partialmodel.timers, &(partialmodel.header.bitmap[10]), sizeof(TimerData)*MAX_TIMERS);
+      memclear(&(partialmodel.header.bitmap[10]), 4);
+    }
+  }
+
+  if ((modelName[0] == 0) && ! error)
+    setModelName(partialmodel.header.name); // resets buffer!!!
+
+  buffer = new BitmapBuffer(BMP_RGB565, MODELCELL_WIDTH, MODELCELL_HEIGHT);
+  if (buffer == NULL) {
+    return;
+  }
+  buffer->clear(TEXT_BGCOLOR);
+
+  if (error) {
+    buffer->drawText(5, 2, "(Invalid Model)", TEXT_COLOR);
+    buffer->drawBitmapPattern(5, 23, LBM_LIBRARY_SLOT, TEXT_COLOR);
+  }
+  else {
+    char timer[LEN_TIMER_STRING];
+    buffer->drawSizedText(5, 2, modelName, LEN_MODEL_NAME, SMLSIZE|TEXT_COLOR);
+    getTimerString(timer, 0);
+    for (uint8_t i = 0; i < MAX_TIMERS; i++) {
+      if (partialmodel.timers[i].mode != 0 && partialmodel.timers[i].persistent) {
+        getTimerString(timer, partialmodel.timers[i].value, 1);
+        break;
+      }
+    }
+    buffer->drawText(101, 40, timer, TEXT_COLOR);
+    for (int i=0; i<4; i++) {
+      buffer->drawBitmapPattern(104+i*11, 25, LBM_SCORE0, TITLE_BGCOLOR);
+    }
+    GET_FILENAME(filename, BITMAPS_PATH, partialmodel.header.bitmap, "");
+    const BitmapBuffer * bitmap = BitmapBuffer::load(filename);
+    if (bitmap) {
+      buffer->drawScaledBitmap(bitmap, 5, 24, 56, 32);
+      delete bitmap;
+    }
+    else {
+      buffer->drawBitmapPattern(5, 23, LBM_LIBRARY_SLOT, TEXT_COLOR);
+    }
+  }
+  buffer->drawSolidHorizontalLine(5, 19, 143, LINE_COLOR);
+}
 
 void ModelCell::save(FIL* file)
 {
-#if !defined(SDCARD_YAML)
   f_puts(modelFilename, file);
   f_putc('\n', file);
-#else
-  f_puts("  - filename: \"", file);
-  f_puts(modelFilename, file);
-  f_puts("\"\n", file);
-
-  f_puts("    name: \"", file);
-  f_puts(modelName, file);
-  f_puts("\"\n", file);
-#endif
 }
 
 void ModelCell::setRfData(ModelData* model)
@@ -133,7 +164,6 @@ void ModelCell::setRfModuleData(uint8_t moduleIdx, ModuleData* modData)
 
 bool ModelCell::fetchRfData()
 {
-#if !defined(SDCARD_YAML)
   //TODO: use g_model in case fetching data for current model
   //
   char buf[256];
@@ -143,7 +173,7 @@ bool ModelCell::fetchRfData()
   uint16_t size;
   uint8_t  version;
 
-  const char * err = openFileBin(buf, &file, &size, &version);
+  const char * err = openFile(buf, &file, &size, &version);
   if (err || version != EEPROM_VER) return false;
 
   FSIZE_t start_offset = f_tell(&file);
@@ -178,11 +208,7 @@ bool ModelCell::fetchRfData()
   
  error:
   f_close(&file);
-  return false;
-
-#else
-  return false;
-#endif
+  return false;  
 }
 
 ModelsCategory::ModelsCategory(const char * name)
@@ -190,26 +216,16 @@ ModelsCategory::ModelsCategory(const char * name)
   strncpy(this->name, name, sizeof(this->name));
 }
 
-ModelsCategory::ModelsCategory(const char * name, uint8_t len)
-{
-  if (len > sizeof(this->name)-1)
-      len = sizeof(this->name)-1;
-
-  memcpy(this->name, name, len);
-  this->name[len] = '\0';
-}
-
 ModelsCategory::~ModelsCategory()
 {
-  for (auto * model: *this) {
-    delete model;
+  for (list<ModelCell *>::iterator it = begin(); it != end(); ++it) {
+    delete *it;
   }
 }
 
+
 ModelCell * ModelsCategory::addModel(const char * name)
 {
-  if (!name) return NULL;
-
   ModelCell * result = new ModelCell(name);
   push_back(result);
   return result;
@@ -248,31 +264,12 @@ void ModelsCategory::moveModel(ModelCell * model, int8_t step)
   erase(current);
 }
 
-int ModelsCategory::getModelIndex(const ModelCell* model)
-{
-  int idx = 0;
-  for (auto m : *this) {
-    if (model == m)
-      return idx;
-
-    ++idx;
-  }
-
-  return -1;
-}
-
 void ModelsCategory::save(FIL * file)
 {
-#if !defined(SDCARD_YAML)
   f_puts("[", file);
   f_puts(name, file);
   f_puts("]", file);
   f_putc('\n', file);
-#else
-  f_puts("- \"", file);
-  f_puts(name, file);
-  f_puts("\":\n", file);
-#endif
   for (list<ModelCell *>::iterator it = begin(); it != end(); ++it) {
     (*it)->save(file);
   }
@@ -305,16 +302,16 @@ void ModelsList::clear()
   init();
 }
 
-bool ModelsList::loadTxt()
+bool ModelsList::load()
 {
   char line[LEN_MODELS_IDX_LINE+1];
-  ModelsCategory * category = nullptr;
-  ModelCell * model = nullptr;
+  ModelsCategory * category = NULL;
+
+  if (loaded)
+    return true;
 
   FRESULT result = f_open(&file, RADIO_MODELSLIST_PATH, FA_OPEN_EXISTING | FA_READ);
   if (result == FR_OK) {
-
-    // TXT reader
     while (readNextLine(line, LEN_MODELS_IDX_LINE)) {
       int len = strlen(line); // TODO could be returned by readNextLine
       if (len > 2 && line[0] == '[' && line[len-1] == ']') {
@@ -323,7 +320,9 @@ bool ModelsList::loadTxt()
         categories.push_back(category);
       }
       else if (len > 0) {
-        model = new ModelCell(line);
+
+        //char* rf_data_str = cutModelFilename(line);
+        ModelCell * model = new ModelCell(line);
         if (!category) {
           category = new ModelsCategory("Models");
           categories.push_back(category);
@@ -333,115 +332,36 @@ bool ModelsList::loadTxt()
           currentCategory = category;
           currentModel = model;
         }
+        //parseModulesData(model, rf_data_str);
+        //TRACE("model=<%s>, valid_rfData=<%i>",model->modelFilename,model->valid_rfData);
         model->fetchRfData();
         modelsCount += 1;
       }
     }
-
     f_close(&file);
-    return true;
-  }
 
-  return false;
-}
-
-#if defined(SDCARD_YAML)
-bool ModelsList::loadYaml()
-{
-  char line[LEN_MODELS_IDX_LINE+1];
-  FRESULT result = f_open(&file, MODELSLIST_YAML_PATH, FA_OPEN_EXISTING | FA_READ);
-
-  if (result != FR_OK) {
-    // move the YaML models list from the old to the new place
-    FILINFO fno;
-    if (f_stat(FALLBACK_MODELSLIST_YAML_PATH, &fno) == FR_OK) {
-      if (!sdCopyFile(FALLBACK_MODELSLIST_YAML_PATH, MODELSLIST_YAML_PATH)) {
-        f_unlink(FALLBACK_MODELSLIST_YAML_PATH);
-        result =
-            f_open(&file, MODELSLIST_YAML_PATH, FA_OPEN_EXISTING | FA_READ);
-      }
+    if (!getCurrentModel()) {
+      TRACE("currentModel is NULL");
     }
   }
 
-  if (result == FR_OK) {
-    // YAML reader
-    TRACE("YAML modelslist reader");
-
-    YamlParser yp;
-    void* ctx = get_modelslist_iter(
-        g_eeGeneral.currModelFilename,
-        strnlen(g_eeGeneral.currModelFilename, LEN_MODEL_FILENAME));
-
-    yp.init(get_modelslist_parser_calls(), ctx);
-
-    UINT bytes_read=0;
-    while (f_read(&file, line, sizeof(line), &bytes_read) == FR_OK) {
-
-      // reached EOF?
-      if (bytes_read == 0)
-        break;
-
-      if (f_eof(&file)) yp.set_eof();
-      if (yp.parse(line, bytes_read) != YamlParser::CONTINUE_PARSING)
-        break;
-    }
-
-    f_close(&file);
-    return true;
-  }
-
-  return false;
-}
-#endif
-
-bool ModelsList::load(Format fmt)
-{
-  if (loaded)
-    return true;
-
-  bool res = false;
-#if !defined(SDCARD_YAML)
-  (void)fmt;
-  res = loadTxt();
-#else
-  FILINFO fno;
-  if (fmt == Format::txt ||
-      (fmt == Format::yaml_txt &&
-       f_stat(MODELSLIST_YAML_PATH, &fno) != FR_OK &&
-       f_stat(FALLBACK_MODELSLIST_YAML_PATH, &fno) != FR_OK)) {
-    res = loadTxt();
-  } else {
-    res = loadYaml();
-  }
-#endif
-
-  if (!currentModel) {
-    if (categories.empty()) {
-      currentCategory = new ModelsCategory("Models");
-      categories.push_back(currentCategory);
-    } else {
-      currentCategory = *categories.begin();
-      if (!currentCategory->empty()) {
-        currentModel = *currentCategory->begin();
-      }
-    }
+  if (categories.size() == 0) {
+    category = new ModelsCategory("Models");
+    categories.push_back(category);
   }
 
   loaded = true;
-  return res;
+  return true;
 }
 
 void ModelsList::save()
 {
-#if !defined(SDCARD_YAML)
   FRESULT result = f_open(&file, RADIO_MODELSLIST_PATH, FA_CREATE_ALWAYS | FA_WRITE);
-#else
-  FRESULT result = f_open(&file, MODELSLIST_YAML_PATH, FA_CREATE_ALWAYS | FA_WRITE);
-#endif
-  if (result != FR_OK) return;
+  if (result != FR_OK) {
+    return;
+  }
 
-  for (list<ModelsCategory *>::iterator it = categories.begin();
-       it != categories.end(); ++it) {
+  for (list<ModelsCategory *>::iterator it = categories.begin(); it != categories.end(); ++it) {
     (*it)->save(&file);
   }
 
@@ -451,22 +371,6 @@ void ModelsList::save()
 void ModelsList::setCurrentCategory(ModelsCategory * cat)
 {
   currentCategory = cat;
-}
-
-int ModelsList::getCurrentCategoryIdx() const
-{
-  if (!currentCategory)
-    return -1;
-  
-  int idx = 0;
-  for (auto cat : categories) {
-    if (currentCategory == cat)
-      return idx;
-
-    ++idx;
-  }
-
-  return -1;
 }
 
 void ModelsList::setCurrentModel(ModelCell * cell)
@@ -493,24 +397,19 @@ bool ModelsList::readNextLine(char * line, int maxlen)
   return false;
 }
 
-ModelsCategory * ModelsList::createCategory(bool save)
+ModelsCategory * ModelsList::createCategory()
 {
-  return createCategory("Category", save);
-}
-
-ModelsCategory * ModelsList::createCategory(const char* name, bool save)
-{
-  ModelsCategory * result = new ModelsCategory(name);
+  ModelsCategory * result = new ModelsCategory("Category");
   categories.push_back(result);
-  if (save) this->save();
+  save();
   return result;
 }
 
-ModelCell * ModelsList::addModel(ModelsCategory * category, const char * name, bool save)
+ModelCell * ModelsList::addModel(ModelsCategory * category, const char * name)
 {
   ModelCell * result = category->addModel(name);
   modelsCount++;
-  if (save) this->save();
+  save();
   return result;
 }
 
@@ -576,8 +475,8 @@ bool ModelsList::isModelIdUnique(uint8_t moduleIdx, char* warn_buf, size_t warn_
         // Hit found!
         hit_found = true;
 
-        const char * modelName = (*it)->modelName;
-        const char * modelFilename = (*it)->modelFilename;
+        const char* modelName = (*it)->modelName;
+        const char* modelFilename = (*it)->modelFilename;
 
         // you cannot rely exactly on WARNING_LINE_LEN so using WARNING_LINE_LEN-2 (-2 for the ",")
         if ((warn_buf_len - 2 - (curr - warn_buf)) > LEN_MODEL_NAME) {

@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -19,44 +18,38 @@
  * GNU General Public License for more details.
  */
 
-#pragma once
-
-#include "touch.h"
+#ifndef _FT5X06_H_
+#define _FT5X06_H_
 
 #define HAS_TOUCH_PANEL()     touchGT911Flag == true
 
-extern bool touchGT911Flag;
-extern uint16_t touchGT911fwver;
-extern uint32_t touchGT911hiccups;
-extern bool touchPanelInit();
+extern uint8_t touchGT911Flag;
+extern bool touchPanelInit(void);
+extern void touchPanelDeInit(void);
 
-struct TouchState touchPanelRead();
+void touchPanelRead();
 bool touchPanelEventOccured();
-struct TouchState getInternalTouchState();
-
-#define GT911_TIMEOUT           3 // 3ms
 
 #define GT911_MAX_TP            5
-#define GT911_CFG_NUMER         0x6D
+#define GT911_CFG_NUMER         0x6A
 
 //I2C
-#define GT911_I2C_ADDR          0x14
-//#define GT_CMD_WR             0x28
-//#define GT_CMD_RD             0x29
-//#define I2C_TIMEOUT_MAX       1000
+#define GT_CMD_WR 		0X28
+#define GT_CMD_RD 		0X29
+#define I2C_TIMEOUT_MAX         1000
 
-//GT911
-#define GT_CTRL_REG 	        0x8040
-#define GT_CFGS_REG 	        0x8047
-#define GT_CHECK_REG 	        0x80FF
-#define GT_PID_REG              0x8140
+//GT9147
+#define GT_CTRL_REG 	        0X8040
+#define GT_CFGS_REG 	        0X8047
+#define GT_CHECK_REG 	        0X80FF
+#define GT_PID_REG 		0X8140
 
-#define GT_GSTID_REG 	        0x814E
-#define GT_TP1_REG              0x8150
-#define GT_TP2_REG              0x8158
-#define GT_TP3_REG              0x8160
-#define GT_TP4_REG              0x8168
-#define GT_TP5_REG              0x8170
+#define GT_GSTID_REG 	        0X814E
+#define GT_TP1_REG 		0X8150
+#define GT_TP2_REG 		0X8158
+#define GT_TP3_REG 		0X8160
+#define GT_TP4_REG 		0X8168
+#define GT_TP5_REG 		0X8170
 
 #define GT911_READ_XY_REG               0x814E
 #define GT911_CLEARBUF_REG              0x814E
@@ -77,6 +70,7 @@ PACK(typedef struct {
 }) TouchPoint;
 
 PACK(struct TouchData {
+  uint8_t pointsCount;
   union
   {
     TouchPoint points[GT911_MAX_TP];
@@ -89,3 +83,5 @@ PACK(struct TouchData {
 
 #define TPINT_LOW()   do { TOUCH_INT_GPIO->BSRRH = TOUCH_INT_GPIO_PIN; } while(0)
 #define TPINT_HIGH()  do { TOUCH_INT_GPIO->BSRRL = TOUCH_INT_GPIO_PIN; } while(0)
+
+#endif // _FT5X06_H_

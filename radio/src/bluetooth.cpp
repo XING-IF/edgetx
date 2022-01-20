@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -19,15 +18,8 @@
  * GNU General Public License for more details.
  */
 
-#include <stdio.h>
 #include "opentx.h"
 #include "io/frsky_firmware_update.h"
-
-#if defined(LIBOPENUI)
-  #include "libopenui.h"
-#else
-  #include "libopenui/src/libopenui_file.h"
-#endif
 
 #if defined(LOG_BLUETOOTH)
 extern FIL g_bluetoothFile;
@@ -57,12 +49,12 @@ Bluetooth bluetooth;
 void Bluetooth::write(const uint8_t * data, uint8_t length)
 {
   if (btTxFifo.hasSpace(length)) {
-    BLUETOOTH_TRACE_VERBOSE("BT>");
+    BLUETOOTH_TRACE("BT>");
     for (int i = 0; i < length; i++) {
-      BLUETOOTH_TRACE_VERBOSE(" %02X", data[i]);
+      BLUETOOTH_TRACE(" %02X", data[i]);
       btTxFifo.push(data[i]);
     }
-    BLUETOOTH_TRACE_VERBOSE(CRLF);
+    BLUETOOTH_TRACE(CRLF);
   }
   else {
     BLUETOOTH_TRACE("[BT] TX fifo full!" CRLF);
@@ -95,7 +87,7 @@ char * Bluetooth::readline(bool error_reset)
       return nullptr;
     }
 
-    BLUETOOTH_TRACE_VERBOSE("%02X ", byte);
+    BLUETOOTH_TRACE("%02X ", byte);
 
 #if 0
     if (error_reset && byte == 'R' && bufferIndex == 4 && memcmp(buffer, "ERRO", 4)) {
@@ -150,7 +142,9 @@ char * Bluetooth::readline(bool error_reset)
 
 void Bluetooth::processTrainerFrame(const uint8_t * buffer)
 {
-  for (uint8_t channel=0, i=1; channel<BLUETOOTH_TRAINER_CHANNELS; channel+=2, i+=3) {
+  BLUETOOTH_TRACE(CRLF);
+
+  for (uint8_t channel=0, i=1; channel<8; channel+=2, i+=3) {
     // +-500 != 512, but close enough.
     ppmInput[channel] = buffer[i] + ((buffer[i+1] & 0xf0) << 4) - 1500;
     ppmInput[channel+1] = ((buffer[i+1] & 0x0f) << 4) + ((buffer[i+2] & 0xf0) >> 4) + ((buffer[i+2] & 0x0f) << 8) - 1500;
@@ -165,13 +159,11 @@ void Bluetooth::appendTrainerByte(uint8_t data)
     buffer[bufferIndex++] = data;
     // we check for "DisConnected", but the first byte could be altered (if received in state STATE_DATA_XOR)
     if (data == '\n') {
-      if (bufferIndex >= 13) {      
-        if (!strncmp((char *)&buffer[bufferIndex-13], "isConnected", 11)) {
-          BLUETOOTH_TRACE("BT< DisConnected" CRLF);
-          state = BLUETOOTH_STATE_DISCONNECTED;
-          bufferIndex = 0;
-          wakeupTime += 200; // 1s
-        }
+      if (!strncmp((char *)&buffer[bufferIndex-13], "isConnected", 11)) {
+        BLUETOOTH_TRACE("BT< DisConnected" CRLF);
+        state = BLUETOOTH_STATE_DISCONNECTED;
+        bufferIndex = 0;
+        wakeupTime += 200; // 1s
       }
     }
   }
@@ -206,22 +198,8 @@ void Bluetooth::processTrainerByte(uint8_t data)
       break;
 
     case STATE_DATA_XOR:
-      switch (data) {
-        case BYTE_STUFF ^ STUFF_MASK:
-        case START_STOP ^ STUFF_MASK:
-          // Expected content, save the data
-          appendTrainerByte(data ^ STUFF_MASK);
-          dataState = STATE_DATA_IN_FRAME;
-          break;
-        case START_STOP:  // Illegal situation, as we have START_STOP, try to start from the beginning
-          bufferIndex = 0;
-          dataState = STATE_DATA_IN_FRAME;
-          break;
-        default:  
-          // Illegal situation, start looking for a new START_STOP byte
-          dataState = STATE_DATA_START;
-          break;
-      }
+      appendTrainerByte(data ^ STUFF_MASK);
+      dataState = STATE_DATA_IN_FRAME;
       break;
 
     case STATE_DATA_IDLE:
@@ -237,11 +215,11 @@ void Bluetooth::processTrainerByte(uint8_t data)
 
   if (bufferIndex >= BLUETOOTH_PACKET_SIZE) {
     uint8_t crc = 0x00;
-    for (int i = 0; i < BLUETOOTH_PACKET_SIZE - 1; i++) {
+    for (int i=0; i<13; i++) {
       crc ^= buffer[i];
     }
-    if (crc == buffer[BLUETOOTH_PACKET_SIZE - 1]) {
-      if (buffer[0] == TRAINER_FRAME) {
+    if (crc == buffer[13]) {
+      if (buffer[0] == 0x80) {
         processTrainerFrame(buffer);
       }
     }
@@ -264,15 +242,15 @@ void Bluetooth::sendTrainer()
   int16_t PPM_range = g_model.extendedLimits ? 640*2 : 512*2;
 
   int firstCh = g_model.trainerData.channelsStart;
-  int lastCh = firstCh + BLUETOOTH_TRAINER_CHANNELS;
+  int lastCh = firstCh + 8;
 
   uint8_t * cur = buffer;
   bufferIndex = 0;
   crc = 0x00;
 
   buffer[bufferIndex++] = START_STOP; // start byte
-  pushByte(TRAINER_FRAME);
-  for (int channel=firstCh; channel<lastCh; channel+=2, cur+=3) {
+  pushByte(0x80); // trainer frame type?
+  for (int channel = firstCh; channel < lastCh; channel += 2, cur += 3) {
     uint16_t channelValue1 = PPM_CH_CENTER(channel) + limit((int16_t)-PPM_range, channelOutputs[channel], (int16_t)PPM_range) / 2;
     uint16_t channelValue2 = PPM_CH_CENTER(channel+1) + limit((int16_t)-PPM_range, channelOutputs[channel+1], (int16_t)PPM_range) / 2;
     pushByte(channelValue1 & 0x00ff);
@@ -283,16 +261,6 @@ void Bluetooth::sendTrainer()
   buffer[bufferIndex++] = START_STOP; // end byte
 
   write(buffer, bufferIndex);
-
-  // If not in verbose mode output one buffer per line
-  #if defined(DEBUG_BLUETOOTH) && !defined(DEBUG_BLUETOOTH_VERBOSE)
-    BLUETOOTH_TRACE_TIMESTAMP();
-    for(int i=0; i < bufferIndex; i++) {
-      BLUETOOTH_TRACE(" %02X", buffer[i]);
-    }
-    BLUETOOTH_TRACE(CRLF);
-  #endif
-
   bufferIndex = 0;
 }
 
@@ -311,15 +279,6 @@ void Bluetooth::forwardTelemetry(const uint8_t * packet)
     write(buffer, bufferIndex);
     bufferIndex = 0;
   }
-
-  // If not in verbose mode output one buffer per line
-  #if defined(DEBUG_BLUETOOTH) && !defined(DEBUG_BLUETOOTH_VERBOSE)
-    BLUETOOTH_TRACE_TIMESTAMP();
-    for(int i=0; i < bufferIndex; i++) {
-      BLUETOOTH_TRACE(" %02X", buffer[i]);
-    }
-    BLUETOOTH_TRACE(CRLF);
-  #endif
 }
 
 void Bluetooth::receiveTrainer()
@@ -331,15 +290,7 @@ void Bluetooth::receiveTrainer()
       return;
     }
 
-#if defined(DEBUG_BLUETOOTH)
-    static uint8_t lastb=0;
     BLUETOOTH_TRACE("%02X ", byte);
-    if(byte == START_STOP && lastb != START_STOP) {
-      BLUETOOTH_TRACE(CRLF);
-      BLUETOOTH_TRACE_TIMESTAMP();
-    }
-    lastb = byte;
-#endif
 
     processTrainerByte(byte);
   }
@@ -365,7 +316,7 @@ void Bluetooth::wakeup(void)
         uint8_t len = ZLEN(g_eeGeneral.bluetoothName);
         if (len > 0) {
           for (int i = 0; i < len; i++) {
-            *cur++ = char2lower(g_eeGeneral.bluetoothName[i]);
+            *cur++ = char2lower(zchar2char(g_eeGeneral.bluetoothName[i]));
           }
           *cur = '\0';
         }
@@ -468,7 +419,7 @@ void Bluetooth::wakeup()
       uint8_t len = ZLEN(g_eeGeneral.bluetoothName);
       if (len > 0) {
         for (int i = 0; i < len; i++) {
-          *cur++ = char2lower(g_eeGeneral.bluetoothName[i]);
+          *cur++ = char2lower(zchar2char(g_eeGeneral.bluetoothName[i]));
         }
         *cur = '\0';
       }
@@ -740,7 +691,7 @@ const char * Bluetooth::bootloaderWriteFlash(const uint8_t * data, uint32_t size
   return nullptr;
 }
 
-const char * Bluetooth::doFlashFirmware(const char * filename, ProgressHandler progressHandler)
+const char * Bluetooth::doFlashFirmware(const char * filename)
 {
   const char * result;
   FIL file;
@@ -774,7 +725,7 @@ const char * Bluetooth::doFlashFirmware(const char * filename, ProgressHandler p
     return "Format error";
   }
 
-  progressHandler(getBasename(filename), STR_FLASH_ERASE, 0, 0);
+  drawProgressScreen(getBasename(filename), STR_FLASH_ERASE, 0, 0);
 
   result = bootloaderEraseFlash(CC26XX_FIRMWARE_BASE, information->size);
   if (result) {
@@ -783,7 +734,7 @@ const char * Bluetooth::doFlashFirmware(const char * filename, ProgressHandler p
   }
 
   uint32_t size = information->size;
-  progressHandler(getBasename(filename), STR_FLASH_WRITE, 0, size);
+  drawProgressScreen(getBasename(filename), STR_FLASH_WRITE, 0, size);
 
   result = bootloaderStartWriteFlash(CC26XX_FIRMWARE_BASE, size);
   if (result)
@@ -791,7 +742,7 @@ const char * Bluetooth::doFlashFirmware(const char * filename, ProgressHandler p
 
   uint32_t done = 0;
   while (1) {
-    progressHandler(getBasename(filename), STR_FLASH_WRITE, done, size);
+    drawProgressScreen(getBasename(filename), STR_FLASH_WRITE, done, size);
     if (f_read(&file, buffer, min<uint32_t>(sizeof(buffer), size - done), &count) != FR_OK) {
       f_close(&file);
       return "Error reading file";
@@ -807,9 +758,9 @@ const char * Bluetooth::doFlashFirmware(const char * filename, ProgressHandler p
   }
 }
 
-const char * Bluetooth::flashFirmware(const char * filename, ProgressHandler progressHandler)
+const char * Bluetooth::flashFirmware(const char * filename)
 {
-  progressHandler(getBasename(filename), STR_MODULE_RESET, 0, 0);
+  drawProgressScreen(getBasename(filename), STR_MODULE_RESET, 0, 0);
 
   state = BLUETOOTH_STATE_FLASH_FIRMWARE;
 
@@ -823,19 +774,20 @@ const char * Bluetooth::flashFirmware(const char * filename, ProgressHandler pro
   watchdogSuspend(500 /*5s*/);
   RTOS_WAIT_MS(1000);
 
-  const char * result = doFlashFirmware(filename, progressHandler);
+  const char * result = doFlashFirmware(filename);
 
   AUDIO_PLAY(AU_SPECIAL_SOUND_BEEP1 );
   BACKLIGHT_ENABLE();
 
   if (result) {
-    POPUP_WARNING(STR_FIRMWARE_UPDATE_ERROR, result);
+    POPUP_WARNING(STR_FIRMWARE_UPDATE_ERROR);
+    SET_WARNING_INFO(result, strlen(result), 0);
   }
   else {
     POPUP_INFORMATION(STR_FIRMWARE_UPDATE_SUCCESS);
   }
 
-  progressHandler(getBasename(filename), STR_MODULE_RESET, 0, 0);
+  drawProgressScreen(getBasename(filename), STR_MODULE_RESET, 0, 0);
 
   /* wait 1s off */
   watchdogSuspend(500 /*5s*/);

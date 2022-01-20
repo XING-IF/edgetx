@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -24,27 +23,26 @@
 
 #if !defined(SIMU)
 
-#include "FreeRTOSConfig.h"
-
 // Start scheduler with default period
 void mixerSchedulerStart()
 {
   MIXER_SCHEDULER_TIMER->CR1 &= ~TIM_CR1_CEN;
 
   MIXER_SCHEDULER_TIMER->CR1   = TIM_CR1_URS; // do not generate interrupt on soft update
-  MIXER_SCHEDULER_TIMER->PSC   = MIXER_SCHEDULER_TIMER_FREQ / 1000000 - 1; // 1uS (1Mhz)
+  MIXER_SCHEDULER_TIMER->PSC   = MIXER_SCHEDULER_TIMER_FREQ / 2000000 - 1; // 0.5uS (2Mhz)
   MIXER_SCHEDULER_TIMER->CCER  = 0;
   MIXER_SCHEDULER_TIMER->CCMR1 = 0;
-  MIXER_SCHEDULER_TIMER->ARR   = getMixerSchedulerPeriod() - 1;
+  MIXER_SCHEDULER_TIMER->ARR   = 2 * getMixerSchedulerPeriod() - 1;
   MIXER_SCHEDULER_TIMER->EGR   = TIM_EGR_UG;   // reset timer
 
   NVIC_EnableIRQ(MIXER_SCHEDULER_TIMER_IRQn);
-  NVIC_SetPriority(MIXER_SCHEDULER_TIMER_IRQn,
-                   configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY);
+  NVIC_SetPriority(MIXER_SCHEDULER_TIMER_IRQn, 8);
 
   MIXER_SCHEDULER_TIMER->SR   &= TIM_SR_UIF;   // clear interrupt flag
-  MIXER_SCHEDULER_TIMER->DIER |= TIM_DIER_UIE; // enable interrupt
   MIXER_SCHEDULER_TIMER->CR1  |= TIM_CR1_CEN;
+
+  mixerSchedulerClearTrigger();
+  mixerSchedulerEnableTrigger();
 }
 
 void mixerSchedulerStop()
@@ -57,6 +55,7 @@ void mixerSchedulerResetTimer()
 {
   mixerSchedulerDisableTrigger();
   MIXER_SCHEDULER_TIMER->CNT = 0;
+  mixerSchedulerClearTrigger();
   mixerSchedulerEnableTrigger();
 }
 
@@ -76,7 +75,7 @@ extern "C" void MIXER_SCHEDULER_TIMER_IRQHandler(void)
   mixerSchedulerDisableTrigger();
 
   // set next period
-  MIXER_SCHEDULER_TIMER->ARR = getMixerSchedulerPeriod() - 1;
+  MIXER_SCHEDULER_TIMER->ARR = 2 * getMixerSchedulerPeriod() - 1;
 
   // trigger mixer start
   mixerSchedulerISRTrigger();

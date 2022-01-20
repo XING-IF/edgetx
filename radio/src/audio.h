@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -23,10 +22,7 @@
 #define _AUDIO_H_
 
 #include <stddef.h>
-#include <string.h>
 #include "ff.h"
-#include "opentx_types.h"
-#include "dataconstants.h"
 
 /*
   Implements a bit field, number of bits is set by the template,
@@ -106,7 +102,7 @@ enum AudioBufferState
   #define AUDIO_DATA_MIN               0
   #define AUDIO_DATA_MAX               0xffff
   #define AUDIO_BITS_PER_SAMPLE        16
-#elif defined(PCBX12S) || defined(PCBNV14)
+#elif defined(PCBX12S)
   typedef int16_t audio_data_t;
   #define AUDIO_DATA_SILENCE           0
   #define AUDIO_DATA_MIN               INT16_MIN
@@ -615,6 +611,7 @@ void pushUnit(uint8_t unit, uint8_t idx, uint8_t id);
 void playModelName();
 
 #define I18N_PLAY_FUNCTION(lng, x, ...) void lng ## _ ## x(__VA_ARGS__, uint8_t id)
+#define PLAY_FUNCTION(x, ...)    void x(__VA_ARGS__, uint8_t id)
 #define PUSH_NUMBER_PROMPT(p)    pushPrompt((p), id)
 #define PUSH_UNIT_PROMPT(p, i)   pushUnit((p), (i), id)
 #define PLAY_NUMBER(n, u, a)     playNumber((n), (u), (a), id)

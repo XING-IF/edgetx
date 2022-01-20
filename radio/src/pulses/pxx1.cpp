@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -195,15 +194,12 @@ void Pxx1Pulses<PxxTransport>::setupFrame(uint8_t module)
 #endif
 
   if (moduleState[module].counter & 0x01) {
-    // channelsCount is shifted by 8
     sendUpperChannels = g_model.moduleData[module].channelsCount;
-    // if real channels count > 8
     if (sendUpperChannels && moduleState[module].counter == 1) {
-      sendFailsafe =
-          (g_model.moduleData[module].failsafeMode != FAILSAFE_NOT_SET &&
-           g_model.moduleData[module].failsafeMode != FAILSAFE_RECEIVER);
+      sendFailsafe = (g_model.moduleData[module].failsafeMode != FAILSAFE_NOT_SET && g_model.moduleData[module].failsafeMode != FAILSAFE_RECEIVER);
     }
-  } else {
+  }
+  else {
     if (moduleState[module].counter == 0) {
       sendFailsafe = (g_model.moduleData[module].failsafeMode != FAILSAFE_NOT_SET && g_model.moduleData[module].failsafeMode != FAILSAFE_RECEIVER);
     }

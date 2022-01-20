@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -211,6 +210,18 @@ void menuStatisticsDebug(event_t event)
     drawValueWithUnit(MENU_DEBUG_COL1_OFS, y, coprocData.temp, UNIT_TEMPERATURE, LEFT);
     drawValueWithUnit(MENU_DEBUG_COL2_OFS, y, coprocData.maxtemp, UNIT_TEMPERATURE, LEFT);
   }
+  y += FH;
+#endif
+
+#if defined(STM32) && !defined(SIMU) && defined(DEBUG)
+  lcdDrawTextAlignedLeft(y, "Usb");
+  lcdDrawNumber(MENU_DEBUG_COL1_OFS, y, charsWritten, LEFT);
+  lcdDrawText(lcdLastRightPos, y, " ");
+  lcdDrawNumber(lcdLastRightPos, y, APP_Rx_ptr_in, LEFT);
+  lcdDrawText(lcdLastRightPos, y, " ");
+  lcdDrawNumber(lcdLastRightPos, y, APP_Rx_ptr_out, LEFT);
+  lcdDrawText(lcdLastRightPos, y, " ");
+  lcdDrawNumber(lcdLastRightPos, y, usbWraps, LEFT);
   y += FH;
 #endif
 

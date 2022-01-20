@@ -75,7 +75,6 @@ class SyncProcess : public QObject
         int flags;               // SyncOptionFlags
         int dirFilterFlags;      // QDir::Filters
         int logLevel;            // QtMsgType (see ProgressWidget::addMessage())
-        int sessionId;           // Last run radio profile
 
         void reset()
         {
@@ -87,7 +86,6 @@ class SyncProcess : public QObject
           logLevel = QtWarningMsg;
           flags = OPT_RECURSIVE;
           dirFilterFlags = QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot;
-          sessionId = -1;
         }
 
         friend inline QDebug operator<<(QDebug debug, const SyncOptions &o) {

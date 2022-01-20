@@ -515,7 +515,7 @@ class StructField: public DataField {
       return result;
     }
 
-    int dump(int level=0, int offset=0) override
+    virtual int dump(int level=0, int offset=0)
     {
       for (int i=0; i<level; i++) printf("  ");
       printf("%s (%d bytes)\n", getName().toLatin1().constData(), size()/8);
@@ -568,7 +568,7 @@ class TransformedField: public DataField {
 
     virtual void afterImport() = 0;
 
-    int dump(int level=0, int offset=0) override
+    int dump(int level, int offset) override
     {
       beforeExport();
       return field.dump(level, offset);
@@ -588,7 +588,7 @@ class UnionField: public DataField {
         virtual bool select(const selectorT& attr) const = 0;
         virtual DataField* getField() = 0;
     };
-
+  
     class TransformedMember: public UnionMember, public TransformedField {
       public:
         TransformedMember(DataField* parent, DataField& field):

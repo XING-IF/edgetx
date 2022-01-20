@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -19,8 +18,8 @@
  * GNU General Public License for more details.
  */
 
-#ifndef _RTC_BACKUP_H_
-#define _RTC_BACKUP_H_
+#ifndef _RAM_BACKUP_H_
+#define _RAM_BACKUP_H_
 
 #include "definitions.h"
 
@@ -31,9 +30,4 @@ PACK(struct RamBackup {
 
 extern RamBackup * ramBackup;
 
-void rambackupWrite();
-bool rambackupRestore();
-unsigned int compress(uint8_t * dst, unsigned int dstsize, const uint8_t * src, unsigned int len);
-unsigned int uncompress(uint8_t * dst, unsigned int dstsize, const uint8_t * src, unsigned int len);
-
-#endif // _RTC_BACKUP_H_
+#endif // _RAM_BACKUP_H_

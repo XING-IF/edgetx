@@ -1,9 +1,8 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
- *   th9x - http://code.google.com/p/th9x
+ *   th9x - http://code.google.com/p/th9x 
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
  *
@@ -38,10 +37,10 @@ static void dumpStart(unsigned int size)
 
 static void dumpBody(const void *data, unsigned int size)
 {
-  for (unsigned int i=0; i<size; i++) {
+  for (unsigned int i= 0; i < size; i++) {
     dumpPrintf("%.2X ", ((uint8_t *)data)[i]);
     dumpPosition++;
-    if ((dumpPosition & 31) == 0) {
+    if ((dumpPosition & (32 - 1)) == 0) {
       dumpPrintf(CRLF);
     }
   }

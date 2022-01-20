@@ -12,8 +12,7 @@ class RadioDataConversionState;
 class CategoryData {
   public:
     CategoryData(const char * name) {
-      memset(this->name, 0, sizeof(CategoryData::name));
-      strncpy(this->name, name, sizeof(CategoryData::name)-1);
+      strncpy(this->name, name, sizeof(CategoryData::name));
     }
     char name[15+1];
 };

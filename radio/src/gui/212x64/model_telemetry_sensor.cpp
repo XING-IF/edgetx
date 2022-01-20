@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -63,8 +62,6 @@ void menuModelSensor(event_t event)
   drawSensorCustomValue(25*FW, 0, s_currIdx, getValue(MIXSRC_FIRST_TELEM+3*s_currIdx));
   lcdDrawFilledRect(0, 0, LCD_W, FH, SOLID, FILL_WHITE|GREY_DEFAULT);
 
-  uint8_t old_editMode = s_editMode;
-
   SUBMENU(STR_MENUSENSOR, SENSOR_FIELD_MAX, { 
     0,  //Name
     0,  // Type
@@ -99,8 +96,7 @@ void menuModelSensor(event_t event)
 
     switch (k) {
       case SENSOR_FIELD_NAME:
-        editSingleName(SENSOR_2ND_COLUMN, y, STR_NAME, sensor->label,
-                       TELEM_LABEL_LEN, event, attr, old_editMode);
+        editSingleName(SENSOR_2ND_COLUMN, y, STR_NAME, sensor->label, TELEM_LABEL_LEN, event, attr);
         break;
       case SENSOR_FIELD_TYPE:
         sensor->type = editChoice(SENSOR_2ND_COLUMN, y, NO_INDENT(STR_TYPE), STR_VSENSORTYPES, sensor->type, 0, 1, attr, event);
@@ -223,7 +219,7 @@ void menuModelSensor(event_t event)
         }
         else {
           if (sensor->unit == UNIT_RPMS) {
-            lcdDrawTextAlignedLeft(y, STR_BLADES);
+            lcdDrawTextAlignedLeft(y, NO_INDENT(STR_BLADES));
             if (attr) sensor->custom.ratio = checkIncDec(event, sensor->custom.ratio, 1, 30000, EE_MODEL|NO_INCDEC_MARKS|INCDEC_REP10);
             lcdDrawNumber(SENSOR_2ND_COLUMN, y, sensor->custom.ratio, LEFT|attr);
             break;
@@ -291,26 +287,26 @@ void menuModelSensor(event_t event)
       }
 
       case SENSOR_FIELD_AUTOOFFSET:
-        sensor->autoOffset = editCheckBox(sensor->autoOffset, SENSOR_2ND_COLUMN, y, STR_AUTOOFFSET, attr, event);
+        ON_OFF_MENU_ITEM(sensor->autoOffset, SENSOR_2ND_COLUMN, y, STR_AUTOOFFSET, attr, event);
         break;
 
       case SENSOR_FIELD_ONLYPOSITIVE:
-        sensor->onlyPositive = editCheckBox(sensor->onlyPositive, SENSOR_2ND_COLUMN, y, STR_ONLYPOSITIVE, attr, event);
+        ON_OFF_MENU_ITEM(sensor->onlyPositive, SENSOR_2ND_COLUMN, y, STR_ONLYPOSITIVE, attr, event);
         break;
 
       case SENSOR_FIELD_FILTER:
-        sensor->filter = editCheckBox(sensor->filter, SENSOR_2ND_COLUMN, y, STR_FILTER, attr, event);
+        ON_OFF_MENU_ITEM(sensor->filter, SENSOR_2ND_COLUMN, y, STR_FILTER, attr, event);
         break;
 
       case SENSOR_FIELD_PERSISTENT:
-        sensor->persistent = editCheckBox(sensor->persistent, SENSOR_2ND_COLUMN, y, NO_INDENT(STR_PERSISTENT), attr, event);
+        ON_OFF_MENU_ITEM(sensor->persistent, SENSOR_2ND_COLUMN, y, NO_INDENT(STR_PERSISTENT), attr, event);
         if (checkIncDec_Ret && !sensor->persistent) {
           sensor->persistentValue = 0;
         }
         break;
 
       case SENSOR_FIELD_LOGS:
-        sensor->logs = editCheckBox(sensor->logs, SENSOR_2ND_COLUMN, y, STR_LOGS, attr, event);
+        ON_OFF_MENU_ITEM(sensor->logs, SENSOR_2ND_COLUMN, y, STR_LOGS, attr, event);
         if (attr && checkIncDec_Ret) {
           logsClose();
         }

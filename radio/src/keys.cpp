@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -45,10 +44,13 @@ Key keys[NUM_KEYS];
 
 event_t getEvent(bool trim)
 {
-  event_t event = s_evt;
-  if (trim == IS_TRIM_EVENT(event)) {
+  event_t evt = s_evt;
+  int8_t k = EVT_KEY_MASK(s_evt) - TRM_BASE;
+  bool trim_evt = (k>=0 && k<TRM_LAST-TRM_BASE+1);
+
+  if (trim == trim_evt) {
     s_evt = 0;
-    return event;
+    return evt;
   }
   else {
     return 0;
@@ -69,7 +71,7 @@ void Key::input(bool val)
     // key is released
     if (m_state != KSTATE_KILLED) {
       // TRACE("key %d BREAK", key());
-      pushEvent(EVT_KEY_BREAK(key()));
+      putEvent(EVT_KEY_BREAK(key()));
     }
     m_state = KSTATE_OFF;
     m_cnt = 0;
@@ -86,7 +88,7 @@ void Key::input(bool val)
 
     case KSTATE_START:
       // TRACE("key %d FIRST", key());
-      pushEvent(EVT_KEY_FIRST(key()));
+      putEvent(EVT_KEY_FIRST(key()));
       inactivity.counter = 0;
       m_state = KSTATE_RPTDELAY;
       m_cnt = 0;
@@ -96,7 +98,7 @@ void Key::input(bool val)
       if (m_cnt == KEY_LONG_DELAY) {
         // generate long key press
         // TRACE("key %d LONG", key());
-        pushEvent(EVT_KEY_LONG(key()));
+        putEvent(EVT_KEY_LONG(key()));
       }
       if (m_cnt == KEY_REPEAT_DELAY) {
         m_state = 16;
@@ -118,7 +120,7 @@ void Key::input(bool val)
         // this produces repeat events that at first repeat slowly and then increase in speed
         // TRACE("key %d REPEAT", key());
         if (!IS_SHIFT_KEY(key()))
-          pushEvent(EVT_KEY_REPT(key()));
+          putEvent(EVT_KEY_REPT(key()));
       }
       break;
 
@@ -198,6 +200,6 @@ bool waitKeysReleased()
   }
 
   memclear(keys, sizeof(keys));
-  pushEvent(0);
+  putEvent(0);
   return true;
 }

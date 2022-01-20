@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -56,16 +55,16 @@ PLAY_FUNCTION(playValue, source_t idx)
     if (telemetrySensor.prec > 0) {
       if (telemetrySensor.prec == 2) {
         if (val >= 5000) {
-          val = divRoundClosest(val, 100);
+          val = div_and_round(val, 100);
         }
         else {
-          val = divRoundClosest(val, 10);
+          val = div_and_round(val, 10);
           attr = PREC1;
         }
       }
       else {
         if (val >= 500) {
-          val = divRoundClosest(val, 10);
+          val = div_and_round(val, 10);
         }
         else {
           attr = PREC1;
@@ -388,11 +387,7 @@ void evalFunctions(const CustomFunctionData * functions, CustomFunctionsContext 
             }
             break;
 #endif
-#if defined(HARDWARE_TOUCH)
-          case FUNC_DISABLE_TOUCH:
-            newActiveFunctions |= (1u << FUNCTION_DISABLE_TOUCH);
-        	break;
-#endif
+
 #if defined(DEBUG)
           case FUNC_TEST:
             testFunc();

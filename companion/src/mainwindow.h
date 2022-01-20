@@ -50,7 +50,6 @@ class MainWindow : public QMainWindow
     void firmwareDownloadCompleted();
     void firmwareChanged();
     void startSync();
-    void onInternalModuleChanged();
 
   protected:
     QString getCompanionUpdateBaseUrl() const;
@@ -104,14 +103,15 @@ class MainWindow : public QMainWindow
     bool loadProfileId(const unsigned pid);
     void loadProfile();
     void logFile();
-    void writeSettings();
-    void readSettings();
+    void writeEeprom();
+    void readEeprom();
     void writeFlash(QString fileToFlash="");
     void readFlash();
     void writeBackup();
     void readBackup();
     void burnConfig();
     void burnList();
+    void contributors();
     void sdsync();
     void changelog();
     void customizeSplash();
@@ -157,7 +157,7 @@ class MainWindow : public QMainWindow
     QMdiSubWindow * findMdiChild(const QString & fileName);
     bool anyChildrenDirty();
 
-    bool readSettingsFromRadio(const QString & filename);
+    bool readEepromFromRadio(const QString & filename);
     bool readFirmwareFromRadio(const QString & filename);
 
     bool checkProfileRadioExists(int profId);
@@ -200,12 +200,13 @@ class MainWindow : public QMainWindow
     QAction *appPrefsAct;
     QAction *fwPrefsAct;
     QAction *checkForUpdatesAct;
+    QAction *contributorsAct;
     QAction *sdsyncAct;
     QAction *changelogAct;
     QAction *compareAct;
     QAction *editSplashAct;
-    QAction *writeSettingsAct;
-    QAction *readSettingsAct;
+    QAction *writeEepromAct;
+    QAction *readEepromAct;
     QAction *burnConfigAct;
     QAction *burnListAct;
     QAction *writeFlashAct;

@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -24,8 +23,6 @@
 
 #include <inttypes.h>
 #include "audio.h"
-#include "lcd.h"
-#include "keys.h"
 
 extern const char * warningText;
 extern const char * warningInfoText;
@@ -60,7 +57,6 @@ void showAlertBox(const char * title, const char * text, const char * action , u
 
 // Full screen with 2 lines and a progress bar
 void drawProgressScreen(const char * title, const char * message, int num, int den);
-typedef void (* ProgressHandler)(const char *, const char *, int, int);
 
 enum
 {
@@ -74,7 +70,7 @@ enum
 #if !defined(GUI)
   #define DISPLAY_WARNING(...)
   inline void POPUP_WAIT(const char * s) { }
-  inline void POPUP_WARNING(const char *, const char * = nullptr) { }
+  inline void POPUP_WARNING(const char * s) { }
   inline void POPUP_CONFIRMATION(const char * s, PopupMenuHandler handler) { }
   inline void POPUP_INPUT(const char * s, PopupFunc func) { }
   inline void SET_WARNING_INFO(const char * info, uint8_t length, uint8_t flags) { }
@@ -105,21 +101,12 @@ enum
     popupFunc = runPopupWarning;
   }
 
-  inline void POPUP_WARNING(const char * message, const char * info = nullptr)
+  inline void POPUP_WARNING(const char * s)
   {
-    warningText = message;
-    warningInfoText = info;
-    warningInfoLength = info ? strlen(info) : 0;
-    warningInfoFlags = 0;
+    warningText = s;
+    warningInfoText = nullptr;
     warningType = WARNING_TYPE_ASTERISK;
     popupFunc = runPopupWarning;
-  }
-
-  inline void SET_WARNING_INFO(const char * info, uint8_t length, uint8_t flags)
-  {
-    warningInfoText = info;
-    warningInfoLength = length;
-    warningInfoFlags = flags;
   }
 
   inline void POPUP_CONFIRMATION(const char * s, PopupMenuHandler handler)
@@ -140,6 +127,13 @@ enum
     warningInfoText = nullptr;
     warningType = WARNING_TYPE_INPUT;
     popupFunc = func;
+  }
+
+  inline void SET_WARNING_INFO(const char * info, uint8_t length, uint8_t flags)
+  {
+    warningInfoText = info;
+    warningInfoLength = length;
+    warningInfoFlags = flags;
   }
 
   inline bool isEventCaughtByPopup()

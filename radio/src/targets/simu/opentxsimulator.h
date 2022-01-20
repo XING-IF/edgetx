@@ -1,13 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Author - Bertrand Songis <bsongis@gmail.com>
  *
- * Based on code named
- *   opentx - https://github.com/opentx/opentx
- *   th9x - http://code.google.com/p/th9x
- *   er9x - http://code.google.com/p/er9x
- *   gruvin9x - http://code.google.com/p/gruvin9x
- *
- * License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html
+ * Based on th9x -> http://code.google.com/p/th9x/
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -17,6 +11,7 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
  */
 
 #ifndef _OPENTX_SIMULATOR_H_
@@ -39,12 +34,6 @@ class DLLEXPORT OpenTxSimulator : public SimulatorInterface
   Q_OBJECT
 
   public:
-
-    enum TouchEvent {
-      TouchUp=0,
-      TouchDown,
-      TouchSlide
-    };
 
     OpenTxSimulator();
     virtual ~OpenTxSimulator();
@@ -75,7 +64,6 @@ class DLLEXPORT OpenTxSimulator : public SimulatorInterface
     virtual void setTrainerInput(unsigned int inputNumber, int16_t value);
     virtual void setInputValue(int type, uint8_t index, int16_t value);
     virtual void rotaryEncoderEvent(int steps);
-    virtual void touchEvent(int type, int x, int y);
     virtual void setTrainerTimeout(uint16_t ms);
     virtual void sendTelemetry(const QByteArray data);
     virtual void setLuaStateReloadPermanentScripts();

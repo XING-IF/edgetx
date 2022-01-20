@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -20,10 +19,6 @@
  */
 
 #include "opentx.h"
-
-#if defined(LIBOPENUI)
-  #include "libopenui.h"
-#endif
 
 void processGetHardwareInfoFrame(uint8_t module, const uint8_t * frame)
 {
@@ -117,30 +112,27 @@ void processRegisterFrame(uint8_t module, const uint8_t * frame)
     return;
   }
 
-  PXX2ModuleSetup& mod = reusableBuffer.moduleSetup.pxx2;
   switch(frame[3]) {
     case 0x00:
-      if (mod.registerStep == REGISTER_INIT) {
+      if (reusableBuffer.moduleSetup.pxx2.registerStep == REGISTER_INIT) {
         // RX_NAME follows, we store it for the next step
-        memcpy(mod.registerRxName, (const char *)&frame[4], PXX2_LEN_RX_NAME);
-        mod.registerLoopIndex = frame[12];
-        mod.registerStep = REGISTER_RX_NAME_RECEIVED;
+        str2zchar(reusableBuffer.moduleSetup.pxx2.registerRxName, (const char *)&frame[4], PXX2_LEN_RX_NAME);
+        reusableBuffer.moduleSetup.pxx2.registerLoopIndex = frame[12];
+        reusableBuffer.moduleSetup.pxx2.registerStep = REGISTER_RX_NAME_RECEIVED;
 #if defined(COLORLCD)
-        pushEvent(EVT_REFRESH);
+        putEvent(EVT_REFRESH);
 #endif
       }
       break;
 
     case 0x01:
-      if (mod.registerStep == REGISTER_RX_NAME_SELECTED) {
+      if (reusableBuffer.moduleSetup.pxx2.registerStep == REGISTER_RX_NAME_SELECTED) {
         // RX_NAME + PASSWORD follow, we check they are good
-        if (memcmp(&frame[4], mod.registerRxName, PXX2_LEN_RX_NAME) == 0 &&
-            memcmp(&frame[12], g_model.modelRegistrationID, PXX2_LEN_REGISTRATION_ID) == 0) {
-          mod.registerStep = REGISTER_OK;
+        if (cmpStrWithZchar((char *)&frame[4], reusableBuffer.moduleSetup.pxx2.registerRxName, PXX2_LEN_RX_NAME) &&
+            cmpStrWithZchar((char *)&frame[12], g_model.modelRegistrationID, PXX2_LEN_REGISTRATION_ID)) {
+          reusableBuffer.moduleSetup.pxx2.registerStep = REGISTER_OK;
           moduleState[module].mode = MODULE_MODE_NORMAL;
-#if !defined(COLORLCD)
           POPUP_INFORMATION(STR_REG_OK);
-#endif
         }
       }
       break;
@@ -219,14 +211,7 @@ void processTelemetryFrame(uint8_t module, const uint8_t * frame)
   }
 }
 
-#if defined(INTERNAL_MODULE_PXX2) && defined(ACCESS_DENIED) && !defined(SIMU)
-
-extern "C" {
-  #include "AccessDenied/access_denied.h"
-};
-
-volatile int16_t authenticateFrames = 0;
-
+#if defined(ACCESS_LIB) && !defined(SIMU)
 void processAuthenticationFrame(uint8_t module, const uint8_t * frame)
 {
   uint8_t cryptoType = frame[3];
@@ -237,21 +222,15 @@ void processAuthenticationFrame(uint8_t module, const uint8_t * frame)
       globalData.upgradeModulePopup = 1;
       POPUP_INFORMATION(STR_AUTH_FAILURE);
     }
-    TRACE("[authFailed]\r\n", authenticateFrames);
     return;
   }
 
-  if (INTERNAL_MODULE == module &&
-      access_denied(cryptoType, frame + 4, messageDigest)) {
+  if (INTERNAL_MODULE == module && accessCRL(cryptoType, frame+4, messageDigest)) {
     moduleState[module].mode = MODULE_MODE_AUTHENTICATION;
-    Pxx2Pulses &pxx2 = intmodulePulsesData.pxx2;
-    pxx2.setupAuthenticationFrame(module, cryptoType,
-                                  (const uint8_t *)messageDigest);
+    Pxx2Pulses & pxx2 = intmodulePulsesData.pxx2;
+    pxx2.setupAuthenticationFrame(module, cryptoType, (const uint8_t *)messageDigest);
     intmoduleSendBuffer(pxx2.getData(), pxx2.getSize());
-    // we remain in AUTHENTICATION mode to avoid a CHANNELS frame is sent at the
-    // end of the mixing process
-    authenticateFrames++;
-    TRACE("[authFrame %d]\r\n", authenticateFrames);
+    // we remain in AUTHENTICATION mode to avoid a CHANNELS frame is sent at the end of the mixing process
   }
 
   if (!globalData.upgradeModulePopup) {
@@ -264,7 +243,6 @@ void processAuthenticationFrame(uint8_t module, const uint8_t * frame)
     }
   }
 }
-
 #else
 #define processAuthenticationFrame(module, frame)
 #endif

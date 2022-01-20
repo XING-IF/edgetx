@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -550,10 +549,10 @@ inline bool isSbus(uint8_t mode)
 
 inline bool isPWM(uint8_t mode)
 {
-  return !(mode & 2);
+  return mode < 2;
 }
 
-RUN_POWER PulsesData::getMaxRunPower() const
+RUN_POWER PulsesData::getMaxRunPower()
 {
   if (powerSource == MODULE_POWER_SOURCE::EXTERNAL) {
     return RUN_POWER::PLUS_33dBm;
@@ -562,7 +561,7 @@ RUN_POWER PulsesData::getMaxRunPower() const
   return RUN_POWER::PLUS_27dbm;
 }
 
-RUN_POWER PulsesData::actualRunPower() const
+RUN_POWER PulsesData::actualRunPower()
 {
   uint8_t actualRfPower = cfg.config.runPower;
   if (getMaxRunPower() < actualRfPower) {
@@ -571,7 +570,7 @@ RUN_POWER PulsesData::actualRunPower() const
   return (RUN_POWER) actualRfPower;
 }
 
-RUN_POWER PulsesData::getRunPower() const
+RUN_POWER PulsesData::getRunPower()
 {
   RUN_POWER targetPower = (RUN_POWER) moduleData->afhds3.runPower;
   if (getMaxRunPower() < targetPower) {
@@ -605,9 +604,7 @@ bool PulsesData::syncSettings()
     putFrame(COMMAND::SEND_COMMAND, FRAME_TYPE::REQUEST_SET_EXPECT_DATA, data, sizeof(data));
     return true;
   }
-  PULSE_MODE modelPulseMode = isPWM(moduleData->afhds3.mode)
-                                  ? PULSE_MODE::PWM_MODE
-                                  : PULSE_MODE::PPM_MODE;
+  PULSE_MODE modelPulseMode = isPWM(moduleData->subType) ? PULSE_MODE::PWM_MODE : PULSE_MODE::PPM_MODE;
   if (modelPulseMode != cfg.config.pulseMode) {
     cfg.config.pulseMode = modelPulseMode;
     TRACE("AFHDS3 PWM/PPM %d", modelPulseMode);
@@ -616,9 +613,7 @@ bool PulsesData::syncSettings()
     return true;
   }
 
-  SERIAL_MODE modelSerialMode = isSbus(moduleData->afhds3.mode)
-                                    ? SERIAL_MODE::SBUS_MODE
-                                    : SERIAL_MODE::IBUS;
+  SERIAL_MODE modelSerialMode = isSbus(moduleData->subType) ? SERIAL_MODE::SBUS_MODE : SERIAL_MODE::IBUS;
   if (modelSerialMode != cfg.config.serialMode) {
     cfg.config.serialMode = modelSerialMode;
     TRACE("AFHDS3 IBUS/SBUS %d", modelSerialMode);
@@ -665,12 +660,9 @@ void PulsesData::setConfigFromModel()
   cfg.config.emiStandard = EMI_STANDARD::FCC;
   cfg.config.telemetry = moduleData->afhds3.telemetry; //always use bidirectional mode
   cfg.config.pwmFreq = moduleData->afhds3.rxFreq();
-  cfg.config.serialMode = isSbus(moduleData->afhds3.mode)
-                              ? SERIAL_MODE::SBUS_MODE
-                              : SERIAL_MODE::IBUS;
-  cfg.config.pulseMode = isPWM(moduleData->afhds3.mode) ? PULSE_MODE::PWM_MODE
-                                                        : PULSE_MODE::PPM_MODE;
-  // use max channels - because channel count can not be changed after bind
+  cfg.config.serialMode = isSbus(moduleData->subType) ? SERIAL_MODE::SBUS_MODE : SERIAL_MODE::IBUS;
+  cfg.config.pulseMode = isPWM(moduleData->subType) ? PULSE_MODE::PWM_MODE : PULSE_MODE::PPM_MODE;
+  //use max channels - because channel count can not be changed after bind
   cfg.config.channelCount = MAX_CHANNELS;
   cfg.config.failSafeTimout = moduleData->afhds3.failsafeTimeout;
   setFailSafe(cfg.config.failSafeMode);

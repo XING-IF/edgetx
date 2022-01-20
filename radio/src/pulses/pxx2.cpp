@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -19,55 +18,9 @@
  * GNU General Public License for more details.
  */
 
-#include <stdio.h>
 #include "opentx.h"
 #include "pulses/pxx2.h"
 #include "io/frsky_firmware_update.h"
-#include "libopenui/src/libopenui_file.h"
-
-bool isPXX2PowerAvailable(const PXX2HardwareInformation& info, int value)
-{
-  uint8_t modelId = info.modelID;
-  uint8_t variant = info.variant;
-
-  if (modelId == PXX2_MODULE_R9M_LITE) {
-    if (variant == PXX2_VARIANT_EU)
-      return (value == 14 /* 25 mW with telemetry */ ||
-              value == 20 /* 100 mW without telemetry */);
-    else
-      return value == 20; /* 100 mW */
-  }
-  else if (modelId == PXX2_MODULE_R9M || modelId == PXX2_MODULE_R9M_LITE_PRO) {
-      if (variant == PXX2_VARIANT_EU)
-        return (value == 14 /* 25 mW */ ||
-                value == 23 /* 200 mW */ ||
-                value == 27 /* 500 mW */);
-      else
-        return (value == 10 /* 10 mW */ ||
-                value == 20 /* 100 mW */ ||
-                value == 27 /* 500 mW */ ||
-                value == 30 /* 1000 mW */);
-  }
-  else {
-    // other modules do not have the power option
-    return false;
-  }
-}
-
-PXX2ModuleSetup& getPXX2ModuleSetupBuffer()
-{
-  return reusableBuffer.moduleSetup.pxx2;
-}
-
-BindInformation& getPXX2BindInformationBuffer()
-{
-  return reusableBuffer.moduleSetup.bindInformation;
-}
-
-PXX2HardwareAndSettings& getPXX2HardwareAndSettingsBuffer()
-{
-  return reusableBuffer.hardwareAndSettings;
-}
 
 uint8_t Pxx2Pulses::addFlag0(uint8_t module)
 {
@@ -224,10 +177,10 @@ void Pxx2Pulses::setupRegisterFrame(uint8_t module)
   if (reusableBuffer.moduleSetup.pxx2.registerStep == REGISTER_RX_NAME_SELECTED) {
     Pxx2Transport::addByte(0x01);
     for (uint8_t i=0; i<PXX2_LEN_RX_NAME; i++) {
-      Pxx2Transport::addByte(reusableBuffer.moduleSetup.pxx2.registerRxName[i]);
+      Pxx2Transport::addByte(zchar2char(reusableBuffer.moduleSetup.pxx2.registerRxName[i]));
     }
     for (uint8_t i=0; i<PXX2_LEN_REGISTRATION_ID; i++) {
-      Pxx2Transport::addByte(g_model.modelRegistrationID[i]);
+      Pxx2Transport::addByte(zchar2char(g_model.modelRegistrationID[i]));
     }
     Pxx2Transport::addByte(reusableBuffer.moduleSetup.pxx2.registerLoopIndex);
   }
@@ -312,11 +265,9 @@ void Pxx2Pulses::setupAccessBindFrame(uint8_t module)
 
   if (destination->step == BIND_WAIT) {
     if (get_tmr10ms() > destination->timeout) {
-      destination->step = BIND_OK;
       moduleState[module].mode = MODULE_MODE_NORMAL;
-#if !defined(COLORLCD)
+      destination->step = BIND_OK;
       POPUP_INFORMATION(STR_BIND_OK); // TODO rather use the new callback
-#endif
     }
     return;
   }
@@ -345,7 +296,7 @@ void Pxx2Pulses::setupAccessBindFrame(uint8_t module)
   else {
     Pxx2Transport::addByte(0x00); // DATA0
     for (uint8_t i=0; i<PXX2_LEN_REGISTRATION_ID; i++) {
-      Pxx2Transport::addByte(g_model.modelRegistrationID[i]);
+      Pxx2Transport::addByte(zchar2char(g_model.modelRegistrationID[i]));
     }
   }
 }
@@ -414,16 +365,10 @@ void Pxx2Pulses::sendOtaUpdate(uint8_t module, const char * rxName, uint32_t add
 
   endFrame();
 
-#if defined(HARDWARE_INTERNAL_MODULE)
-  if (module == INTERNAL_MODULE) {
-    intmoduleSendNextFrame();
-  }
-#endif
-#if defined(HARDWARE_EXTERNAL_MODULE)
-  if (module == EXTERNAL_MODULE) {
+  if (module == EXTERNAL_MODULE)
     extmoduleSendNextFrame();
-  }
-#endif
+  else if (module == INTERNAL_MODULE)
+    intmoduleSendNextFrame();
 }
 
 void Pxx2Pulses::setupAuthenticationFrame(uint8_t module, uint8_t mode, const uint8_t * outputMessage)
@@ -468,14 +413,12 @@ bool Pxx2Pulses::setupFrame(uint8_t module)
       setupRegisterFrame(module);
       break;
     case MODULE_MODE_BIND:
-      if ((g_model.moduleData[module].type == MODULE_TYPE_ISRM_PXX2 &&
-           g_model.moduleData[module].subType !=
-               MODULE_SUBTYPE_ISRM_PXX2_ACCESS) ||
-          (g_model.moduleData[module].type == MODULE_TYPE_XJT_LITE_PXX2)) {
+      if (g_model.moduleData[module].type == MODULE_TYPE_ISRM_PXX2 && g_model.moduleData[module].subType != MODULE_SUBTYPE_ISRM_PXX2_ACCESS)
         setupAccstBindFrame(module);
-      } else {
+      else if (g_model.moduleData[module].type == MODULE_TYPE_XJT_LITE_PXX2)
+        setupAccstBindFrame(module);
+      else
         setupAccessBindFrame(module);
-      }
       break;
     case MODULE_MODE_RESET:
       setupResetFrame(module);
@@ -550,7 +493,7 @@ const char * Pxx2OtaUpdate::nextStep(uint8_t step, const char * rxName, uint32_t
   }
 }
 
-const char * Pxx2OtaUpdate::doFlashFirmware(const char * filename, ProgressHandler progressHandler)
+const char * Pxx2OtaUpdate::doFlashFirmware(const char * filename)
 {
   FIL file;
   uint8_t buffer[32];
@@ -582,7 +525,7 @@ const char * Pxx2OtaUpdate::doFlashFirmware(const char * filename, ProgressHandl
 
   uint32_t done = 0;
   while (1) {
-    progressHandler(getBasename(filename), STR_OTA_UPDATE, done, size);
+    drawProgressScreen(getBasename(filename), STR_OTA_UPDATE, done, size);
     if (f_read(&file, buffer, sizeof(buffer), &count) != FR_OK) {
       f_close(&file);
       return "Read file failed";
@@ -604,7 +547,7 @@ const char * Pxx2OtaUpdate::doFlashFirmware(const char * filename, ProgressHandl
   return nextStep(OTA_UPDATE_EOF, nullptr, done, nullptr);
 }
 
-void Pxx2OtaUpdate::flashFirmware(const char * filename, ProgressHandler progressHandler)
+void Pxx2OtaUpdate::flashFirmware(const char * filename)
 {
   pausePulses();
 
@@ -612,14 +555,15 @@ void Pxx2OtaUpdate::flashFirmware(const char * filename, ProgressHandler progres
   RTOS_WAIT_MS(100);
 
   moduleState[module].mode = MODULE_MODE_OTA_UPDATE;
-  const char * result = doFlashFirmware(filename, progressHandler);
+  const char * result = doFlashFirmware(filename);
   moduleState[module].mode = MODULE_MODE_NORMAL;
 
   AUDIO_PLAY(AU_SPECIAL_SOUND_BEEP1 );
   BACKLIGHT_ENABLE();
 
   if (result) {
-    POPUP_WARNING(STR_FIRMWARE_UPDATE_ERROR, result);
+    POPUP_WARNING(STR_FIRMWARE_UPDATE_ERROR);
+    SET_WARNING_INFO(result, strlen(result), 0);
   }
   else {
     POPUP_INFORMATION(STR_FIRMWARE_UPDATE_SUCCESS);

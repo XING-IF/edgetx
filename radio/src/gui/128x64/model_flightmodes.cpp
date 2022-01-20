@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -64,14 +63,12 @@ void menuModelFlightModeOne(event_t event)
   FlightModeData * fm = flightModeAddress(s_currIdx);
   drawFlightMode(13*FW, 0, s_currIdx+1, (getFlightMode()==s_currIdx ? BOLD : 0));
 
-  uint8_t old_editMode = s_editMode;
-
 #if defined(GVARS) && !defined(GVARS_IN_CURVES_SCREEN)
   #define VERTICAL_SHIFT  (ITEM_MODEL_FLIGHT_MODE_FADE_IN-ITEM_MODEL_FLIGHT_MODE_TRIMS)
   static const uint8_t mstate_tab_fm1[]  = {0, 3, 0, 0, (uint8_t)-1, 1, 1, 1, 1, 1, 1};
   static const uint8_t mstate_tab_others[]  = {0, 0, 3, 0, 0, (uint8_t)-1, 2, 2, 2, 2, 2};
 
-  check(event, 0, nullptr, 0, (s_currIdx == 0) ? mstate_tab_fm1 : mstate_tab_others, DIM(mstate_tab_others)-1, ITEM_MODEL_FLIGHT_MODE_MAX - HEADER_LINE - (s_currIdx==0 ? (ITEM_MODEL_FLIGHT_MODE_FADE_IN-ITEM_MODEL_FLIGHT_MODE_SWITCH-1) : 0));
+  check(event, 0, NULL, 0, (s_currIdx == 0) ? mstate_tab_fm1 : mstate_tab_others, DIM(mstate_tab_others)-1, ITEM_MODEL_FLIGHT_MODE_MAX - HEADER_LINE - (s_currIdx==0 ? (ITEM_MODEL_FLIGHT_MODE_FADE_IN-ITEM_MODEL_FLIGHT_MODE_SWITCH-1) : 0));
 
   title(STR_MENUFLIGHTMODE);
 
@@ -101,8 +98,7 @@ void menuModelFlightModeOne(event_t event)
 #endif
     switch (i) {
       case ITEM_MODEL_FLIGHT_MODE_NAME:
-        editSingleName(MIXES_2ND_COLUMN, y, STR_PHASENAME, fm->name,
-                       sizeof(fm->name), event, attr, old_editMode);
+        editSingleName(MIXES_2ND_COLUMN, y, STR_PHASENAME, fm->name, sizeof(fm->name), event, attr);
         break;
 
       case ITEM_MODEL_FLIGHT_MODE_SWITCH:
@@ -145,7 +141,7 @@ void menuModelFlightModeOne(event_t event)
         if (attr && posHorz > 0 && s_currIdx==0) posHorz++;
 
         drawStringWithIndex(INDENT_WIDTH, y, STR_GV, idx+1, posHorz==0 ? attr : 0);
-        lcdDrawSizedText(4*FW, y,g_model.gvars[idx].name, LEN_GVAR_NAME, 0);
+        lcdDrawSizedText(4*FW, y,g_model.gvars[idx].name, LEN_GVAR_NAME, ZCHAR);
         if (attr && editMode>0 && posHorz==0) {
           s_currIdxSubMenu = sub - ITEM_MODEL_FLIGHT_MODE_GV1;
           editMode = 0;
@@ -217,9 +213,9 @@ void menuModelFlightModesAll(event_t event)
     FlightModeData * p = flightModeAddress(i);
     drawFlightMode(0, y, i+1, att|(getFlightMode()==i ? BOLD : 0));
 #if defined(PCBTARANIS)
-    lcdDrawSizedText(NAME_POS, y, p->name, sizeof(p->name), 0);
+    lcdDrawSizedText(NAME_POS, y, p->name, sizeof(p->name), ZCHAR);
 #else
-    lcdDrawSizedText(4*FW+NAME_OFS, y, p->name, sizeof(p->name), 0);
+    lcdDrawSizedText(4*FW+NAME_OFS, y, p->name, sizeof(p->name), ZCHAR);
 #endif
     if (i == 0) {
       for (uint8_t t=0; t<NUM_STICKS; t++) {
@@ -251,7 +247,7 @@ void menuModelFlightModesAll(event_t event)
 
   if (menuVerticalOffset != MAX_FLIGHT_MODES-(LCD_LINES-2)) return;
 
-  lcdDrawText(LCD_W/2, (LCD_LINES-1)*FH+1, STR_CHECKTRIMS, CENTERED);
+  lcdDrawTextAlignedLeft((LCD_LINES-1)*FH+1, STR_CHECKTRIMS);
   drawFlightMode(OFS_CHECKTRIMS, (LCD_LINES-1)*FH+1, mixerCurrentFlightMode+1);
   if (sub==MAX_FLIGHT_MODES && !trimsCheckTimer) {
     lcdInvertLastLine();

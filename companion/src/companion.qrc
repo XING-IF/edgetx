@@ -2,6 +2,7 @@
   <qresource prefix="/">
     <file>images/customize.png</file>
     <file alias="icon.png">images/icon.png</file>
+    <file>../../CREDITS.txt</file>
     <file>../releasenotes.txt</file>
     <file>images/screenshot.png</file>
     <file>images/splash.png</file>
@@ -188,10 +189,6 @@
     <file>images/simulator/JumperTLITE/right_top.png</file>
     <file>images/simulator/JumperTLITE/right_bottom.png</file>
     <file>images/simulator/JumperTLITE/top.png</file>
-    <file>images/simulator/JumperTPRO/bottom.png</file>
-    <file>images/simulator/JumperTPRO/left.png</file>
-    <file>images/simulator/JumperTPRO/right.png</file>
-    <file>images/simulator/JumperTPRO/top.png</file>
     <file>images/simulator/TX12/left.png</file>
     <file>images/simulator/TX12/left-pageup.png</file>
     <file>images/simulator/TX12/left-pagedn.png</file>
@@ -203,17 +200,6 @@
     <file>images/simulator/TX12/right-mdl.png</file>
     <file>images/simulator/TX12/bottom.png</file>
     <file>images/simulator/TX12/top.png</file>
-    <file>images/simulator/Zorro/left.png</file>
-    <file>images/simulator/Zorro/left-pageup.png</file>
-    <file>images/simulator/Zorro/left-pagedn.png</file>
-    <file>images/simulator/Zorro/left-rtn.png</file>
-    <file>images/simulator/Zorro/left-sys.png</file>
-    <file>images/simulator/Zorro/right-tele.png</file>
-    <file>images/simulator/Zorro/right.png</file>
-    <file>images/simulator/Zorro/right-ent.png</file>
-    <file>images/simulator/Zorro/right-mdl.png</file>
-    <file>images/simulator/Zorro/bottom.png</file>
-    <file>images/simulator/Zorro/top.png</file>
     <file>images/simulator/T8/left.png</file>
     <file>images/simulator/T8/left-pageup.png</file>
     <file>images/simulator/T8/left-pagedn.png</file>
@@ -258,10 +244,6 @@
     <file>images/simulator/TX16S/left_tele.png</file>
     <file>images/simulator/TX16S/right_ent.png</file>
     <file>images/simulator/TX16S/right_mdl.png</file>
-    <file>images/simulator/NV14/left.png</file>
-    <file>images/simulator/NV14/right.png</file>
-    <file>images/simulator/NV14/top.png</file>
-    <file>images/simulator/NV14/bottom.png</file>
     <file>images/wizard/ailerons.png</file>
     <file>images/wizard/airbrakes.png</file>
     <file>images/wizard/elevons.png</file>
@@ -1242,20 +1224,5 @@
     <file>themes/yerico/48/stop.png</file>
     <file>themes/yerico/48/write_eeprom.png</file>
     <file>themes/yerico/48/sdsync.png</file>
-  </qresource>
-  <qresource prefix="/layouts/">
-    <file alias="mask_layout1p2.png">../../radio/src/gui/colorlcd/layouts/mask_layout1+2.png</file>
-    <file alias="mask_layout1p3.png">../../radio/src/gui/colorlcd/layouts/mask_layout1+3.png</file>
-    <file alias="mask_layout1x1.png">../../radio/src/gui/colorlcd/layouts/mask_layout1x1.png</file>
-    <file alias="mask_layout1x2.png">../../radio/src/gui/colorlcd/layouts/mask_layout1x2.png</file>
-    <file alias="mask_layout1x3.png">../../radio/src/gui/colorlcd/layouts/mask_layout1x3.png</file>
-    <file alias="mask_layout1x4.png">../../radio/src/gui/colorlcd/layouts/mask_layout1x4.png</file>
-    <file alias="mask_layout2p1.png">../../radio/src/gui/colorlcd/layouts/mask_layout2+1.png</file>
-    <file alias="mask_layout2p3.png">../../radio/src/gui/colorlcd/layouts/mask_layout2+3.png</file>
-    <file alias="mask_layout2x1.png">../../radio/src/gui/colorlcd/layouts/mask_layout2x1.png</file>
-    <file alias="mask_layout2x2.png">../../radio/src/gui/colorlcd/layouts/mask_layout2x2.png</file>
-    <file alias="mask_layout2x3.png">../../radio/src/gui/colorlcd/layouts/mask_layout2x3.png</file>
-    <file alias="mask_layout2x4.png">../../radio/src/gui/colorlcd/layouts/mask_layout2x4.png</file>
-    <file alias="mask_layout4p2.png">../../radio/src/gui/colorlcd/layouts/mask_layout4+2.png</file>
   </qresource>
 </RCC>

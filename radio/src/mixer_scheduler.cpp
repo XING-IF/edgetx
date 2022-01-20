@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -25,6 +24,7 @@
 #if !defined(SIMU)
 
 // Global trigger flag
+RTOS_FLAG_HANDLE mixerFlag;
 
 // Mixer schedule
 struct MixerSchedule {
@@ -47,16 +47,12 @@ uint16_t getMixerSchedulerPeriod()
     return mixerSchedules[EXTERNAL_MODULE].period;
   }
 #endif
-#if defined(STM32) && !defined(SIMU)
-  if (getSelectedUsbMode() == USB_JOYSTICK_MODE) {
-    return MIXER_SCHEDULER_JOYSTICK_PERIOD_US;
-  }
-#endif
   return MIXER_SCHEDULER_DEFAULT_PERIOD_US;
 }
 
 void mixerSchedulerInit()
 {
+  RTOS_CREATE_FLAG(mixerFlag);
   memset(mixerSchedules, 0, sizeof(mixerSchedules));
 }
 
@@ -72,45 +68,19 @@ void mixerSchedulerSetPeriod(uint8_t moduleIdx, uint16_t periodUs)
   mixerSchedules[moduleIdx].period = periodUs;
 }
 
+void mixerSchedulerClearTrigger()
+{
+  RTOS_CLEAR_FLAG(mixerFlag);
+}
+
 bool mixerSchedulerWaitForTrigger(uint8_t timeoutMs)
 {
-  uint32_t ulNotificationValue;
-  const TickType_t xMaxBlockTime = pdMS_TO_TICKS( timeoutMs );
-
-  /* Wait to be notified that the transmission is complete.  Note
-     the first parameter is pdTRUE, which has the effect of clearing
-     the task's notification value back to 0, making the notification
-     value act like a binary (rather than a counting) semaphore.  */
-  ulNotificationValue = ulTaskNotifyTake( pdTRUE, xMaxBlockTime );
-
-  if( ulNotificationValue == 1 ) {
-    /* The transmission ended as expected. */
-    return false;
-
-  } else {
-    /* The call to ulTaskNotifyTake() timed out. */
-    return true;
-  }
+  return RTOS_WAIT_FLAG(mixerFlag, timeoutMs);
 }
 
 void mixerSchedulerISRTrigger()
 {
-  BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-
-  /* At this point xTaskToNotify should not be NULL as
-     a transmission was in progress. */
-  configASSERT( mixerTaskId.rtos_handle != NULL );
-
-  /* Notify the task that the transmission is complete. */
-  vTaskNotifyGiveFromISR( mixerTaskId.rtos_handle,
-                          &xHigherPriorityTaskWoken );
-
-  /* If xHigherPriorityTaskWoken is now set to pdTRUE then a
-     context switch should be performed to ensure the interrupt
-     returns directly to the highest priority task.  The macro used
-     for this purpose is dependent on the port in use and may be
-     called portEND_SWITCHING_ISR(). */
-  portYIELD_FROM_ISR( xHigherPriorityTaskWoken );
+  RTOS_ISR_SET_FLAG(mixerFlag);
 }
 
 #endif

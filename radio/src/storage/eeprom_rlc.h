@@ -1,9 +1,8 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
- *   th9x - http://code.google.com/p/th9x
+ *   th9x - http://code.google.com/p/th9x 
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
  *
@@ -175,10 +174,8 @@ const char * eeBackupModel(uint8_t i_fileSrc);
 const char * eeRestoreModel(uint8_t i_fileDst, char *model_name);
 #endif
 
-#if !defined(SDCARD_RAW) && !defined(SDCARD_YAML)
 // For conversions
 void loadRadioSettings();
-#endif
 
 bool eepromOpen();
 void eeLoadModelName(uint8_t id, char * name);
@@ -207,9 +204,5 @@ inline bool isEepromStart(const void * buffer)
 }
 
 void eepromBackup();
-
-#if defined(SDCARD_RAW) || defined(SDCARD_YAML)
-bool eeModelExistsRlc(uint8_t id);
-#endif
 
 #endif // _EEPROM_RLC_H_

@@ -5,12 +5,12 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "(Linux|FreeBSD)")
   set(COMPANION_NAME "companion${C9X_NAME_SUFFIX}")
   set(SIMULATOR_NAME "simulator${C9X_NAME_SUFFIX}")
   if (NOT ${SIMULATOR_INSTALL_PREFIX} STREQUAL "")
-    set(SIMULATOR_LIB_PATH ${SIMULATOR_INSTALL_PREFIX}/lib/${COMPANION_NAME})
+    set(SIMULATOR_LIB_PATH ${SIMULATOR_INSTALL_PREFIX}/lib/companion${C9X_NAME_SUFFIX})
   else()
-    set(SIMULATOR_LIB_PATH "../lib/${COMPANION_NAME}")
+    set(SIMULATOR_LIB_PATH ${CMAKE_INSTALL_PREFIX}/lib/companion${C9X_NAME_SUFFIX})
   endif()
   message(STATUS "Simulators library search path: " ${SIMULATOR_LIB_PATH})
-  set(SIMULATOR_LIB_INSTALL_PATH ${CMAKE_INSTALL_PREFIX}/lib/${COMPANION_NAME})
+  set(SIMULATOR_LIB_INSTALL_PATH ${CMAKE_INSTALL_PREFIX}/lib/companion${C9X_NAME_SUFFIX})
 else()
   set(COMPANION_NAME "companion")
   set(SIMULATOR_NAME "simulator")
@@ -19,7 +19,7 @@ endif()
 # This the name that the user will see in the generated DMG and what the application
 # will be called under /Applications. We include the version string to make installing
 # different versions for different eeproms easier, i.e. without manually renaming
-set(COMPANION_OSX_APP_BUNDLE_NAME "EdgeTX Companion ${VERSION_MAJOR}.${VERSION_MINOR}")
+set(COMPANION_OSX_APP_BUNDLE_NAME "OpenTX Companion ${VERSION_MAJOR}.${VERSION_MINOR}")
 
 # On OS X we copy dfu-util to the application bundle. This the path from which we copy
 # the binary (default homebrew path)
@@ -60,9 +60,17 @@ endif()
 
 add_definitions(${APP_COMMON_DEFINES})  # set in top-level CMakeLists
 
-set(WARNING_FLAGS "${WARNING_FLAGS} -Wall")
-if(WARNINGS_AS_ERRORS)
-  set(WARNING_FLAGS "${WARNING_FLAGS} -Werror")
+if(NOT MSVC)
+  set(WARNING_FLAGS "${WARNING_FLAGS} -Wall")
+  if(WARNINGS_AS_ERRORS)
+    set(WARNING_FLAGS "${WARNING_FLAGS} -Werror")
+  endif()
+else()
+  # silence lots of warnings regarding "insecure" use of functions (sprintf, strcpy, etc)
+  set(WARNING_FLAGS "${WARNING_FLAGS} /D_CRT_SECURE_NO_WARNINGS")
+  if(WARNINGS_AS_ERRORS)
+    set(WARNING_FLAGS "${WARNING_FLAGS} /WX")
+  endif()
 endif()
 
 if(WIN32)
@@ -70,10 +78,16 @@ if(WIN32)
   if(NOT WIN_USE_CONSOLE)
     set(WIN_EXECUTABLE_TYPE WIN32)  # GUI (WinMain) app
   endif()
-  if(MINGW)
+  if(MSVC)
+    if(NOT CLANG)
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /LD /MP")
+    endif()
+    if(NOT WIN_USE_CONSOLE)
+      set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS,5.01")  # is this even needed?
+    endif()
+  elseif(MINGW)
     get_filename_component(MINGW_DIR ${CMAKE_CXX_COMPILER} DIRECTORY)
-    # struct packing breaks on MinGW w/out -mno-ms-bitfields: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=52991
-    # & http://stackoverflow.com/questions/24015852/struct-packing-and-alignment-with-mingw
+    # struct packing breaks on MinGW w/out -mno-ms-bitfields: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=52991 & http://stackoverflow.com/questions/24015852/struct-packing-and-alignment-with-mingw
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mno-ms-bitfields")
   endif()
 else()
@@ -136,7 +150,7 @@ configure_file(${COMPANION_SRC_DIRECTORY}/translations.qrc.in ${TRANSLATIONS_QRC
 
 ### Add optional "translations" target for updating .ts files
 if(QT_LUPDATE_EXECUTABLE)
-  add_custom_target(companion_translations
+  add_custom_target(translations
     WORKING_DIRECTORY ${COMPANION_SRC_DIRECTORY}
     COMMAND ${QT_LUPDATE_EXECUTABLE} ${CMAKE_SOURCE_DIR} -no-obsolete -ts ${companion_TS}
     )
@@ -198,12 +212,6 @@ add_subdirectory(storage)
 add_subdirectory(thirdparty/qcustomplot)
 add_subdirectory(thirdparty/maxlibqt/src/widgets)
 
-set(YAML_CPP_BUILD_TESTS OFF CACHE BOOL "Enable testing" FORCE)
-set(YAML_CPP_BUILD_TOOLS OFF CACHE BOOL "Enable parse tools" FORCE)
-set(YAML_CPP_BUILD_CONTRIB OFF CACHE BOOL "Enable contrib stuff in library" FORCE)
-set(YAML_CPP_INSTALL OFF CACHE BOOL "Enable generation of install target" FORCE)
-add_subdirectory(thirdparty/yaml-cpp)
-
 ############# Companion ###############
 
 set(companion_SRCS
@@ -215,6 +223,7 @@ set(companion_SRCS
   burnconfigdialog.cpp
   multimodelprinter.cpp
   comparedialog.cpp
+  creditsdialog.cpp
   releasenotesdialog.cpp
   releasenotesfirmwaredialog.cpp
   customizesplashdialog.cpp
@@ -248,6 +257,7 @@ set(companion_MOC_HDRS
   comparedialog.h
   printdialog.h
   logsdialog.h
+  creditsdialog.h
   releasenotesdialog.h
   releasenotesfirmwaredialog.h
   customizesplashdialog.h
@@ -314,12 +324,18 @@ set(simu_SRCS simulator.cpp )
 add_executable(${SIMULATOR_NAME} MACOSX_BUNDLE ${WIN_EXECUTABLE_TYPE} ${simu_SRCS} ${icon_RC})
 target_link_libraries(${SIMULATOR_NAME} PRIVATE ${CPN_COMMON_LIB})
 
-add_subdirectory(tests)
+if(NOT MSVC)
+  add_subdirectory(tests)
+endif()
 
 ############# Install ####################
 
 # Generate list of simulator plugins, used by all platforms
-file(GLOB simulator_plugins "${CMAKE_BINARY_DIR}/*edgetx-*simulator${CMAKE_SHARED_LIBRARY_SUFFIX}")
+if(WIN32)
+  file(GLOB simulator_plugins "${CMAKE_BINARY_DIR}/Release/*opentx-*simulator${CMAKE_SHARED_LIBRARY_SUFFIX}")
+else()
+  file(GLOB simulator_plugins "${CMAKE_BINARY_DIR}/*opentx-*simulator${CMAKE_SHARED_LIBRARY_SUFFIX}")
+endif()
 
 # the current flavour is not automatically added if build in the current cmake iteration, so always
 # add its library name to be sure
@@ -329,12 +345,8 @@ elseif(PCB STREQUAL X7 AND PCBREV STREQUAL T12)
   set(FLAVOUR t12)
 elseif(PCB STREQUAL X7 AND PCBREV STREQUAL TLITE)
   set(FLAVOUR tlite)
-elseif(PCB STREQUAL X7 AND PCBREV STREQUAL TPRO)
-  set(FLAVOUR tpro)
 elseif(PCB STREQUAL X7 AND PCBREV STREQUAL TX12)
   set(FLAVOUR tx12)
-elseif(PCB STREQUAL X7 AND PCBREV STREQUAL ZORRO)
-  set(FLAVOUR zorro)
 elseif(PCB STREQUAL X7 AND PCBREV STREQUAL T8)
   set(FLAVOUR t8)
 elseif(PCB STREQUAL X9D+ AND PCBREV STREQUAL 2019)
@@ -355,7 +367,7 @@ if(POLICY CMP0026)
 endif()
 
 if(SIMU_TARGET)
-  get_property(current_plugin TARGET edgetx-${FLAVOUR}-simulator PROPERTY LOCATION)
+  get_property(current_plugin TARGET opentx-${FLAVOUR}-simulator PROPERTY LOCATION)
   list(APPEND simulator_plugins "${current_plugin}")
 endif()
 
@@ -383,18 +395,26 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
   install(FILES ../targets/linux/45-usbasp.rules DESTINATION ${INSTALL_TEMP_LIB_PFX}lib/udev/rules.d RENAME 45-companion${C9X_NAME_SUFFIX}-usbasp.rules)
   # Linux specific code
   set(OperatingSystem "Linux")
+
 elseif(WIN32)
-  set(INSTALL_DESTINATION "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${CMAKE_BUILD_TYPE}")
-  message(STATUS "Install to " ${INSTALL_DESTINATION})
-  # companion & simulator binaries
-  install(TARGETS ${COMPANION_NAME} DESTINATION ${INSTALL_DESTINATION})
-  install(TARGETS ${SIMULATOR_NAME} DESTINATION ${INSTALL_DESTINATION})
-  install(FILES ${simulator_plugins} DESTINATION ${INSTALL_DESTINATION})
-  # supporting utilities
-  set(INSTALL_TEMP_FILES dfu-util.exe libusb0.dll libusb-1.0.dll license.txt)
-  foreach(tmpfile ${INSTALL_TEMP_FILES})
-    install(FILES "${COMPANION_SRC_DIRECTORY}/../targets/windows/${tmpfile}" DESTINATION ${INSTALL_DESTINATION})
-  endforeach()
+  if(NOT WIN_DO_FULL_INSTALL)
+    # Just copy supporting DLLs to build folder
+    set(INSTALL_DESTINATION "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+    message(STATUS "Partial install to " ${INSTALL_DESTINATION})
+  else()
+    # Full Windows installation with all supporting files
+    set(INSTALL_DESTINATION "${CMAKE_INSTALL_PREFIX}")
+    message(STATUS "Full install to " ${INSTALL_DESTINATION})
+    # companion & simulator binaries
+    install(TARGETS ${COMPANION_NAME} DESTINATION ${INSTALL_DESTINATION})
+    install(TARGETS ${SIMULATOR_NAME} DESTINATION ${INSTALL_DESTINATION})
+    install(FILES ${simulator_plugins} DESTINATION "${INSTALL_DESTINATION}")
+    # supporting utilities
+    set(INSTALL_TEMP_FILES dfu-util.exe libusb0.dll libusb-1.0.dll license.txt)
+    foreach(tmpfile ${INSTALL_TEMP_FILES})
+      install(FILES "${COMPANION_SRC_DIRECTORY}/../targets/windows/${tmpfile}" DESTINATION ${INSTALL_DESTINATION})
+    endforeach()
+  endif()  # WIN_DO_FULL_INSTALL
 
   # Qt dlls (using windeployqt)
   ## Qt translations are already packaged into our custom qrc. Also don't need software rendering engines.
@@ -402,11 +422,14 @@ elseif(WIN32)
   if(CMAKE_BUILD_TYPE STREQUAL "Release")
     set(wdqtopts ${wdqtopts} --release)  # release builds aren't always properly detected with mingw
   endif()
-  set(wdqtopts ${wdqtopts} -dir "\"${INSTALL_DESTINATION}\"" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${COMPANION_NAME}.exe" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${SIMULATOR_NAME}.exe")
-  list(JOIN wdqtopts " " wdqtopts)
+  if(MSVC)
+    set(wdqtopts ${wdqtopts} --no-compiler-runtime)  # --compiler-runtime includes vcredist_x86, but we just copy the required DLLs manually
+  endif()
+  set(wdqtopts ${wdqtopts} -dir "\"${INSTALL_DESTINATION}\"" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/Release/${COMPANION_NAME}.exe" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/Release/${SIMULATOR_NAME}.exe")
 
   # Add installer command to execute windeployqt
   message(STATUS "windeployqt command: ${QT_BIN_DIR}/windeployqt.exe ${wdqtopts}")
+  install(CODE "execute_process(COMMAND \"${QT_BIN_DIR}/windeployqt.exe\" ${wdqtopts})")
 
   # SDL dll
   if(SDL_FOUND AND EXISTS "${SDL_LIBRARY_PATH}/SDL.dll")
@@ -417,21 +440,34 @@ elseif(WIN32)
   endif()
 
   # libeay (SSL) dlls  (used by QtNetwork) -- not strictly required but avoids possible issues with downloads and Qt warnings.
-  # file(TO_CMAKE_PATH "$ENV{PROGRAMFILES}" WIN_PROGRAM_FILES)
-  # find_path(EAY_LIB_DIR libeay32.dll HINTS
-  #   "${WIN_PROGRAM_FILES}/OpenSSL" "${WIN_PROGRAM_FILES}/OpenSSL-Win32"
-  #   "C:/OpenSSL/" "C:/OpenSSL-Win32/"
-  #   "${WIN_EXTRA_LIBS_PATH}" "${WIN_EXTRA_LIBS_PATH}/OpenSSL" "${WIN_EXTRA_LIBS_PATH}/OpenSSL-Win32"
-  #   "${MINGW_DIR}/../opt/bin"
-  #   "${PYTHON_DIRECTORY}/lib/site-packages/PyQt4"
-  #   PATH_SUFFIXES bin
-  #   DOC "Path to libeay32.dll and ssleay32.dll (OpenSSL)"
-  # )
-  # if (EAY_LIB_DIR)
-  #   install(FILES "${EAY_LIB_DIR}/libeay32.dll" "${EAY_LIB_DIR}/ssleay32.dll" DESTINATION ${INSTALL_DESTINATION} OPTIONAL)
-  # else()
-  #   message(WARNING "Installer: SSL libs not found, set EAY_LIB_DIR manually.")
-  # endif()
+  file(TO_CMAKE_PATH "$ENV{PROGRAMFILES}" WIN_PROGRAM_FILES)
+  find_path(EAY_LIB_DIR libeay32.dll HINTS
+    "${WIN_PROGRAM_FILES}/OpenSSL" "${WIN_PROGRAM_FILES}/OpenSSL-Win32"
+    "C:/OpenSSL/" "C:/OpenSSL-Win32/"
+    "${WIN_EXTRA_LIBS_PATH}" "${WIN_EXTRA_LIBS_PATH}/OpenSSL" "${WIN_EXTRA_LIBS_PATH}/OpenSSL-Win32"
+    "${MINGW_DIR}/../opt/bin"
+    "${PYTHON_DIRECTORY}/lib/site-packages/PyQt4"
+    PATH_SUFFIXES bin
+    DOC "Path to libeay32.dll and ssleay32.dll (OpenSSL)"
+  )
+  if (EAY_LIB_DIR)
+    install(FILES "${EAY_LIB_DIR}/libeay32.dll" "${EAY_LIB_DIR}/ssleay32.dll" DESTINATION ${INSTALL_DESTINATION} OPTIONAL)
+  else()
+    message(WARNING "Installer: SSL libs not found, set EAY_LIB_DIR manually.")
+  endif()
+
+  # C++/system dlls, depends on compiler
+  if(MSVC)
+    file(TO_CMAKE_PATH "$ENV{windir}/SysWOW64" WIN_SYSDIR)    # This would be "system32" for a 64-bit build or on x86... but how to tell?
+    if (NOT EXISTS "${WIN_SYSDIR}")
+      file(TO_CMAKE_PATH "$ENV{windir}/system32" WIN_SYSDIR)  # Must be 32-bit Windows.
+    endif()
+    install(FILES "${WIN_SYSDIR}/msvcp140.dll" "${WIN_SYSDIR}/vcruntime140.dll" DESTINATION ${INSTALL_DESTINATION} OPTIONAL)
+    if(WIN_PTHREAD_DLL)
+      install(FILES "${WIN_PTHREAD_DLL}" DESTINATION ${INSTALL_DESTINATION})
+    endif()
+  endif()
+
 endif() # WIN32 install
 
 ############# Packaging ####################
@@ -453,16 +489,16 @@ if(WIN32)
     add_custom_target(installer
       # The 'install' target prepares all the distro files, make sure it has been executed first.
       COMMAND "${CMAKE_COMMAND}" --build "${CMAKE_BINARY_DIR}" --target install --config Release
-      COMMAND "${QT_BIN_DIR}/windeployqt.exe" "${wdqtopts}"
       COMMAND "${NSIS_EXE}" "${NSI_FILE}"
       DEPENDS "${NSI_FILE}"
       COMMENT "Building Windows NSIS installer..."
     )
   endif()
+
 endif()
 
 set(CPACK_PACKAGE_NAME "companion${C9X_NAME_SUFFIX}")
-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Models and settings editor for the EdgeTX open source firmware")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Models and settings editor for the OpenTX open source firmware")
 string(TOLOWER "${CPACK_PACKAGE_NAME}" CPACK_PACKAGE_NAME_LOWERCASE)
 
 # The file stripping is deliberately disabled, with the stripped file we get
@@ -483,8 +519,8 @@ IF(APPLE)
   # Use a non standard Info.plist that adds Retina support flags
   set_target_properties(${COMPANION_NAME} PROPERTIES MACOSX_BUNDLE_INFO_PLIST ${PROJECT_SOURCE_DIR}/companion/targets/mac/MacOSXBundleInfo.plist.in)
   set_target_properties(${SIMULATOR_NAME} PROPERTIES MACOSX_BUNDLE_INFO_PLIST ${PROJECT_SOURCE_DIR}/companion/targets/mac/MacOSXBundleInfo.plist.in)
-
-  set(MACOSX_BUNDLE_GUI_IDENTIFIER "org.edgetx.companion")
+  
+  set(MACOSX_BUNDLE_GUI_IDENTIFIER "org.opentx.companion")
 
   INSTALL(TARGETS ${COMPANION_NAME}
       BUNDLE DESTINATION . COMPONENT Runtime
@@ -535,56 +571,44 @@ IF(APPLE)
   # technically a hack (that is already is in the Bundle library ...)
   install(CODE "
    include(BundleUtilities)
-   file(GLOB bundle_simulator_libs \"\${CMAKE_INSTALL_PREFIX}/${companion_res_dir}/libedgetx-*${CMAKE_SHARED_LIBRARY_SUFFIX}\")
+   file(GLOB bundle_simulator_libs \"\${CMAKE_INSTALL_PREFIX}/${companion_res_dir}/libopentx-*${CMAKE_SHARED_LIBRARY_SUFFIX}\")
    set(BU_CHMOD_BUNDLE_ITEMS on)
    fixup_bundle(\"${APPS}\"   \"\${bundle_simulator_libs};${bundle_qt_libs};${bundle_tools_path}\"   \"${QT_LIB_DIR}\")
    file(RENAME \"\${CMAKE_INSTALL_PREFIX}/${COMPANION_NAME}.app\" \"\${CMAKE_INSTALL_PREFIX}/${COMPANION_OSX_APP_BUNDLE_NAME}.app\")
    " COMPONENT Runtime)
 endif()
 
-if(APPLE)
+find_program(DPKG_PROGRAM dpkg DOC "dpkg program of Debian-based systems")
+
+if(DPKG_PROGRAM)
+  set(CPACK_GENERATOR "DEB")
+  execute_process(
+    COMMAND ${DPKG_PROGRAM} --print-architecture
+    OUTPUT_VARIABLE CPACK_DEBIAN_PACKAGE_ARCHITECTURE
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+  )
+  set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME_LOWERCASE}_${VERSION}_${CPACK_DEBIAN_PACKAGE_ARCHITECTURE}")
+  set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Bertrand Songis <bsongis-nosp@m-gmail.com>")
+  set(CPACK_DEBIAN_PACKAGE_VERSION ${VERSION})
+  set(CPACK_DEBIAN_PACKAGE_VERSION_MAJOR ${VERSION_MAJOR})
+  set(CPACK_DEBIAN_PACKAGE_VERSION_MINOR ${VERSION_MINOR})
+  set(CPACK_DEBIAN_ARCHITECTURE $(CMAKE_SYSTEM_PROCESSOR))
+  set(CPACK_DEBIAN_PACKAGE_DEPENDS "libqt5multimedia5-plugins")
+  set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+elseif(APPLE)
   set(CPACK_GENERATOR "DragNDrop")
 # set(CPACK_GENERATOR "TGZ")  # for quick testing
   set(CPACK_BINARY_DRAGNDROP ON)
   set(CPACK_DMG_BACKGROUND_IMAGE ${COMPANION_SRC_DIRECTORY}/images/splash_dmg.png)
-  set(CPACK_DMG_VOLUME_NAME "EdgeTX Companion")
+  set(CPACK_DMG_VOLUME_NAME "OpenTX Companion")
   set(CPACK_DMG_DS_STORE ${PROJECT_SOURCE_DIR}/companion/targets/mac/DS_Store)
-  set(CPACK_PACKAGE_FILE_NAME "edgetx-${CPACK_PACKAGE_NAME_LOWERCASE}-${VERSION}")
-endif(APPLE)
-
-if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-  get_filename_component(_qt_bin_dir "${QT_QMAKE_EXECUTABLE}" DIRECTORY)
-  find_program(LINUXDEPLOY_EXECUTABLE linuxdeployqt HINTS "${_qt_bin_dir}")
-
-  if(NOT LINUXDEPLOY_EXECUTABLE)
-    message(STATUS "linuxdeployqt will be downloaded")
-
-    set(LINUXDEPLOY_EXECUTABLE "${CMAKE_BINARY_DIR}/deployqt/AppRun")
-    set(LINUXDEPLOY_URL "https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage")
-    set(LINUXDEPLOY_BUNDLE "${CMAKE_BINARY_DIR}/linuxdeployqt.AppImage")
-
-    if (NOT EXISTS "${LINUXDEPLOY_EXECUTABLE}")
-      file(DOWNLOAD "${LINUXDEPLOY_URL}" "${LINUXDEPLOY_BUNDLE}")
-      execute_process(
-        COMMAND chmod +x "${LINUXDEPLOY_BUNDLE}"
-        WORKING_DIRECTORY "${CMAKE_BINARY_DIR}")
-      execute_process(
-        COMMAND "${LINUXDEPLOY_BUNDLE}" --appimage-extract
-        WORKING_DIRECTORY "${CMAKE_BINARY_DIR}")
-
-      file(REMOVE_RECURSE "${CMAKE_BINARY_DIR}/deployqt")
-      execute_process(
-        COMMAND mv "${CMAKE_BINARY_DIR}/squashfs-root" deployqt
-        WORKING_DIRECTORY "${CMAKE_BINARY_DIR}")
-      file(REMOVE "${LINUXDEPLOY_BUNDLE}")
-    endif()
-  endif()
-
-  set(CPACK_PACKAGE_DIRECTORY "${CMAKE_BINARY_DIR}")
-  set(CPACK_GENERATOR "External")
-
-  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/CPackLinuxDeployQt.cmake.in "${CMAKE_BINARY_DIR}/CPackExternal.cmake" @ONLY)
-  set(CPACK_EXTERNAL_PACKAGE_SCRIPT "${CMAKE_BINARY_DIR}/CPackExternal.cmake")
-endif()
+  set(CPACK_PACKAGE_FILE_NAME "opentx-${CPACK_PACKAGE_NAME_LOWERCASE}-${VERSION}")
+else(DPKG_PROGRAM)
+  set(CPACK_GENERATOR "RPM")
+  set(CPACK_RPM_PACKAGE_VERSION ${VERSION})
+  set(CPACK_RPM_PACKAGE_DESCRIPTION ${CPACK_PACKAGE_DESCRIPTION_SUMMARY})
+  set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME_LOWERCASE}-${VERSION}-${CMAKE_SYSTEM_PROCESSOR}")
+  set(CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION "/lib /lib/udev /lib/udev/rules.d")
+endif(DPKG_PROGRAM)
 
 include(CPack)

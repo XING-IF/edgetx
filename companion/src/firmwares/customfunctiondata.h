@@ -69,8 +69,6 @@ enum AssignFunc {
   FuncRangeCheckExternalModule,
   FuncBindInternalModule,
   FuncBindExternalModule,
-  FuncRacingMode,
-  FuncDisableTouch,
   FuncCount,
   FuncReserve = -1
 };

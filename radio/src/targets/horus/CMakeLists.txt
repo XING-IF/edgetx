@@ -1,6 +1,5 @@
 option(DISK_CACHE "Enable SD card disk cache" ON)
 option(UNEXPECTED_SHUTDOWN "Enable the Unexpected Shutdown screen" ON)
-option(IMU_LSM6DS33 "Enable I2C2 and LSM6DS33 IMU" OFF)
 option(PXX1 "PXX1 protocol support" ON)
 option(PXX2 "PXX2 protocol support" OFF)
 option(AFHDS3 "AFHDS3 TX Module" ON)
@@ -12,12 +11,9 @@ set(PWR_BUTTON "PRESS" CACHE STRING "Pwr button type (PRESS/SWITCH)")
 set(CPU_TYPE STM32F4)
 set(HSE_VALUE 12000000)
 set(SDCARD YES)
-set(STORAGE SDCARD)
-set(STORAGE_FORMAT RAW)
-set(STORAGE_MODELSLIST YES)
+set(EEPROM SDCARD)
 set(HAPTIC YES)
-set(GUI_DIR colorlcd)
-set(BITMAPS_DIR 480x272)
+set(GUI_DIR 480x272)
 set(NAVIGATION_TYPE horus)
 set(TARGET_DIR horus)
 set(LINKER_SCRIPT targets/horus/stm32f4_flash.ld)
@@ -25,18 +21,7 @@ set(RTC_BACKUP_RAM YES)
 set(PPM_LIMITS_SYMETRICAL YES)
 set(USB_SERIAL ON CACHE BOOL "Enable USB serial (CDC)")
 set(ROTARY_ENCODER YES)
-set(HARDWARE_EXTERNAL_MODULE YES)
-
-if(BOOTLOADER)
-  set(LINKER_SCRIPT targets/horus/stm32f4_flash_bootloader.ld)
-else()
-  set(LINKER_SCRIPT targets/horus/stm32f4_flash.ld)
-endif()
-
-if(YAML_STORAGE)
-  set(STORAGE_CONVERT RAW)
-  set(STORAGE_FORMAT  YAML)
-endif()
+set(EXTERNAL_MODULE YES)
 
 # for size report script
 set(CPU_TYPE_FULL STM32F429xI)
@@ -46,15 +31,6 @@ if(SPLASH STREQUAL OFF)
   message(FATAL_ERROR "Option SPLASH=OFF not supported on Horus")
 endif()
 
-add_definitions(-DPCBFRSKY)
-
-# defines existing internal modules
-set(INTERNAL_MODULES PXX1;PXX2;MULTI;CRSF CACHE STRING "Internal modules")
-
-# VCP CLI
-set(ENABLE_SERIAL_PASSTHROUGH ON CACHE BOOL "Enable serial passthrough")
-set(CLI ON CACHE BOOL "Enable CLI")
-
 if (PCB STREQUAL X10)
   set(PCBREV "STD" CACHE STRING "PCB Revision")
   add_definitions(-DPCBX10)
@@ -62,25 +38,18 @@ if (PCB STREQUAL X10)
   set(TARGET_SRC
     ${TARGET_SRC}
     ../common/arm/stm32/audio_dac_driver.cpp
-    )
-  if (NOT PCBREV STREQUAL TX16S)
-      set(TARGET_SRC
-        ${TARGET_SRC}
-        ../common/arm/stm32/sticks_pwm_driver.cpp
-        )
-  endif()
-  set(FIRMWARE_TARGET_SRC
-    ${FIRMWARE_TARGET_SRC}
-    ../common/arm/stm32/stm32_hal_adc.cpp
-    ../../hal/adc_driver.cpp
+    ../common/arm/stm32/adc_driver.cpp
+    ../common/arm/stm32/sticks_pwm_driver.cpp
     )
   set(BITMAPS_TARGET x10_bitmaps)
   set(FONTS_TARGET x10_fonts)
   set(LCD_DRIVER lcd_driver.cpp)
   set(LUA_EXPORT lua_export_x10)
+  set(INTERNAL_GPS OFF)
   if (PCBREV STREQUAL EXPRESS)
     set(FLAVOUR x10express)
-    set(DEFAULT_INTERNAL_MODULE ISRM_PXX2 CACHE STRING "Default internal module")
+    option(INTERNAL_MODULE_PXX1 "Support for PXX1 internal module" OFF)
+    option(INTERNAL_MODULE_PXX2 "Support for PXX2 internal module" ON)
     set(BLUETOOTH ON)
     add_definitions(-DHARDWARE_POWER_MANAGEMENT_UNIT)
     add_definitions(-DRADIO_X10E)
@@ -90,7 +59,7 @@ if (PCB STREQUAL X10)
     set(LUA_EXPORT lua_export_t16)
     add_definitions(-DRADIO_T16)
     add_definitions(-DRADIO_FAMILY_T16)
-    set(DEFAULT_INTERNAL_MODULE MULTIMODULE CACHE STRING "Default internal module")
+    option(INTERNAL_MODULE_MULTI "Support for MULTI internal module" OFF)
     option(BLUETOOTH "Support for bluetooth module" OFF)
     add_definitions(-DMANUFACTURER_JUMPER)
   elseif (PCBREV STREQUAL TX16S)
@@ -98,7 +67,7 @@ if (PCB STREQUAL X10)
     set(LUA_EXPORT lua_export_t16)
     add_definitions(-DRADIO_TX16S)
     add_definitions(-DRADIO_FAMILY_T16)
-    set(DEFAULT_INTERNAL_MODULE MULTIMODULE CACHE STRING "Default internal module")
+    option(INTERNAL_MODULE_MULTI "Support for MULTI internal module" ON)
     option(BLUETOOTH "Support for bluetooth module" OFF)
     option(INTERNAL_GPS "Support for internal ublox GPS" OFF)
     set(HARDWARE_TOUCH YES)
@@ -116,18 +85,19 @@ if (PCB STREQUAL X10)
     set(LUA_EXPORT lua_export_t16)
     add_definitions(-DRADIO_T18)
     add_definitions(-DRADIO_FAMILY_T16)
-    set(DEFAULT_INTERNAL_MODULE MULTIMODULE CACHE STRING "Default internal module")
+    option(INTERNAL_MODULE_MULTI "Support for MULTI internal module" ON)
     option(BLUETOOTH "Support for bluetooth module" OFF)
-    set(HARDWARE_TOUCH YES)
     add_definitions(-DMANUFACTURER_JUMPER)
   else()
     set(FLAVOUR x10)
-    set(DEFAULT_INTERNAL_MODULE XJT_PXX1 CACHE STRING "Default internal module")
+    option(INTERNAL_MODULE_PXX1 "Support for PXX1 internal module" ON)
+    option(INTERNAL_MODULE_PXX2 "Support for PXX2 internal module" OFF)
     set(BLUETOOTH ON)
     add_definitions(-DMANUFACTURER_FRSKY)
   endif()
 elseif (PCB STREQUAL X12S)
-  set(DEFAULT_INTERNAL_MODULE XJT_PXX1 CACHE STRING "Default internal module")
+  option(INTERNAL_MODULE_PXX1 "Support for PXX1 internal module" ON)
+  option(INTERNAL_MODULE_PXX2 "Support for PXX2 internal module" OFF)
   set(FLAVOUR x12s)
   set(BLUETOOTH ON)
   set(PCBREV "13" CACHE STRING "PCB Revision")
@@ -144,10 +114,6 @@ elseif (PCB STREQUAL X12S)
   set(TARGET_SRC
     ${TARGET_SRC}
     audio_spi_driver.cpp
-    )
-  set(FIRMWARE_TARGET_SRC
-    ${FIRMWARE_TARGET_SRC}
-    ../../hal/adc_driver.cpp
     x12s_adc_driver.cpp
     )
   set(BITMAPS_TARGET x12s_bitmaps)
@@ -163,22 +129,14 @@ add_definitions(-DPCBREV_${PCBREV})
 set(RADIO_DEPENDENCIES
   ${RADIO_DEPENDENCIES}
   ${BITMAPS_TARGET}
-  truetype_fonts
   )
-
-if(HARDWARE_EXTERNAL_MODULE)
-  set(TARGET_SRC ${TARGET_SRC} extmodule_driver.cpp)
-endif()
 
 set(FIRMWARE_DEPENDENCIES datacopy)
 
-add_definitions(-DPCBHORUS -DSTM32F429_439xx -DSDRAM -DCCMRAM -DCOLORLCD -DHARDWARE_KEYS)
+add_definitions(-DPCBHORUS -DSTM32F429_439xx -DSDRAM -DCOLORLCD)
 add_definitions(-DEEPROM_VARIANT=0 -DAUDIO -DVOICE -DRTCLOCK)
 add_definitions(-DGPS_USART_BAUDRATE=${INTERNAL_GPS_BAUDRATE})
 add_definitions(-DPWR_BUTTON_${PWR_BUTTON})
-add_definitions(-DHARDWARE_TRAINER_JACK)
-
-set(SDRAM ON)
 
 if(DEFAULT_THEME)
   add_definitions(-DDEFAULT_THEME_${DEFAULT_THEME})
@@ -196,29 +154,77 @@ if(HARDWARE_EXTERNAL_ACCESS_MOD)
   add_definitions(-DHARDWARE_EXTERNAL_ACCESS_MOD)
 endif()
 
-if(PCB STREQUAL X10)
-  set(FLYSKY_HALL_STICKS_DRIVER flyskyHallStick_driver.cpp)
+if(INTERNAL_MODULE_PXX1)
+  add_definitions(-DHARDWARE_INTERNAL_MODULE)
+  add_definitions(-DINTERNAL_MODULE_PXX1)
 endif()
 
-if(IMU_LSM6DS33)
-  add_definitions(-DIMU_LSM6DS33)
-  set(AUX_SERIAL OFF)
-  set(IMU_LSM6DS33_DRIVER imu_lsm6ds33.cpp)
-endif()
-
-if(NOT INTERNAL_MODULE_PXX1)
-  option(ALLOW_TRAINER_MULTI "Allow multimodule to be use as trainer input" OFF)
-endif()
-
-if(PXX2 IN_LIST INTERNAL_MODULES)
+if(INTERNAL_MODULE_PXX2)
+  set(PXX2 ON)
+  add_definitions(-DHARDWARE_INTERNAL_MODULE)
+  add_definitions(-DINTERNAL_MODULE_PXX2)
   if (NOT PCBREV STREQUAL EXPRESS)
-    set(ACCESS_DENIED ON)
-    add_definitions(-DACCESS_DENIED)
+    set(ACCESS_LIB ON)
+    add_definitions(-DACCESS_LIB)
   endif()
 endif()
 
-if(ALLOW_TRAINER_MULTI)
-  add_definitions(-DALLOW_TRAINER_MULTI)
+if(INTERNAL_MODULE_MULTI)
+  add_definitions(-DHARDWARE_INTERNAL_MODULE)
+  add_definitions(-DINTERNAL_MODULE_MULTI)
+endif()
+
+if(EXTERNAL_MODULE)
+  add_definitions(-DHARDWARE_EXTERNAL_MODULE)
+endif()
+
+include_directories(${RADIO_SRC_DIRECTORY}/fonts/480x272 gui/${GUI_DIR} gui/${GUI_DIR}/layouts)
+
+file(GLOB THEMES_SRC RELATIVE ${RADIO_SRC_DIRECTORY}/gui/480x272 ${RADIO_SRC_DIRECTORY}/gui/480x272/themes/*.cpp)
+file(GLOB LAYOUTS_SRC RELATIVE ${RADIO_SRC_DIRECTORY}/gui/480x272 ${RADIO_SRC_DIRECTORY}/gui/480x272/layouts/*.cpp)
+file(GLOB WIDGETS_SRC RELATIVE ${RADIO_SRC_DIRECTORY}/gui/480x272 ${RADIO_SRC_DIRECTORY}/gui/480x272/widgets/*.cpp)
+set(GUI_SRC
+  ${GUI_SRC}
+  bitmapbuffer.cpp
+  curves.cpp
+  bitmaps.cpp
+  radio_sdmanager.cpp
+  radio_hardware.cpp
+  radio_diagkeys.cpp
+  radio_diaganas.cpp
+  model_inputs.cpp
+  model_mixes.cpp
+  model_curves.cpp
+  view_channels.cpp
+  view_logical_switches.cpp
+  view_about.cpp
+  view_text.cpp
+  screens_setup.cpp
+  theme.cpp
+  topbar.cpp
+  layout.cpp
+  widget.cpp
+  menus.cpp
+  ${THEMES_SRC}
+  ${LAYOUTS_SRC}
+  ${WIDGETS_SRC}
+  rle.cpp
+  )
+
+if(PXX2 OR LUA OR MULTIMODULE)
+  set(GUI_SRC ${GUI_SRC} radio_tools.cpp)
+endif()
+
+if(PXX2 OR MULTIMODULE)
+  set(GUI_SRC ${GUI_SRC} radio_spectrum_analyser.cpp)
+endif()
+
+if(PXX2)
+  set(GUI_SRC ${GUI_SRC} radio_power_meter.cpp)
+endif()
+
+if(GHOST)
+  set(GUI_SRC ${GUI_SRC} radio_ghost_menu.cpp)
 endif()
 
 if(DISK_CACHE)
@@ -238,17 +244,20 @@ set(GVAR_SCREEN model_gvars.cpp)
 set(TARGET_SRC
   ${TARGET_SRC}
   led_driver.cpp
+  extmodule_driver.cpp
   trainer_driver.cpp
   ../common/arm/stm32/mixer_scheduler_driver.cpp
+  ../common/arm/stm32/heartbeat_driver.cpp
   ../common/arm/stm32/timers_driver.cpp
   ../common/arm/stm32/intmodule_serial_driver.cpp
   ../common/arm/stm32/rotary_encoder_driver.cpp
   )
 
 if(HARDWARE_TOUCH)
-  set(TOUCH_DRIVER tp_gt911.cpp i2c_driver.cpp)
+  set(TARGET_SRC ${TARGET_SRC}
+    tp_gt911.cpp
+    )
   add_definitions(-DHARDWARE_TOUCH)
-  set(SOFTWARE_KEYBOARD ON)
 endif()
 
 if(USB_CHARGER)
@@ -260,7 +269,6 @@ if(BLUETOOTH)
   add_definitions(-DBLUETOOTH)
   set(TARGET_SRC ${TARGET_SRC} ../common/arm/stm32/bluetooth_driver.cpp)
   set(SRC ${SRC} bluetooth.cpp)
-  add_definitions(-DHARDWARE_TRAINER_BLUETOOTH)
 endif()
 
 if (AUX_SERIAL)
@@ -285,39 +293,20 @@ set(FIRMWARE_TARGET_SRC
   ${FIRMWARE_TARGET_SRC}
   ${LCD_DRIVER}
   ${AUX_SERIAL_DRIVER}
-  ${FLYSKY_HALL_STICKS_DRIVER}
-  ${IMU_LSM6DS33_DRIVER}
-  ${TOUCH_DRIVER}
   board.cpp
   backlight_driver.cpp
   ../common/arm/stm32/pwr_driver.cpp
   sdram_driver.c
   startup_stm32f42_43xxx.s
-  ../common/arm/stm32/heartbeat_driver.cpp
   ../common/arm/stm32/sdio_sd.c
+  ../common/arm/loadboot.cpp
   )
 
-if(BOOTLOADER)
-  set(FIRMWARE_TARGET_SRC
-    ${FIRMWARE_TARGET_SRC}
-    ../common/arm/loadboot.cpp
-    )
-endif()
-
-set(SRC ${SRC}
+set(SRC
+  ${SRC}
   io/frsky_firmware_update.cpp
   io/multi_firmware_update.cpp
   )
-
-if (MULTIMODULE)
-  add_definitions(-DMULTI_PROTOLIST)
-    set(SRC ${SRC}
-      io/multi_protolist.cpp
-  )
-endif()
-
-# Make malloc() thread-safe
-add_definitions(-DTHREADSAFE_MALLOC)
 
 set(STM32LIB_SRC
   STM32F4xx_StdPeriph_Driver/src/stm32f4xx_sdio.c
@@ -329,9 +318,9 @@ set(STM32LIB_SRC
 
 MACRO(GET_GCC_INCLUDE_PATH gcc_include_path)
   if (WIN32)
-    execute_process(COMMAND ${CMAKE_C_COMPILER} -v -x c -E NUL ERROR_VARIABLE _gcc_output OUTPUT_QUIET)
+    execute_process(COMMAND arm-none-eabi-gcc -v -x c -E NUL ERROR_VARIABLE _gcc_output OUTPUT_QUIET)
   else()
-    execute_process(COMMAND ${CMAKE_C_COMPILER} -v -x c -E - INPUT_FILE /dev/null ERROR_VARIABLE _gcc_output OUTPUT_QUIET)
+    execute_process(COMMAND arm-none-eabi-gcc -v -x c -E - INPUT_FILE /dev/null ERROR_VARIABLE _gcc_output OUTPUT_QUIET)
   endif()
 
   # Build an array of string from the GCC output
@@ -350,7 +339,7 @@ MACRO(GET_GCC_INCLUDE_PATH gcc_include_path)
       # Remove the leading and trailing empty characters
       string(REPLACE "\r" "" _line ${_line})
       string(SUBSTRING "${_line}" 1 -1 _line)
-      set(_include_path "${_include_path}" "-I\"${_line}\"")
+      set(_include_path "${_include_path}" "-I${_line}")
     endif()
 
     if(${_line} STREQUAL "#include <...> search starts here:")
@@ -361,15 +350,14 @@ MACRO(GET_GCC_INCLUDE_PATH gcc_include_path)
 ENDMACRO()
 
 if(PYTHONINTERP_FOUND)
-  GET_GCC_INCLUDE_PATH(gcc_include_path)
+  GET_GCC_INCLUDE_PATH(arm_gcc_include_path)
 
   add_custom_command(
     OUTPUT ${PROJECT_BINARY_DIR}/radio/src/datacopy.cpp
     WORKING_DIRECTORY ${RADIO_DIRECTORY}/src
-    COMMAND ${PYTHON_EXECUTABLE} ${RADIO_DIRECTORY}/util/generate_datacopy.py datastructs_private.h -DPCBHORUS -DPCBX10 -DCPUARM -DSTM32F4 -DSTM32F429_439xx -DCOLORLCD -DBACKUP -DSIMU -I. -Igui/colorlcd -Itargets/horus -Itargets/common/arm/stm32 -I${THIRDPARTY_DIR} -I${THIRDPARTY_DIR}/libopenui/src -I${THIRDPARTY_DIR}/STM32F4xx_DSP_StdPeriph_Lib_V1.8.0/Libraries/STM32F4xx_StdPeriph_Driver/inc -I${THIRDPARTY_DIR}/STM32F4xx_DSP_StdPeriph_Lib_V1.8.0/Libraries/CMSIS/Device/ST/STM32F4xx/Include -I${THIRDPARTY_DIR}/STM32F4xx_DSP_StdPeriph_Lib_V1.8.0/Libraries/CMSIS/Include ${gcc_include_path} -Wno-asm-operand-widths -Wno-pragma-once-outside-header ${SYSROOT_ARG} > ${PROJECT_BINARY_DIR}/radio/src/datacopy.cpp
+    COMMAND ${PYTHON_EXECUTABLE} ${RADIO_DIRECTORY}/util/generate_datacopy.py datastructs.h -DPCBHORUS -DPCBX10 -DCPUARM -DSTM32F4 -DSTM32F429_439xx -DCOLORLCD -DBACKUP -DSIMU -I. -Itargets/horus -Itargets/common/arm/stm32 -I${THIRDPARTY_DIR} -I${THIRDPARTY_DIR}/STM32F4xx_DSP_StdPeriph_Lib_V1.4.0/Libraries/CMSIS/Device/ST/STM32F4xx/Include ${arm_gcc_include_path} > ${PROJECT_BINARY_DIR}/radio/src/datacopy.cpp
     DEPENDS ${RADIO_DIRECTORY}/src/datastructs.h ${RADIO_DIRECTORY}/util/generate_datacopy.py
     )
-
   add_custom_target(datacopy
     DEPENDS ${PROJECT_BINARY_DIR}/radio/src/datacopy.cpp
     )

@@ -29,6 +29,7 @@
 #include "downloaddialog.h"
 #include "printdialog.h"
 #include "version.h"
+#include "creditsdialog.h"
 #include "releasenotesdialog.h"
 #include "releasenotesfirmwaredialog.h"
 #include "customizesplashdialog.h"
@@ -54,10 +55,10 @@
 #include <QFileInfo>
 #include <QDesktopServices>
 #include <QMessageBox>
-#include <QtNetwork/QNetworkAccessManager>
-#include <QtNetwork/QNetworkProxyFactory>
-#include <QtNetwork/QNetworkReply>
-#include <QtNetwork/QNetworkRequest>
+#include <QNetworkAccessManager>
+#include <QNetworkProxyFactory>
+#include <QNetworkReply>
+#include <QNetworkRequest>
 
 // update check flags
 #define CHECK_COMPANION        1
@@ -65,8 +66,7 @@
 #define INTERACTIVE_DOWNLOAD   4
 #define AUTOMATIC_DOWNLOAD     8
 
-#define OPENTX_DOWNLOADS_PAGE_URL         QStringLiteral("https://edgetx.org/downloads")
-#define DONATE_STR                        QStringLiteral("https://opencollective.com/edgetx/donate")
+#define DONATE_STR                        QStringLiteral("https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=QUZ48K4SEXDP2")
 
 #ifdef Q_OS_MACOS
   #define COMPANION_STAMP                 QStringLiteral("companion-macosx.stamp")
@@ -157,7 +157,7 @@ MainWindow::MainWindow():
   if (!str.isEmpty()) {
     int fileType = getStorageType(str);
 
-    if (fileType==STORAGE_TYPE_EEPE || fileType==STORAGE_TYPE_EEPM || fileType==STORAGE_TYPE_BIN || fileType==STORAGE_TYPE_ETX) {
+    if (fileType==STORAGE_TYPE_EEPE || fileType==STORAGE_TYPE_EEPM || fileType==STORAGE_TYPE_BIN || fileType==STORAGE_TYPE_OTX) {
       MdiChild * child = createMdiChild();
       if (child->loadFile(str)) {
         if (!(printing && model >= 0 && (getCurrentFirmware()->getCapability(Models) == 0 || model<getCurrentFirmware()->getCapability(Models)) && !printfilename.isEmpty())) {
@@ -263,9 +263,6 @@ void MainWindow::checkForUpdates()
     checkForUpdatesState = 0;
     return;
   }
-
-  QMessageBox::information(this, CPN_STR_APP_NAME, tr("Updates via Companion currently unavailable. Please go to the EdgeTX <a href='%1'>website</a> for installation instructions. Update the application settings to disable this message.").arg("https://github.com/EdgeTX/edgetx.github.io/wiki/EdgeTX-Installation-Guide"));
-  return;
 
   if (networkManager)
     disconnect(networkManager, 0, this, 0);
@@ -382,7 +379,7 @@ void MainWindow::checkForCompanionUpdateFinished(QNetworkReply * reply)
       }
     }
 #else
-    QMessageBox::warning(this, tr("New release available"), tr("A new release of Companion is available, please check the <a href='%1'>EdgeTX website!</a>").arg(OPENTX_DOWNLOADS_PAGE_URL));
+    QMessageBox::warning(this, tr("New release available"), tr("A new release of Companion is available, please check the <a href='%1'>OpenTX website!</a>").arg(getCurrentFirmware()->getReleaseNotesUrl()));
 #endif
   }
   else {
@@ -710,7 +707,7 @@ void MainWindow::newFile()
 
 void MainWindow::openDocURL()
 {
-  QString link = "https://edgetx.org/";
+  QString link = "http://www.open-tx.org/documents.html";
   QDesktopServices::openUrl(QUrl(link));
 }
 
@@ -840,19 +837,19 @@ void MainWindow::fwPrefs()
   dialog->deleteLater();
 }
 
+void MainWindow::contributors()
+{
+  CreditsDialog * dialog = new CreditsDialog(this);
+  dialog->exec();
+  dialog->deleteLater();
+}
+
 void MainWindow::sdsync()
 {
   // remember user-selectable options for duration of session  TODO: save to settings
   static SyncProcess::SyncOptions syncOpts;
   static bool showExtraOptions = false;
   QStringList errorMsgs;
-
-  if (syncOpts.sessionId != g.sessionId()) {
-    syncOpts.reset();
-    syncOpts.folderA = QString();
-    syncOpts.folderB = QString();
-    syncOpts.sessionId = g.sessionId();
-  }
 
   if (syncOpts.folderA.isEmpty())
     syncOpts.folderA = g.profile[g.id()].sdPath();
@@ -886,8 +883,7 @@ void MainWindow::sdsync()
 
 void MainWindow::changelog()
 {
-  QString link = "https://edgetx.org";
-  QDesktopServices::openUrl(QUrl(link));
+  QDesktopServices::openUrl(QUrl(getCurrentFirmware()->getReleaseNotesUrl()));
 }
 
 void MainWindow::customizeSplash()
@@ -897,24 +893,24 @@ void MainWindow::customizeSplash()
   dialog->deleteLater();
 }
 
-void MainWindow::writeSettings()
+void MainWindow::writeEeprom()
 {
   if (activeMdiChild())
-    activeMdiChild()->writeSettings();
+    activeMdiChild()->writeEeprom();
 }
 
-void MainWindow::readSettings()
+void MainWindow::readEeprom()
 {
   Board::Type board = getCurrentBoard();
   QString tempFile;
-  if (Boards::getCapability(board, Board::HasSDCard))
-    tempFile = generateProcessUniqueTempFileName("temp.etx");
+  if (IS_FAMILY_HORUS_OR_T16(board))
+    tempFile = generateProcessUniqueTempFileName("temp.otx");
   else
     tempFile = generateProcessUniqueTempFileName("temp.bin");
 
-  qDebug() << "Reading models and settings into temp file: " << tempFile;
+  qDebug() << "MainWindow::readEeprom(): using temp file: " << tempFile;
 
-  if (readSettingsFromRadio(tempFile)) {
+  if (readEepromFromRadio(tempFile)) {
     MdiChild * child = createMdiChild();
     child->newFile(false);
     child->loadFile(tempFile, false);
@@ -933,10 +929,10 @@ bool MainWindow::readFirmwareFromRadio(const QString & filename)
   return result;
 }
 
-bool MainWindow::readSettingsFromRadio(const QString & filename)
+bool MainWindow::readEepromFromRadio(const QString & filename)
 {
   ProgressDialog progressDialog(this, tr("Read Models and Settings from Radio"), CompanionIcon("read_eeprom.png"));
-  bool result = ::readSettings(filename, progressDialog.progress());
+  bool result = ::readEeprom(filename, progressDialog.progress());
   if (!result) {
     if (!progressDialog.isEmpty()) {
       progressDialog.exec();
@@ -974,7 +970,7 @@ void MainWindow::readBackup()
   }
   QString fileName = QFileDialog::getSaveFileName(this, tr("Save Radio Backup to File"), g.eepromDir(), EXTERNAL_EEPROM_FILES_FILTER);
   if (!fileName.isEmpty()) {
-    if (!readSettingsFromRadio(fileName))
+    if (!readEepromFromRadio(fileName))
       return;
   }
 }
@@ -1017,21 +1013,15 @@ void MainWindow::logFile()
 void MainWindow::about()
 {
   QString aboutStr = "<center><img src=\":/images/companion-title.png\"></center><br/>";
-  aboutStr.append(tr("EdgeTX Home Page: <a href='%1'>%1</a>").arg("https://edgetx.org"));
+  aboutStr.append(tr("OpenTX Home Page: <a href='%1'>%1</a>").arg("http://www.open-tx.org"));
   aboutStr.append("<br/><br/>");
-  aboutStr.append(tr("The EdgeTX Companion project was originally forked from <a href='%1'>OpenTX</a>").arg("https://github.com/opentx/opentx"));
+  aboutStr.append(tr("The OpenTX Companion project was originally forked from <a href='%1'>eePe</a>").arg("http://code.google.com/p/eepe"));
   aboutStr.append("<br/><br/>");
   aboutStr.append(tr("If you've found this program useful, please support by <a href='%1'>donating</a>").arg(DONATE_STR));
   aboutStr.append("<br/><br/>");
-  aboutStr.append(QString("Version %1 \"%2\", %3").arg(VERSION).arg(CODENAME).arg(__DATE__));
-  aboutStr.append("<br/>");
-  aboutStr.append(QString("Commit <a href='%1'>%2</a>").arg("https://github.com/EdgeTX/edgetx/commit/" GIT_STR).arg(GIT_STR));
+  aboutStr.append(QString("Version %1, %2").arg(VERSION).arg(__DATE__));
   aboutStr.append("<br/><br/>");
-  aboutStr.append(tr("File new <a href='%1'>Issue or Request</a>").arg("https://github.com/EdgeTX/edgetx/issues/new/choose"));
-  aboutStr.append("<br/><br/>");
-  aboutStr.append(tr("Copyright") + QString(" &copy; 2022 EdgeTX<br/>"));
-  // aboutStr.append(tr("Copyright") + QString(" &copy; 2021-%1 EdgeTX<br/>").arg(QString(__DATE__).right(4)));
-
+  aboutStr.append(tr("Copyright OpenTX Team") + QString("<br/>&copy; 2011-%1<br/>").arg(QString(__DATE__).right(4)));
   QMessageBox msgBox(this);
   msgBox.setWindowIcon(CompanionIcon("information.png"));
   msgBox.setWindowTitle(tr("About Companion"));
@@ -1049,8 +1039,8 @@ void MainWindow::updateMenus()
   saveAsAct->setEnabled(activeChild);
   closeAct->setEnabled(activeChild);
   compareAct->setEnabled(activeChild);
-  writeSettingsAct->setEnabled(activeChild);
-  readSettingsAct->setEnabled(true);
+  writeEepromAct->setEnabled(activeChild);
+  readEepromAct->setEnabled(true);
   if (IS_FAMILY_HORUS_OR_T16(getCurrentBoard())) {
     writeBUToRadioAct->setEnabled(false);
     readBUToFileAct->setEnabled(false);
@@ -1112,7 +1102,7 @@ void MainWindow::updateMenus()
 
   updateRecentFileActions();
   updateProfilesActions();
-  setWindowTitle(tr("EdgeTX Companion %1 - Radio: %2 - Profile: %3").arg(VERSION).arg(getCurrentFirmware()->getName()).arg(g.profile[g.id()].name()));
+  setWindowTitle(tr("OpenTX Companion %1 - Radio: %2 - Profile: %3").arg(VERSION).arg(getCurrentFirmware()->getName()).arg(g.profile[g.id()].name()));
 }
 
 MdiChild * MainWindow::createMdiChild()
@@ -1194,7 +1184,7 @@ void MainWindow::retranslateUi(bool showMsg)
   trAct(logsAct,            tr("View Log File..."),           tr("Open and view log file"));
   trAct(appPrefsAct,        tr("Settings..."),                tr("Edit Settings"));
   trAct(fwPrefsAct,         tr("Download..."),                tr("Download firmware and voice files"));
-  trAct(checkForUpdatesAct, tr("Check for Updates..."),       tr("Check EdgeTX and Companion updates"));
+  trAct(checkForUpdatesAct, tr("Check for Updates..."),       tr("Check OpenTX and Companion updates"));
   trAct(changelogAct,       tr("Release notes..."),           tr("Show release notes"));
   trAct(compareAct,         tr("Compare Models..."),          tr("Compare models"));
   trAct(editSplashAct,      tr("Edit Radio Splash Image..."), tr("Edit the splash image of your Radio"));
@@ -1202,12 +1192,13 @@ void MainWindow::retranslateUi(bool showMsg)
   trAct(writeFlashAct,      tr("Write Firmware to Radio"),    tr("Write firmware to Radio"));
   trAct(sdsyncAct,          tr("Synchronize SD"),             tr("SD card synchronization"));
 
-  trAct(openDocURLAct,      tr("Manuals and other Documents"),         tr("Open the EdgeTX document page in a web browser"));
-  trAct(writeSettingsAct,   tr("Write Models and Settings To Radio"),  tr("Write Models and Settings to Radio"));
-  trAct(readSettingsAct,    tr("Read Models and Settings From Radio"), tr("Read Models and Settings from Radio"));
+  trAct(openDocURLAct,      tr("Manuals and other Documents"),         tr("Open the OpenTX document page in a web browser"));
+  trAct(writeEepromAct,     tr("Write Models and Settings To Radio"),  tr("Write Models and Settings to Radio"));
+  trAct(readEepromAct,      tr("Read Models and Settings From Radio"), tr("Read Models and Settings from Radio"));
   trAct(burnConfigAct,      tr("Configure Communications..."),         tr("Configure software for communicating with the Radio"));
   trAct(writeBUToRadioAct,  tr("Write Backup to Radio"),               tr("Write Backup from file to Radio"));
   trAct(readBUToFileAct,    tr("Backup Radio to File"),                tr("Save a complete backup file of all settings and model data in the Radio"));
+  trAct(contributorsAct,    tr("Contributors..."),                     tr("A tribute to those who have contributed to OpenTX and Companion"));
 
   trAct(createProfileAct,   tr("Add Radio Profile"),               tr("Create a new Radio Settings Profile"));
   trAct(copyProfileAct,     tr("Copy Current Radio Profile"),      tr("Duplicate current Radio Settings Profile"));
@@ -1260,8 +1251,8 @@ void MainWindow::createActions()
   burnListAct =        addAct("list.png",              SLOT(burnList()));
   readFlashAct =       addAct("read_flash.png",        SLOT(readFlash()));
   writeFlashAct =      addAct("write_flash.png",       SLOT(writeFlash()));
-  writeSettingsAct =   addAct("write_eeprom.png",      SLOT(writeSettings()));
-  readSettingsAct =    addAct("read_eeprom.png",       SLOT(readSettings()));
+  writeEepromAct =     addAct("write_eeprom.png",      SLOT(writeEeprom()));
+  readEepromAct =      addAct("read_eeprom.png",       SLOT(readEeprom()));
   burnConfigAct =      addAct("configure.png",         SLOT(burnConfig()));
 
   writeBUToRadioAct = addAct("write_eeprom_file.png", SLOT(writeBackup()));
@@ -1283,6 +1274,7 @@ void MainWindow::createActions()
   aboutAct =           addAct("information.png",    SLOT(about()));
   openDocURLAct =      addAct("changelog.png",      SLOT(openDocURL()));
   changelogAct =       addAct("changelog.png",      SLOT(changelog()));
+  contributorsAct =    addAct("contributors.png",   SLOT(contributors()));
 
   // these two get assigned menus in createMenus()
   recentFilesAct =     addAct("recentdocument.png");
@@ -1291,13 +1283,13 @@ void MainWindow::createActions()
   exitAct->setMenuRole(QAction::QuitRole);
   aboutAct->setMenuRole(QAction::AboutRole);
   appPrefsAct->setMenuRole(QAction::PreferencesRole);
+  contributorsAct->setMenuRole(QAction::ApplicationSpecificRole);
   openDocURLAct->setMenuRole(QAction::ApplicationSpecificRole);
   checkForUpdatesAct->setMenuRole(QAction::ApplicationSpecificRole);
   changelogAct->setMenuRole(QAction::ApplicationSpecificRole);
 
   actTabbedWindows->setCheckable(true);
   compareAct->setEnabled(false);
-  fwPrefsAct->setEnabled(false);
 }
 
 void MainWindow::createMenus()
@@ -1351,8 +1343,8 @@ void MainWindow::createMenus()
   settingsMenu->addAction(importSettingsAct);
 
   burnMenu = menuBar()->addMenu("");
-  burnMenu->addAction(writeSettingsAct);
-  burnMenu->addAction(readSettingsAct);
+  burnMenu->addAction(writeEepromAct);
+  burnMenu->addAction(readEepromAct);
   burnMenu->addSeparator();
   burnMenu->addAction(writeBUToRadioAct);
   burnMenu->addAction(readBUToFileAct);
@@ -1378,6 +1370,7 @@ void MainWindow::createMenus()
   helpMenu->addSeparator();
   helpMenu->addAction(changelogAct);
   helpMenu->addSeparator();
+  helpMenu->addAction(contributorsAct);
 
   recentFilesMenu = new QMenu(this);
   recentFilesMenu->setToolTipsVisible(true);
@@ -1439,8 +1432,8 @@ void MainWindow::createToolBars()
   burnToolBar = new QToolBar(this);
   addToolBar( Qt::LeftToolBarArea, burnToolBar );
   burnToolBar->setObjectName("Write");
-  burnToolBar->addAction(writeSettingsAct);
-  burnToolBar->addAction(readSettingsAct);
+  burnToolBar->addAction(writeEepromAct);
+  burnToolBar->addAction(readEepromAct);
   burnToolBar->addSeparator();
   burnToolBar->addAction(writeBUToRadioAct);
   burnToolBar->addAction(readBUToFileAct);
@@ -1630,11 +1623,9 @@ int MainWindow::newProfile(bool loadProfile)
   if (i == MAX_PROFILES)  //Failed to find free slot
     return -1;
 
-  Firmware *newfw = Firmware::getDefaultVariant();
   g.profile[i].init();
-  g.profile[i].name("New Radio");
-  g.profile[i].fwType(newfw->getId());
-  g.profile[i].defaultInternalModule(Boards::getDefaultInternalModules(newfw->getBoard()));
+  g.profile[i].name(tr("New Radio"));
+  g.profile[i].fwType(Firmware::getDefaultVariant()->getId());
 
   if (loadProfile) {
     if (loadProfileId(i))

@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -73,7 +72,6 @@ bool isModuleSynchronous(uint8_t moduleIdx)
     case PROTOCOL_CHANNELS_CROSSFIRE:
     case PROTOCOL_CHANNELS_GHOST:
     case PROTOCOL_CHANNELS_AFHDS3:
-    case PROTOCOL_CHANNELS_AFHDS2A:
     case PROTOCOL_CHANNELS_NONE:
 
 #if defined(MULTIMODULE)
@@ -113,7 +111,7 @@ void sendSynchronousPulses(uint8_t runMask)
 }
 
 constexpr uint8_t MIXER_FREQUENT_ACTIONS_PERIOD = 5 /*ms*/;
-constexpr uint8_t MIXER_MAX_PERIOD = MAX_REFRESH_RATE / 1000 /*ms*/;
+constexpr uint8_t MIXER_MAX_PERIOD = 30 /*ms*/;
 
 void execMixerFrequentActions()
 {
@@ -129,31 +127,25 @@ void execMixerFrequentActions()
 #if defined(BLUETOOTH)
   bluetooth.wakeup();
 #endif
-
-  if (!s_pulses_paused) {
-    DEBUG_TIMER_START(debugTimerTelemetryWakeup);
-    telemetryWakeup();
-    DEBUG_TIMER_STOP(debugTimerTelemetryWakeup);
-  }
 }
+
+uint32_t nextMixerTime[NUM_MODULES];
 
 TASK_FUNCTION(mixerTask)
 {
   s_pulses_paused = true;
 
   mixerSchedulerInit();
+
+#if !defined(PCBSKY9X)
   mixerSchedulerStart();
+#endif
 
   while (true) {
-    int timeout = 0;
-    for (; timeout < MIXER_MAX_PERIOD; timeout += MIXER_FREQUENT_ACTIONS_PERIOD) {
-
-      // run periodicals before waiting for the trigger
-      // to keep the delay short
+    for (int timeout = 0; timeout < MIXER_MAX_PERIOD; timeout += MIXER_FREQUENT_ACTIONS_PERIOD) {
       execMixerFrequentActions();
-
-      // mixer flag triggered?
-      if (!mixerSchedulerWaitForTrigger(MIXER_FREQUENT_ACTIONS_PERIOD)) {
+      bool interruptedByTimeout = mixerSchedulerWaitForTrigger(MIXER_FREQUENT_ACTIONS_PERIOD);
+      if (!interruptedByTimeout) {
         break;
       }
     }
@@ -163,8 +155,10 @@ TASK_FUNCTION(mixerTask)
     GPIO_ResetBits(EXTMODULE_TX_GPIO, EXTMODULE_TX_GPIO_PIN);
 #endif
 
-    // re-enable trigger
+#if !defined(PCBSKY9X)
+    mixerSchedulerClearTrigger();
     mixerSchedulerEnableTrigger();
+#endif
 
 #if defined(SIMU)
     if (pwrCheck() == e_power_off) {
@@ -183,7 +177,15 @@ TASK_FUNCTION(mixerTask)
       RTOS_LOCK_MUTEX(mixerMutex);
 
       doMixerCalculations();
+
+#if defined(HARDWARE_INTERNAL_MODULE) && defined(HARDWARE_EXTERNAL_MODULE)
       sendSynchronousPulses((1 << INTERNAL_MODULE) | (1 << EXTERNAL_MODULE));
+#elif defined(HARDWARE_INTERNAL_MODULE)
+      sendSynchronousPulses((1 << INTERNAL_MODULE));
+#elif defined(HARDWARE_EXTERNAL_MODULE)
+      sendSynchronousPulses(1 << EXTERNAL_MODULE);
+#endif
+
       doMixerPeriodicUpdates();
 
       DEBUG_TIMER_START(debugTimerMixerCalcToUsage);
@@ -197,6 +199,14 @@ TASK_FUNCTION(mixerTask)
       }
 #endif
 
+#if defined(PCBSKY9X) && !defined(SIMU)
+      usbJoystickUpdate();
+#endif
+
+      DEBUG_TIMER_START(debugTimerTelemetryWakeup);
+      telemetryWakeup();
+      DEBUG_TIMER_STOP(debugTimerTelemetryWakeup);
+
       if (heartbeat == HEART_WDT_CHECK) {
         WDG_RESET();
         heartbeat = 0;
@@ -205,10 +215,32 @@ TASK_FUNCTION(mixerTask)
       t0 = getTmr2MHz() - t0;
       if (t0 > maxMixerDuration)
         maxMixerDuration = t0;
+
+      // TODO:
+      // - check the cause of timeouts when switching
+      //    between protocols with multi-proto RF
     }
   }
 }
 
+void scheduleNextMixerCalculation(uint8_t module, uint32_t period_ms)
+{
+  // Schedule next mixer calculation time,
+
+  if (isModuleSynchronous(module)) {
+    nextMixerTime[module] += period_ms / RTOS_MS_PER_TICK;
+    if (nextMixerTime[module] < RTOS_GET_TIME()) {
+      // we are late ... let's add some small delay
+      nextMixerTime[module] = (uint32_t) RTOS_GET_TIME() + (period_ms / RTOS_MS_PER_TICK);
+    }
+  }
+  else {
+    // for now assume mixer calculation takes 2 ms.
+    nextMixerTime[module] = (uint32_t) RTOS_GET_TIME() + (period_ms / RTOS_MS_PER_TICK);
+  }
+
+  DEBUG_TIMER_STOP(debugTimerMixerCalcToUsage);
+}
 
 #define MENU_TASK_PERIOD_TICKS         (50 / RTOS_MS_PER_TICK)    // 50ms
 
@@ -218,17 +250,6 @@ bool perMainEnabled = true;
 
 TASK_FUNCTION(menusTask)
 {
-#if defined(SPLASH) && !defined(STARTUP_ANIMATION)
-  if (!UNEXPECTED_SHUTDOWN()) {
-    drawSplash();
-    TRACE("drawSplash() completed");
-  }
-#endif
-
-#if defined(HARDWARE_TOUCH) && !defined(PCBFLYSKY) && !defined(SIMU)
-  touchPanelInit();
-#endif
-  
   opentxInit();
 
 #if defined(PWR_BUTTON_PRESS)
@@ -282,22 +303,21 @@ TASK_FUNCTION(menusTask)
 
 void tasksStart()
 {
-  RTOS_CREATE_MUTEX(audioMutex);
-  RTOS_CREATE_MUTEX(mixerMutex);
+  RTOS_INIT();
 
 #if defined(CLI)
   cliStart();
 #endif
 
-  RTOS_CREATE_TASK(mixerTaskId, mixerTask, "mixer", mixerStack,
-                   MIXER_STACK_SIZE, MIXER_TASK_PRIO);
-  RTOS_CREATE_TASK(menusTaskId, menusTask, "menus", menusStack,
-                   MENUS_STACK_SIZE, MENUS_TASK_PRIO);
+  RTOS_CREATE_TASK(mixerTaskId, mixerTask, "mixer", mixerStack, MIXER_STACK_SIZE, MIXER_TASK_PRIO);
+  RTOS_CREATE_TASK(menusTaskId, menusTask, "menus", menusStack, MENUS_STACK_SIZE, MENUS_TASK_PRIO);
 
 #if !defined(SIMU)
-  RTOS_CREATE_TASK(audioTaskId, audioTask, "audio", audioStack,
-                   AUDIO_STACK_SIZE, AUDIO_TASK_PRIO);
+  RTOS_CREATE_TASK(audioTaskId, audioTask, "audio", audioStack, AUDIO_STACK_SIZE, AUDIO_TASK_PRIO);
 #endif
+
+  RTOS_CREATE_MUTEX(audioMutex);
+  RTOS_CREATE_MUTEX(mixerMutex);
 
   RTOS_START();
 }

@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -41,7 +40,7 @@ void menuRadioDiagKeys(event_t event)
 
   lcdDrawText(14*FW, MENU_HEADER_HEIGHT + 1, STR_VTRIM);
 
-  for (uint8_t i=0; i<10; i++) {
+  for (uint8_t i=0; i<9; i++) {
     coord_t y;
 
     if (i < NUM_TRIMS_KEYS) {
@@ -50,17 +49,15 @@ void menuRadioDiagKeys(event_t event)
       displayKeyState(i&1? 20*FW : 18*FW, y, TRM_BASE+i);
     }
 
-    if (i <= KEY_MAX) {
-      if (i == 7) { // T8 8th key???
-        y = MENU_HEADER_HEIGHT + 1 + FH * 6;
-        lcdDrawTextAtIndex(8, y, STR_VKEYS, i, 0);
-        displayKeyState(lcdNextPos + 10, y, i);
-      }
-      else {
-        y = MENU_HEADER_HEIGHT + 1 + FH * i;
-        lcdDrawTextAtIndex(0, y, STR_VKEYS, i, 0);
-        displayKeyState(5 * FW + 2, y, i);
-      }
+    if (i == 7) {
+      y = MENU_HEADER_HEIGHT + 1 + FH * 6;
+      lcdDrawTextAtIndex(8, y, STR_VKEYS, i, 0);
+      displayKeyState(lcdNextPos + 10, y, i);
+    }
+    else if (i <= KEY_MAX) {
+      y = MENU_HEADER_HEIGHT + 1 + FH * i;
+      lcdDrawTextAtIndex(0, y, STR_VKEYS, i, 0);
+      displayKeyState(5 * FW + 2, y, i);
     }
 
 #if defined(PCBSKY9X)
@@ -69,19 +66,10 @@ void menuRadioDiagKeys(event_t event)
       drawSwitch(8*FW, y, i+1, 0);
       displaySwitchState(11*FW+2, y, i);
     }
-#elif (NUM_SWITCHES > 6)
-    if (i < NUM_SWITCHES) {
-      if (SWITCH_EXISTS(i)) {
-        y = (i > 4) ? FH*(i-4)+1 : MENU_HEADER_HEIGHT + FH*i + 1;
-        getvalue_t val = getValue(MIXSRC_FIRST_SWITCH+i);
-        getvalue_t sw = ((val < 0) ? 3*i+1 : ((val == 0) ? 3*i+2 : 3*i+3));
-        drawSwitch(i > 4 ? 11*FW-5: 8*FW-9, y, sw, 0, false);
-      }
-    }
 #else
     if (i < NUM_SWITCHES) {
       if (SWITCH_EXISTS(i)) {
-        y = (NUM_SWITCHES - NUM_FUNCTIONS_SWITCHES > 6 ? 0 : MENU_HEADER_HEIGHT) + FH*i;
+        y = (NUM_SWITCHES > 6 ? 0 : MENU_HEADER_HEIGHT) + FH*i;
         getvalue_t val = getValue(MIXSRC_FIRST_SWITCH+i);
         getvalue_t sw = ((val < 0) ? 3*i+1 : ((val == 0) ? 3*i+2 : 3*i+3));
         drawSwitch(8*FW+4, y, sw, 0);
@@ -90,19 +78,9 @@ void menuRadioDiagKeys(event_t event)
 #endif
   }
 
-#if defined(FUNCTION_SWITCHES) && defined(DEBUG)
-  lcdDrawText(LCD_W / 2 , LCD_H - 2 * FH, "Phys");
-  lcdDrawText(LCD_W / 2 , LCD_H - 1 * FH, "Log");
-
-  for (uint8_t i = 0; i < NUM_FUNCTIONS_SWITCHES; i++) {
-    lcdDrawNumber(LCD_W / 2 + 20 + (i + 1) * FW , LCD_H - 2 * FH, getFSPhysicalState(i));
-    lcdDrawNumber(LCD_W / 2 + 20 + (i + 1) * FW , LCD_H - 1 * FH, getFSLogicalState(i));
-  }
-#endif
-
 #if defined(ROTARY_ENCODER_NAVIGATION)
-  coord_t y = LCD_H - FH + 1;
-  lcdDrawText(8*FW-9, y, STR_ROTARY_ENCODER);
-  lcdDrawNumber(12*FW+FWNUM+2, y, rotencValue / ROTARY_ENCODER_GRANULARITY, RIGHT);
+  coord_t y = MENU_HEADER_HEIGHT + 1 + FH*KEY_COUNT;
+  lcdDrawText(0, y, STR_ROTARY_ENCODER);
+  lcdDrawNumber(5*FW+FWNUM+2, y, rotencValue / ROTARY_ENCODER_GRANULARITY, RIGHT);
 #endif
 }

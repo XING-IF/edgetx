@@ -18,8 +18,7 @@
  * GNU General Public License for more details.
  */
 
-#ifndef _MODELEDIT_H_
-#define _MODELEDIT_H_
+#pragma once
 
 #include <QtWidgets>
 #include "genericpanel.h"
@@ -48,8 +47,6 @@ class ModelEdit : public QDialog
     ModelEdit(QWidget * parent, RadioData & radioData, int modelId, Firmware * firmware);
     ~ModelEdit();
 
-    int getModelId() { return modelId; }
-
   protected:
     void closeEvent(QCloseEvent *event);
 
@@ -71,5 +68,3 @@ class ModelEdit : public QDialog
     void launchSimulation();
 
 };
-
-#endif // _MODELEDIT_H_

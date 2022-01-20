@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -27,14 +26,6 @@
 #include "board_common.h"
 #include "hal.h"
 
-#if defined(HARDWARE_TOUCH)
-#include "tp_gt911.h"
-#endif
-
-#if defined(IMU_LSM6DS33)
-#include "imu_lsm6ds33.h"
-#endif
-
 PACK(typedef struct {
   uint8_t pcbrev:2;
   uint8_t sticksPwmDisabled:1;
@@ -44,10 +35,10 @@ PACK(typedef struct {
 extern HardwareOptions hardwareOptions;
 
 #if !defined(LUA_EXPORT_GENERATION)
-  #include "stm32f4xx_sdio.h"
-  #include "stm32f4xx_dma2d.h"
-  #include "stm32f4xx_ltdc.h"
-  #include "stm32f4xx_fmc.h"
+#include "STM32F4xx_DSP_StdPeriph_Lib_V1.4.0/Libraries/STM32F4xx_StdPeriph_Driver/inc/stm32f4xx_sdio.h"
+#include "STM32F4xx_DSP_StdPeriph_Lib_V1.4.0/Libraries/STM32F4xx_StdPeriph_Driver/inc/stm32f4xx_dma2d.h"
+#include "STM32F4xx_DSP_StdPeriph_Lib_V1.4.0/Libraries/STM32F4xx_StdPeriph_Driver/inc/stm32f4xx_ltdc.h"
+#include "STM32F4xx_DSP_StdPeriph_Lib_V1.4.0/Libraries/STM32F4xx_StdPeriph_Driver/inc/stm32f4xx_fmc.h"
 #endif
 
 #define FLASHSIZE                      0x200000
@@ -80,7 +71,7 @@ void boardOff();
 
 // Timers driver
 void init2MhzTimer();
-void init1msTimer();
+void init5msTimer();
 
 // PCBREV driver
 enum {
@@ -134,6 +125,15 @@ uint32_t sdMounted();
 #define SD_CARD_PRESENT()              true
 #endif
 
+#if defined(DISK_CACHE)
+#include "diskio.h"
+DRESULT __disk_read(BYTE drv, BYTE * buff, DWORD sector, UINT count);
+DRESULT __disk_write(BYTE drv, const BYTE * buff, DWORD sector, UINT count);
+#else
+#define __disk_read                    disk_read
+#define __disk_write                   disk_write
+#endif
+
 // Flash Write driver
 #define FLASH_PAGESIZE                 256
 void unlockFlash();
@@ -146,27 +146,7 @@ uint32_t isBootloaderStart(const uint8_t * buffer);
 void SDRAM_Init();
 
 // Pulses driver
-#if defined(RADIO_T18) || defined(RADIO_T16)
-
-// TX18S Workaround (see https://github.com/EdgeTX/edgetx/issues/802)
-// and also T16     (see https://github.com/EdgeTX/edgetx/issues/1239)
-//   Add some delay after turning the internal module ON
-//   on the T16, T18 & TX18S, as they seem to have issues
-//   with power supply instability
-//
-#define INTERNAL_MODULE_ON()                                  \
-  do {                                                        \
-    GPIO_SetBits(INTMODULE_PWR_GPIO, INTMODULE_PWR_GPIO_PIN); \
-    delay_ms(1);                                              \
-  } while (0)
-
-#else
-
-// Just turn the modue ON for all other targets
-#define INTERNAL_MODULE_ON() \
-  GPIO_SetBits(INTMODULE_PWR_GPIO, INTMODULE_PWR_GPIO_PIN)
-
-#endif
+#define INTERNAL_MODULE_ON()           GPIO_SetBits(INTMODULE_PWR_GPIO, INTMODULE_PWR_GPIO_PIN)
 
 #if defined(INTERNAL_MODULE_PXX1) || defined(INTERNAL_MODULE_PXX2)
   #define HARDWARE_INTERNAL_RAS
@@ -198,6 +178,11 @@ void SDRAM_Init();
 
 void init_intmodule_heartbeat();
 void check_intmodule_heartbeat();
+
+void intmoduleSerialStart(uint32_t baudrate, uint8_t rxEnable, uint16_t parity, uint16_t stopBits, uint16_t wordLength);
+void intmoduleSendByte(uint8_t byte);
+void intmoduleSendBuffer(const uint8_t * data, uint8_t size);
+void intmoduleSendNextFrame();
 
 void extmoduleSerialStart();
 void extmoduleInvertedSerialStart(uint32_t baudrate);
@@ -305,10 +290,6 @@ enum EnumSwitchesPositions
 
 #define STORAGE_NUM_SWITCHES_POSITIONS  (STORAGE_NUM_SWITCHES * 3)
 
-#if !defined(NUM_FUNCTIONS_SWITCHES)
-#define NUM_FUNCTIONS_SWITCHES        0
-#endif
-
 void keysInit();
 uint32_t switchState(uint8_t index);
 uint32_t readKeys();
@@ -355,22 +336,17 @@ void watchdogInit(unsigned int duration);
 // ADC driver
 
 #if defined(PCBX10)
-  #define NUM_POTS                     7
-  #define STORAGE_NUM_POTS             7
+#define NUM_POTS                       5
 #else
-  #define NUM_POTS                     3
-  #define STORAGE_NUM_POTS             5
+#define NUM_POTS                       3
 #endif
 
 #define NUM_XPOTS                      NUM_POTS
+#define STORAGE_NUM_POTS               5
 
 #if defined(PCBX10)
   #define NUM_SLIDERS                  2
-  #if defined(RADIO_TX16S) || defined(RADIO_T18) || defined(RADIO_T16)
-    #define NUM_PWMSTICKS              0
-  #else
-    #define NUM_PWMSTICKS              4
-  #endif
+  #define NUM_PWMSTICKS                4
 #else
   #define NUM_SLIDERS                  4
   #define NUM_PWMSTICKS                0
@@ -390,8 +366,6 @@ enum Analogs {
 #if defined(PCBX10)
   EXT1,
   EXT2,
-  EXT3,
-  EXT4,
 #endif
   POT_LAST = POT_FIRST + NUM_POTS - 1,
   SLIDER_FIRST,
@@ -410,11 +384,6 @@ enum Analogs {
   NUM_ANALOGS
 };
 
-#if defined(PCBX12S)
-#define EXT1 SLIDER_FRONT_LEFT
-#define EXT2 SLIDER_FRONT_RIGHT
-#endif
-
 #define SLIDER1 SLIDER_FRONT_LEFT
 #define SLIDER2 SLIDER_FRONT_RIGHT
 
@@ -431,14 +400,6 @@ enum Analogs {
 #define DEFAULT_SLIDERS_CONFIG (SLIDER_WITH_DETENT << 1) + (SLIDER_WITH_DETENT << 0)
 #endif
 
-#define HARDWARE_POT3
-#if !defined(PCBX12S) // ext are used by mouse on X12S
-  #define HARDWARE_EXT1
-  #define HARDWARE_EXT2
-  #define HARDWARE_EXT3
-  #define HARDWARE_EXT4
-#endif
-
 enum CalibratedAnalogs {
   CALIBRATED_STICK1,
   CALIBRATED_STICK2,
@@ -449,16 +410,12 @@ enum CalibratedAnalogs {
   CALIBRATED_POT3,
 #if defined(PCBX12S)
   CALIBRATED_SLIDER_FRONT_LEFT,
-  CALIBRATED_POT_EXT1 = CALIBRATED_SLIDER_FRONT_LEFT,
   CALIBRATED_SLIDER_FRONT_RIGHT,
-  CALIBRATED_POT_EXT2 = CALIBRATED_SLIDER_FRONT_RIGHT,
   CALIBRATED_SLIDER_REAR_LEFT,
   CALIBRATED_SLIDER_REAR_RIGHT,
 #else
   CALIBRATED_POT_EXT1,
   CALIBRATED_POT_EXT2,
-  CALIBRATED_POT_EXT3,
-  CALIBRATED_POT_EXT4,
   CALIBRATED_SLIDER_REAR_LEFT,
   CALIBRATED_SLIDER_REAR_RIGHT,
 #endif
@@ -595,16 +552,9 @@ void backlightEnable(uint8_t dutyCycle = 0);
 #else
 #define BACKLIGHT_LEVEL_MIN   46
 #endif
-#if defined(SIMU)
-#define BACKLIGHT_ENABLE()
-#define BACKLIGHT_DISABLE()
-#define isBacklightEnabled(...) true
-#else
-extern bool boardBacklightOn;
-#define BACKLIGHT_ENABLE()    {boardBacklightOn = true; backlightEnable(globalData.unexpectedShutdown ? BACKLIGHT_LEVEL_MAX : BACKLIGHT_LEVEL_MAX - currentBacklightBright);}
-#define BACKLIGHT_DISABLE()   {boardBacklightOn = false; backlightEnable(globalData.unexpectedShutdown ? BACKLIGHT_LEVEL_MAX : ((g_eeGeneral.blOffBright == BACKLIGHT_LEVEL_MIN) && (g_eeGeneral.backlightMode != e_backlight_mode_off)) ? 0 : g_eeGeneral.blOffBright);}
-bool isBacklightEnabled();
-#endif
+#define BACKLIGHT_ENABLE()    backlightEnable(globalData.unexpectedShutdown ? BACKLIGHT_LEVEL_MAX : BACKLIGHT_LEVEL_MAX - currentBacklightBright)
+#define BACKLIGHT_DISABLE()   backlightEnable(globalData.unexpectedShutdown ? BACKLIGHT_LEVEL_MAX : ((g_eeGeneral.blOffBright == BACKLIGHT_LEVEL_MIN) && (g_eeGeneral.backlightMode != e_backlight_mode_off)) ? 0 : g_eeGeneral.blOffBright)
+#define isBacklightEnabled()  true
 
 #if !defined(SIMU)
 void usbJoystickUpdate();
@@ -644,7 +594,6 @@ void audioConsumeCurrentBuffer();
 #define setSampleRate(freq)
 #else
 void setSampleRate(uint32_t frequency);
-#define audioWaitReady()
 #endif
 void setScaledVolume(uint8_t volume);
 void setVolume(uint8_t volume);
@@ -690,7 +639,7 @@ void sportUpdatePowerInit();
   #define DEBUG_BAUDRATE                  115200
   #define LUA_DEFAULT_BAUDRATE            115200
 #endif
-#if defined(AUX_SERIAL)
+#if defined(AUX_SERIAL_GPIO)
 extern uint8_t auxSerialMode;
 #if defined __cplusplus
 void auxSerialSetup(unsigned int baudrate, bool dma, uint16_t length = USART_WordLength_8b, uint16_t parity = USART_Parity_No, uint16_t stop = USART_StopBits_1);

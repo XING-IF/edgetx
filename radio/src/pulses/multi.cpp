@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -21,9 +20,6 @@
 
 #include "opentx.h"
 #include "multi.h"
-
-#include "io/multi_protolist.h"
-#include "telemetry/multi.h"
 
 // for the  MULTI protocol definition
 // see https://github.com/pascallanger/DIY-Multiprotocol-TX-Module
@@ -53,7 +49,7 @@ static void sendDSM(uint8_t moduleIdx);
 void multiPatchCustom(uint8_t moduleIdx)
 {
   if (g_model.moduleData[moduleIdx].multi.customProto) {
-    uint8_t type = g_model.moduleData[moduleIdx].getMultiProtocol() - 1;  // custom where starting at 1, etx list at 0
+    uint8_t type = g_model.moduleData[moduleIdx].getMultiProtocol() - 1;  // custom where starting at 1, otx list at 0
     int subtype = g_model.moduleData[moduleIdx].subType;
 
     g_model.moduleData[moduleIdx].multi.customProto = 0;
@@ -138,7 +134,7 @@ void setupPulsesMulti(uint8_t moduleIdx)
 {
   static int counter[2] = {0,0}; //TODO
   static uint8_t invert[2] = {0x00,        //internal
-#if defined(PCBTARANIS) || defined(PCBHORUS) || defined(PCBNV14)
+#if defined(PCBTARANIS) || defined(PCBHORUS)
     0x08        //external
 #else
     0x00	//external
@@ -146,30 +142,25 @@ void setupPulsesMulti(uint8_t moduleIdx)
   };
   uint8_t type=MULTI_NORMAL;
 
-  // not scanning protos &&  not spectrum analyser
-  if (getModuleMode(moduleIdx) == MODULE_MODE_NORMAL) {
-    // Failsafe packets
-    if (counter[moduleIdx] % 1000 == 0 &&
-        g_model.moduleData[moduleIdx].failsafeMode != FAILSAFE_NOT_SET &&
-        g_model.moduleData[moduleIdx].failsafeMode != FAILSAFE_RECEIVER) {
-      type |= MULTI_FAILSAFE;
-    }
-
-    counter[moduleIdx]++;
+  // Failsafe packets
+  if (counter[moduleIdx] % 1000 == 0 && g_model.moduleData[moduleIdx].failsafeMode != FAILSAFE_NOT_SET && g_model.moduleData[moduleIdx].failsafeMode != FAILSAFE_RECEIVER) {
+    type|=MULTI_FAILSAFE;
   }
 
   // Invert telemetry if needed
-  if (invert[moduleIdx] & 0x80 &&
-      !g_model.moduleData[moduleIdx].multi.disableTelemetry) {
+  if (invert[moduleIdx] & 0x80 && !g_model.moduleData[moduleIdx].multi.disableTelemetry) {
     if (getMultiModuleStatus(moduleIdx).isValid()) {
-      invert[moduleIdx] &= 0x08;  // Telemetry received, stop searching
-    } else if (counter[moduleIdx] % 100 == 0) {
+      invert[moduleIdx] &= 0x08;    // Telemetry received, stop searching
+    }
+    else if (counter[moduleIdx] % 100 == 0) {
       invert[moduleIdx] ^= 0x08;  // Try inverting telemetry
     }
   }
 
+  counter[moduleIdx]++;
+
   // Send header
-  sendFrameProtocolHeader(moduleIdx, type & MULTI_FAILSAFE);
+  sendFrameProtocolHeader(moduleIdx, type&MULTI_FAILSAFE);
 
   // Send channels
   if (type & MULTI_FAILSAFE)
@@ -178,11 +169,7 @@ void setupPulsesMulti(uint8_t moduleIdx)
     sendChannels(moduleIdx);
 
   // Multi V1.3.X.X -> Send byte 26, Protocol (bits 7 & 6), RX_Num (bits 5 & 4), invert, not used, disable telemetry, disable mapping
-  if ((moduleState[moduleIdx].mode == MODULE_MODE_SPECTRUM_ANALYSER)
-#if defined(MULTI_PROTOLIST)
-      || (moduleState[moduleIdx].mode == MODULE_MODE_GET_HARDWARE_INFO)
-#endif
-      ) {
+  if (moduleState[moduleIdx].mode == MODULE_MODE_SPECTRUM_ANALYSER) {
     sendMulti(moduleIdx, invert[moduleIdx] & 0x08);
   }
   else {
@@ -268,7 +255,7 @@ void sendChannels(uint8_t moduleIdx)
   }
 }
 
-void convertMultiProtocolToEtx(int *protocol, int *subprotocol)
+void convertMultiProtocolToOtx(int *protocol, int *subprotocol)
 {
   if (*protocol == 3 && *subprotocol == 0) {
     *protocol = MODULE_SUBTYPE_MULTI_FRSKY + 1;
@@ -312,7 +299,7 @@ void convertMultiProtocolToEtx(int *protocol, int *subprotocol)
     *protocol -= 1;
 }
 
-void convertEtxProtocolToMulti(int *protocol, int *subprotocol)
+void convertOtxProtocolToMulti(int *protocol, int *subprotocol)
 {
   // Special treatment for the FrSky entry...
   if (*protocol == MODULE_SUBTYPE_MULTI_FRSKY + 1) {
@@ -366,8 +353,7 @@ void sendFrameProtocolHeader(uint8_t moduleIdx, bool failsafe)
 
   uint8_t protoByte = 0;
 
-  uint8_t moduleMode = getModuleMode(moduleIdx);
-  if (moduleMode == MODULE_MODE_SPECTRUM_ANALYSER) {
+  if (moduleState[moduleIdx].mode == MODULE_MODE_SPECTRUM_ANALYSER) {
     sendMulti(moduleIdx, (uint8_t) 0x54);  // Header byte
     sendMulti(moduleIdx, (uint8_t) 54);    // Spectrum custom protocol
     sendMulti(moduleIdx, (uint8_t) 0);
@@ -375,23 +361,9 @@ void sendFrameProtocolHeader(uint8_t moduleIdx, bool failsafe)
     return;
   }
 
-#if defined(MULTI_PROTOLIST)
-  if (moduleMode == MODULE_MODE_GET_HARDWARE_INFO) {
-    sendMulti(moduleIdx, (uint8_t) 0x55); // Header byte
-    sendMulti(moduleIdx, (uint8_t) 0);    // PROTOLIST custom protocol
-    sendMulti(moduleIdx, (uint8_t) 0);
-
-    // proto array item
-    uint8_t protoIdx = MultiRfProtocols::instance(moduleIdx)->getScanProto();
-    TRACE("scan [%d]", protoIdx);
-    sendMulti(moduleIdx, protoIdx);
-    return;
-  }
-#endif
-
-  if (moduleMode == MODULE_MODE_BIND)
+  if (moduleState[moduleIdx].mode == MODULE_MODE_BIND)
     protoByte |= MULTI_SEND_BIND;
-  else if (moduleMode ==  MODULE_MODE_RANGECHECK)
+  else if (moduleState[moduleIdx].mode ==  MODULE_MODE_RANGECHECK)
     protoByte |= MULTI_SEND_RANGECHECK;
 
   // rfProtocol
@@ -407,7 +379,7 @@ void sendFrameProtocolHeader(uint8_t moduleIdx, bool failsafe)
   }
 
   // Special treatment for the FrSky entry...
-  convertEtxProtocolToMulti(&type, &subtype);
+  convertOtxProtocolToMulti(&type, &subtype);
 
   // Set the highest bit of option byte in AFHDS2A protocol to instruct MULTI to passthrough telemetry bytes instead
   // of sending Frsky D telemetry
@@ -511,4 +483,3 @@ void sendDSM(uint8_t moduleIdx)
   }
 }
 #endif
-

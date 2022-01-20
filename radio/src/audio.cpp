@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -21,10 +20,6 @@
 
 #include "opentx.h"
 #include <math.h>
-
-#if defined(LIBOPENUI)
-  #include "libopenui.h"
-#endif
 
 extern RTOS_MUTEX_HANDLE audioMutex;
 
@@ -212,18 +207,12 @@ const char * const audioFilenames[] = {
   "midstck2",
   "midstck3",
   "midstck4",
-#if defined(PCBFRSKY)
+#if defined(PCBTARANIS) || defined(PCBHORUS)
   "midpot1",
   "midpot2",
 #if defined(PCBX9E)
   "midpot3",
   "midpot4",
-#endif
-#if defined(PCBX10)
-  "midpot4",
-  "midpot5",
-  "midpot6",
-  "midpot7",
 #endif
   "midslid1",
   "midslid2",
@@ -310,7 +299,7 @@ char * getModelAudioPath(char * path)
 {
   strcpy(path, SOUNDS_PATH "/");
   strncpy(path+SOUNDS_PATH_LNG_OFS, currentLanguagePack->id, 2);
-  char * result = strcat_currentmodelname(path+sizeof(SOUNDS_PATH), 0);
+  char * result = strcat_currentmodelname(path+sizeof(SOUNDS_PATH));
   *result++ = '/';
   *result = '\0';
   return result;
@@ -328,7 +317,7 @@ void getSwitchAudioFile(char * filename, swsrc_t index)
 {
   char * str = getModelAudioPath(filename);
 
-#if defined(PCBFRSKY)
+#if defined(PCBTARANIS) || defined(PCBHORUS)
   if (index <= SWSRC_LAST_SWITCH) {
     div_t swinfo = switchInfo(index);
     *str++ = 'S';
@@ -356,7 +345,7 @@ void getLogicalSwitchAudioFile(char * filename, int index, unsigned int event)
 {
   char * str = getModelAudioPath(filename);
 
-#if defined(PCBFRSKY)
+#if defined(PCBTARANIS) || defined(PCBHORUS)
   *str++ = 'L';
   if (index >= 9) {
     div_t qr = div(index+1, 10);
@@ -538,15 +527,13 @@ void audioTask(void * pdata)
 #if defined(PCBX12S) || defined(RADIO_TX16S)
   // The audio amp needs ~2s to start
   RTOS_WAIT_MS(1000); // 1s
-#elif defined(PCBNV14)
-  while(!isAudioReady())
-  {
-    audioChipReset();
-    RTOS_WAIT_MS(1000);
-  }
 #endif
 
-  while (true) {
+  if (!globalData.unexpectedShutdown) {
+    AUDIO_HELLO();
+  }
+
+  while (1) {
     DEBUG_TIMER_SAMPLE(debugTimerAudioIterval);
     DEBUG_TIMER_START(debugTimerAudioDuration);
     audioQueue.wakeup();
@@ -1142,13 +1129,7 @@ void audioEvent(unsigned int index)
       case AU_POT3_MIDDLE:
       case AU_POT4_MIDDLE:
 #endif
-#if defined(PCBX10)
-      case AU_POT4_MIDDLE:
-      case AU_POT5_MIDDLE:
-      case AU_POT6_MIDDLE:
-      case AU_POT7_MIDDLE:
-#endif
-#if defined(PCBFRSKY)
+#if defined(PCBTARANIS) || defined(PCBHORUS)
       case AU_SLIDER1_MIDDLE:
       case AU_SLIDER2_MIDDLE:
 #if defined(PCBX9E)
@@ -1279,14 +1260,4 @@ void pushPrompt(uint16_t prompt, uint8_t id)
   }
   audioQueue.playFile(filename, 0, id);
 #endif
-}
-
-void onKeyPress()
-{
-  audioKeyPress();
-}
-
-void onKeyError()
-{
-  audioKeyError();
 }

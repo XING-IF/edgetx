@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -35,12 +34,7 @@ enum MemoryType {
 #define getBinaryPath(mt)  (FIRMWARES_PATH)
 #endif
 
-#if LCD_H == 480
-#define MAX_NAMES_ON_SCREEN   13
-#else
 #define MAX_NAMES_ON_SCREEN   6
-#endif
-
 #define MAX_BIN_FILES         (MAX_NAMES_ON_SCREEN+1)
 
 // Size of the block read when checking / writing BIN files
@@ -48,7 +42,7 @@ enum MemoryType {
 
 // File info struct while browsing files on SD card
 struct BinFileInfo {
-    TCHAR        name[FF_MAX_LFN + 1];
+    TCHAR        name[_MAX_LFN + 1];
     unsigned int size;
 };
 
@@ -78,7 +72,6 @@ struct VersionTag
 {
     char        flavour[8];
     const char* version;
-    const char* fork;
 };
 
 // Can be called right after openBinFile() to extract the version information

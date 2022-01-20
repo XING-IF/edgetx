@@ -1,24 +1,3 @@
-/*
- * Copyright (C) EdgeTX
- *
- * Based on code named
- *   opentx - https://github.com/opentx/opentx
- *   th9x - http://code.google.com/p/th9x
- *   er9x - http://code.google.com/p/er9x
- *   gruvin9x - http://code.google.com/p/gruvin9x
- *
- * License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- */
-
 #include "opentx.h"
 #include "../../common/arm/stm32/bootloader/boot.h"
 #include "../../common/arm/stm32/bootloader/bin_files.h"
@@ -27,7 +6,6 @@ extern MemoryType memoryType;
 
 void bootloaderInitScreen()
 {
-  lcdSetContrast(true);
 }
 
 static void bootloaderDrawMsg(unsigned int x, const char *str, uint8_t line, bool inverted)
@@ -48,12 +26,8 @@ void bootloaderDrawScreen(BootloaderState st, int opt, const char *str)
 
   if (st == ST_START) {
     lcdDrawText(3*FW, 2*FH, "Write Firmware", opt == 0 ? INVERS : 0);
-#if defined(EEPROM)
     lcdDrawText(3*FW, 3*FH, "Restore EEPROM", opt == 1 ? INVERS : 0);
     lcdDrawText(3*FW, 4*FH, "Exit", opt == 2 ? INVERS : 0);
-#else
-    lcdDrawText(3*FW, 3*FH, "Exit", opt == 1 ? INVERS : 0);
-#endif    
 
     lcdDrawText(LCD_W / 2, 5 * FH + FH / 2, STR_OR_PLUGIN_USB_CABLE, CENTERED);
 

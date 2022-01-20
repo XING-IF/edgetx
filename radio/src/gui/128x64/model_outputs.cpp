@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -67,6 +66,7 @@ enum MenuModelOutputsItems {
 #endif
 
 #define LIMITS_CURVE_POS          17*FW+1
+#define LIMITS_MIN_MAX_OFFSET 1000
 #define CONVERT_US_MIN_MAX(x) ((int16_t(x)*128)/25)
 #define MIN_MAX_ATTR          attr
 
@@ -105,8 +105,6 @@ void menuModelLimitsOne(event_t event)
   lcdDrawNumber(19*FW, 0, PPM_CH_CENTER(s_currIdx)+channelOutputs[s_currIdx]/2, RIGHT);
   lcdDrawText(19*FW, 0, STR_US);
 
-  uint8_t old_editMode = s_editMode;
-
   SUBMENU_NOTITLE(ITEM_OUTPUTONE_MAXROW, { 0, 0, 0, 0, 0, 0 , 0  /*, 0...*/ });
 
   int8_t sub = menuVerticalPosition;
@@ -116,12 +114,11 @@ void menuModelLimitsOne(event_t event)
     uint8_t i = k + menuVerticalOffset;
     uint8_t attr = (sub==i ? (s_editMode>0 ? BLINK|INVERS : INVERS) : 0);
     uint8_t active = (attr && s_editMode > 0) ;
-    int limit = (g_model.extendedLimits ? LIMIT_EXT_MAX : LIMIT_STD_MAX);
+    int limit = (g_model.extendedLimits ? LIMIT_EXT_MAX : 1000);
 
     switch (i) {
       case ITEM_OUTPUTONE_CH_NAME:
-        editSingleName(LIMITS_ONE_2ND_COLUMN, y, STR_NAME, ld->name,
-                       sizeof(ld->name), event, attr, old_editMode);
+        editSingleName(LIMITS_ONE_2ND_COLUMN, y, STR_NAME, ld->name, sizeof(ld->name), event, attr);
         break;
 
       case ITEM_OUTPUTONE_OFFSET:
@@ -137,7 +134,7 @@ void menuModelLimitsOne(event_t event)
         }
         lcdDrawNumber(LIMITS_ONE_2ND_COLUMN, y, MIN_MAX_DISPLAY(ld->min-LIMITS_MIN_MAX_OFFSET), attr|PREC1);
         if (active) {
-          ld->min = LIMITS_MIN_MAX_OFFSET + checkIncDec(event, ld->min-LIMITS_MIN_MAX_OFFSET, -limit, 0, EE_MODEL, nullptr, stops1000);
+          ld->min = LIMITS_MIN_MAX_OFFSET + checkIncDec(event, ld->min-LIMITS_MIN_MAX_OFFSET, -limit, 0, EE_MODEL, NULL, stops1000);
         }
         break;
 
@@ -149,7 +146,7 @@ void menuModelLimitsOne(event_t event)
         }
         lcdDrawNumber(LIMITS_ONE_2ND_COLUMN, y, MIN_MAX_DISPLAY(ld->max+LIMITS_MIN_MAX_OFFSET), attr|PREC1);
         if (active) {
-          ld->max = -LIMITS_MIN_MAX_OFFSET + checkIncDec(event, ld->max+LIMITS_MIN_MAX_OFFSET, 0, +limit, EE_MODEL, nullptr, stops1000);
+          ld->max = -LIMITS_MIN_MAX_OFFSET + checkIncDec(event, ld->max+LIMITS_MIN_MAX_OFFSET, 0, +limit, EE_MODEL, NULL, stops1000);
         }
         break;
 
@@ -184,7 +181,7 @@ void menuModelLimitsOne(event_t event)
 #if defined(PPM_LIMITS_SYMETRICAL)
       case ITEM_OUTPUTONE_SYMETRICAL:
         lcdDrawTextAlignedLeft(y, TR_LIMITS_HEADERS_SUBTRIMMODE);
-        lcdDrawChar(LIMITS_ONE_2ND_COLUMN, y, ld->symetrical ? '=' : '\206', attr);
+        lcdDrawChar(LIMITS_ONE_2ND_COLUMN, y, ld->symetrical ? '=' : '\306', attr);
         if (active) {
           CHECK_INCDEC_MODELVAR_ZERO(event, ld->symetrical, 1);
         }
@@ -270,7 +267,7 @@ void menuModelLimits(event_t event)
       putsChn(0, y, k+1, (sub==k) ? INVERS : 0);
     }
     else {
-      lcdDrawSizedText(0, y, ld->name, sizeof(ld->name), ((sub==k) ? INVERS : 0) | LEFT);
+      lcdDrawSizedText(0, y, ld->name, sizeof(ld->name), ((sub==k) ? INVERS : 0) | ZCHAR | LEFT);
     }
 
     for (uint8_t j=0; j<ITEM_OUTPUTS_COUNT; j++) {
@@ -333,7 +330,7 @@ void menuModelLimits(event_t event)
           break;
 
         case ITEM_OUTPUTS_SYMETRICAL:
-          lcdDrawChar(LCD_W-FW, y, ld->symetrical ? '=' : '\206', 0);
+          lcdDrawChar(LCD_W-FW, y, ld->symetrical ? '=' : '\306', 0);
           break;
       }
     }

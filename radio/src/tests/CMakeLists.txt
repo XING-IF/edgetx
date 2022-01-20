@@ -5,17 +5,17 @@ if(GTEST_INCDIR AND GTEST_SRCDIR AND Qt5Widgets_FOUND)
   target_include_directories(gtests-radio-lib PUBLIC ${GTEST_INCDIR} ${GTEST_INCDIR}/gtest ${GTEST_SRCDIR})
   add_definitions(-DSIMU -DGTESTS)
   remove_definitions(-DCLI)
-  set(TESTS_PATH ${RADIO_SRC_DIR}/tests)
+  set(TESTS_PATH ${RADIO_SRC_DIRECTORY}/tests)
   set(TESTS_BUILD_PATH ${CMAKE_CURRENT_BINARY_DIR})
-  configure_file(${RADIO_SRC_DIR}/tests/location.h.in ${CMAKE_CURRENT_BINARY_DIR}/location.h @ONLY)
+  configure_file(${RADIO_SRC_DIRECTORY}/tests/location.h.in ${CMAKE_CURRENT_BINARY_DIR}/location.h @ONLY)
   include_directories(${CMAKE_CURRENT_BINARY_DIR})
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS_DEBUG} -O0 -fsanitize=address")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS_DEBUG} -O0 ${WARNING_FLAGS} -fsanitize=address")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS_DEBUG} -O0")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS_DEBUG} -O0 ${WARNING_FLAGS}")
   use_cxx11()  # ensure gnu++11 in CXX_FLAGS with CMake < 3.1
 
   if(PCB STREQUAL X12S OR PCB STREQUAL X10)
 
-    set(EXTRACT_MODEL_FILES model_23_x12s model_23_x10 model_25_tx16s)
+    set(EXTRACT_MODEL_FILES model_22_x12s model_22_x10)
 
     foreach(model_file ${EXTRACT_MODEL_FILES})
       add_custom_command(
@@ -45,23 +45,14 @@ if(GTEST_INCDIR AND GTEST_SRCDIR AND Qt5Widgets_FOUND)
     set(RADIO_SRC ${RADIO_SRC} ../${FILE})
   endforeach()
 
-  file(GLOB TEST_SRC_FILES ${RADIO_SRC_DIR}/tests/*.cpp)
+  file(GLOB TEST_SRC_FILES ${RADIO_SRC_DIRECTORY}/tests/*.cpp)
 
   if(MINGW)
     # struct packing breaks on MinGW w/out -mno-ms-bitfields: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=52991 & http://stackoverflow.com/questions/24015852/struct-packing-and-alignment-with-mingw
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mno-ms-bitfields")
   endif()
 
-  add_executable(gtests-radio EXCLUDE_FROM_ALL
-    ${GTEST_SRC}
-    ${TEST_SRC_FILES}
-    ${CMAKE_CURRENT_SOURCE_DIR}/location.h
-    ${RADIO_SRC}
-    ../targets/simu/simpgmspace.cpp
-    ../targets/simu/simueeprom.cpp
-    ../targets/simu/simufatfs.cpp
-    ../targets/simu/simulcd.cpp
-    )
+  add_executable(gtests-radio EXCLUDE_FROM_ALL ${GTEST_SRC} ${TEST_SRC_FILES} ${CMAKE_CURRENT_SOURCE_DIR}/location.h ${RADIO_SRC} ../targets/simu/simpgmspace.cpp ../targets/simu/simueeprom.cpp ../targets/simu/simufatfs.cpp)
   add_dependencies(gtests-radio ${RADIO_DEPENDENCIES} ${FIRMWARE_DEPENDENCIES} gtests-radio-lib)
   if(PCB STREQUAL X12S OR PCB STREQUAL X10)
     add_dependencies(gtests-radio ${HORUS_MODEL_FILES})

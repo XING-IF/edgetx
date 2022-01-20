@@ -1,9 +1,8 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
- *   th9x - http://code.google.com/p/th9x
+ *   th9x - http://code.google.com/p/th9x 
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
  *
@@ -62,8 +61,5 @@ static inline tmr10ms_t get_tmr10ms()
 {
   return g_tmr10ms;
 }
-
-int16_t throttleSource2Source(int16_t thrSrc);
-int16_t source2ThrottleSource(int16_t src);
 
 #endif // _TIMERS_H_

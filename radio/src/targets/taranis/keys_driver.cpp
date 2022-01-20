@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -206,11 +205,11 @@ uint32_t switchState(uint8_t index)
 
   switch (index) {
 
-#if defined(RADIO_TX12) || defined(RADIO_ZORRO) || defined(RADIO_T8)
+#if defined(RADIO_TX12) || defined(RADIO_T8)
     ADD_2POS_CASE(A);
     ADD_3POS_CASE(B, 1);
     ADD_3POS_CASE(C, 2);
-#elif defined(RADIO_TLITE) || defined(RADIO_TPRO)
+#elif defined(RADIO_TLITE)
     ADD_3POS_CASE(A, 0);
     ADD_3POS_CASE(B, 1);
     ADD_2POS_CASE(C);
@@ -242,36 +241,17 @@ uint32_t switchState(uint8_t index)
     ADD_2POS_CASE(H);
     ADD_2POS_CASE(I);
     // no SWJ on XLITE
-#elif defined(RADIO_ZORRO)
-    ADD_2POS_CASE(D);
-    ADD_2POS_CASE(E);
-    ADD_2POS_CASE(F);
-    ADD_2POS_CASE(G);
-    ADD_2POS_CASE(H);
-#elif defined(RADIO_TX12) || defined(RADIO_ZORRO)
+#elif defined(RADIO_TX12)
     ADD_2POS_CASE(D);
     ADD_3POS_CASE(E, 4);
     ADD_3POS_CASE(F, 5);
-    ADD_2POS_CASE(I);
-    ADD_2POS_CASE(J);
 #elif defined(RADIO_T8)
     ADD_2POS_CASE(D);
 #elif defined(RADIO_TLITE)
     // Only 4 switches
-#elif defined(RADIO_TPRO)
-    ADD_2POS_CASE(E);
-    ADD_2POS_CASE(F);
-    ADD_2POS_CASE(G);
-    ADD_2POS_CASE(H);
-    ADD_2POS_CASE(I);
-    ADD_2POS_CASE(J);
 #elif defined(PCBX7)
     ADD_3POS_CASE(D, 3);
-#if defined(RADIO_T12)
-    ADD_2POS_CASE(G);
-#else
     ADD_2POS_CASE(F);
-#endif
     ADD_2POS_CASE(H);
     ADD_2POS_CASE(I);
     ADD_2POS_CASE(J);

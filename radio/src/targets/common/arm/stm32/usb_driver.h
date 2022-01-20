@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -19,10 +18,10 @@
  * GNU General Public License for more details.
  */
 
-#pragma once
+#ifndef OPENTX_USB_DRIVER_H
+#define OPENTX_USB_DRIVER_H
 
 #include <stdbool.h>
-#include <stdint.h>
 
 // USB driver
 enum usbMode {
@@ -37,20 +36,22 @@ enum usbMode {
 #endif
 };
 
-int  usbPlugged();
+int usbPlugged();
 void usbInit();
 void usbStart();
 void usbStop();
 bool usbStarted();
-
-int  getSelectedUsbMode();
+int getSelectedUsbMode();
 void setSelectedUsbMode(int mode);
 
-uint32_t usbSerialFreeSpace();
-void     usbSerialPutc(uint8_t c);
+void usbSerialPutc(uint8_t c);
 
-uint32_t usbSerialBaudRate(void);
+// Used in view_statistics.cpp
+#if defined(DEBUG) && !defined(BOOT)
+  extern uint16_t usbWraps;
+  extern uint16_t charsWritten;
+  extern volatile uint32_t APP_Rx_ptr_in;
+  extern volatile uint32_t APP_Rx_ptr_out;
+#endif
 
-void usbSerialSetReceiveDataCb(void (*cb)(uint8_t* buf, uint32_t len));
-void usbSerialSetCtrlLineStateCb(void (*cb)(uint16_t ctrlLineState));
-void usbSerialSetBaudRateCb(void (*cb)(uint32_t baud));
+#endif

@@ -109,13 +109,13 @@ void Joystick::processEvents()
   }
   for (i = 0; i < numButtons; i++) {
     Uint8 changed = SDL_JoystickGetButton(joystick, i);
-    if (changed != buttons[i]) {
+    if ((changed != buttons[i])) {
       emit buttonValueChanged(i, (bool) changed);
       buttons[i] = changed;
       buttonRepeatTimers[i].restart();
     }
     else if (autoRepeat && changed != 0) {
-      if (buttonRepeatTimers[i].elapsed() >= autoRepeatDelay) {
+      if ( buttonRepeatTimers[i].elapsed() >= autoRepeatDelay ) {
         emit buttonValueChanged(i, (bool) changed);
         buttons[i] = changed;
       }
@@ -126,7 +126,7 @@ void Joystick::processEvents()
   }
   for (i = 0; i < numHats; i++) {
     Uint8 changed = SDL_JoystickGetHat(joystick, i);
-    if (changed != hats[i]) {
+    if ( (changed != hats[i]) ) {
       emit hatValueChanged(i, changed);
       hats[i] = changed;
       hatRepeatTimers[i].restart();

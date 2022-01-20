@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -23,14 +22,10 @@
 #define _MYEEPROM_H_
 
 #include "datastructs.h"
-#include "libopenui/src/bitfield.h"
+#include "bitfield.h"
 
-#if defined(SDCARD_YAML)
-  #define EEPROM_VER           221
-#else
-  #define EEPROM_VER           220
-#endif
-#define FIRST_CONV_EEPROM_VER  219
+#define EEPROM_VER             219
+#define FIRST_CONV_EEPROM_VER  216
 
 #define GET_MODULE_PPM_POLARITY(idx)             g_model.moduleData[idx].ppm.pulsePol
 #define GET_TRAINER_PPM_POLARITY()               g_model.trainerData.pulsePol
@@ -38,13 +33,15 @@
 #define GET_MODULE_PPM_DELAY(idx)                (g_model.moduleData[idx].ppm.delay * 50 + 300)
 #define GET_TRAINER_PPM_DELAY()                  (g_model.trainerData.delay * 50 + 300)
 
-#if defined(HARDWARE_TRAINER_EXTERNAL_MODULE)
-  #define IS_TRAINER_EXTERNAL_MODULE()           (g_model.trainerData.mode == TRAINER_MODE_MASTER_SBUS_EXTERNAL_MODULE || g_model.trainerData.mode == TRAINER_MODE_MASTER_CPPM_EXTERNAL_MODULE)
+#if defined(PCBHORUS)
+  #define IS_TRAINER_EXTERNAL_MODULE()    false
+  #define HAS_WIRELESS_TRAINER_HARDWARE() (g_eeGeneral.auxSerialMode==UART_MODE_SBUS_TRAINER)
+#elif defined(PCBTARANIS)
+  #define IS_TRAINER_EXTERNAL_MODULE()      (g_model.trainerData.mode == TRAINER_MODE_MASTER_SBUS_EXTERNAL_MODULE || g_model.trainerData.mode == TRAINER_MODE_MASTER_CPPM_EXTERNAL_MODULE)
+  #define HAS_WIRELESS_TRAINER_HARDWARE()   (g_eeGeneral.auxSerialMode == UART_MODE_SBUS_TRAINER)
 #else
-  #define IS_TRAINER_EXTERNAL_MODULE()           false
+  #define IS_TRAINER_EXTERNAL_MODULE()    false
 #endif
-
-#define IS_TRAINER_AUX_SERIAL()                  (g_eeGeneral.auxSerialMode == UART_MODE_SBUS_TRAINER)
 
 #define IS_PLAY_FUNC(func)             ((func) >= FUNC_PLAY_SOUND && func <= FUNC_PLAY_VALUE)
 
@@ -81,20 +78,11 @@
 #define MODEL_GVAR_MIN(idx)            (CFN_GVAR_CST_MIN + g_model.gvars[idx].min)
 #define MODEL_GVAR_MAX(idx)            (CFN_GVAR_CST_MAX - g_model.gvars[idx].max)
 
-#if defined(PCBFRSKY) || defined(PCBNV14)
+#if defined(PCBTARANIS) || defined(PCBHORUS)
   #define SWITCH_CONFIG(x)            (bfGet<swconfig_t>(g_eeGeneral.switchConfig, 2*(x), 2))
-#if defined(FUNCTION_SWITCHES)
-  #define FSWITCH_CONFIG(x)           (bfGet<swconfig_t>(g_model.functionSwitchConfig, 2*(x), 2))
-  #define FSWITCH_GROUP(x)            (bfGet<swconfig_t>(g_model.functionSwitchGroup, 2*(x), 2))
-  #define IS_SWITCH_FS(x)             (x >= NUM_REGULAR_SWITCHES)
-  #define SWITCH_EXISTS(x)            (IS_SWITCH_FS(x)  ? true : (FSWITCH_CONFIG(x) != SWITCH_NONE))
-  #define IS_CONFIG_3POS(x)           (IS_SWITCH_FS(x)  ? (FSWITCH_CONFIG(x - NUM_REGULAR_SWITCHES) == SWITCH_3POS) : (SWITCH_CONFIG(x) == SWITCH_3POS))
-  #define IS_CONFIG_TOGGLE(x)         (IS_SWITCH_FS(x)  ? (FSWITCH_CONFIG(x - NUM_REGULAR_SWITCHES) == SWITCH_TOGGLE) : (SWITCH_CONFIG(x) == SWITCH_TOGGLE))
-#else
   #define SWITCH_EXISTS(x)            (SWITCH_CONFIG(x) != SWITCH_NONE)
   #define IS_CONFIG_3POS(x)           (SWITCH_CONFIG(x) == SWITCH_3POS)
   #define IS_CONFIG_TOGGLE(x)         (SWITCH_CONFIG(x) == SWITCH_TOGGLE)
-#endif
   #define SWITCH_WARNING_ALLOWED(x)   (SWITCH_EXISTS(x) && !IS_CONFIG_TOGGLE(x))
 #else
   #define IS_CONFIG_3POS(x)           IS_3POS(x)
@@ -105,7 +93,7 @@
 
 #define ALTERNATE_VIEW                0x10
 
-#if defined(COLORLCD)
+#if defined(PCBHORUS)
   #include "layout.h"
   #include "theme.h"
   #include "topbar.h"
@@ -122,35 +110,20 @@ enum CurveRefType {
   CURVE_REF_CUSTOM
 };
 
+#define MIN_EXPO_WEIGHT         -100
 #define EXPO_VALID(ed)          ((ed)->mode)
 #define EXPO_MODE_ENABLE(ed, v) (((v)<0 && ((ed)->mode&1)) || ((v)>=0 && ((ed)->mode&2)))
 
 #define limit_min_max_t     int16_t
 #define LIMIT_EXT_PERCENT   150
-#define LIMIT_STD_PERCENT   100
 #define LIMIT_EXT_MAX       (LIMIT_EXT_PERCENT*10)
-#define LIMIT_STD_MAX       (LIMIT_STD_PERCENT*10)
 #define PPM_CENTER_MAX      500
-#define LIMIT_MAX(lim)                                            \
-  (GV_IS_GV_VALUE(lim->max, -GV_RANGELARGE, GV_RANGELARGE)        \
-       ? GET_GVAR_PREC1(lim->max, -LIMIT_EXT_MAX, +LIMIT_EXT_MAX, \
-                        mixerCurrentFlightMode)                   \
-       : lim->max + LIMIT_STD_MAX)
-#define LIMIT_MIN(lim)                                            \
-  (GV_IS_GV_VALUE(lim->min, -GV_RANGELARGE, GV_RANGELARGE)        \
-       ? GET_GVAR_PREC1(lim->min, -LIMIT_EXT_MAX, +LIMIT_EXT_MAX, \
-                        mixerCurrentFlightMode)                   \
-       : lim->min - LIMIT_STD_MAX)
-#define LIMIT_OFS(lim)                                               \
-  (GV_IS_GV_VALUE(lim->offset, -LIMIT_STD_MAX, LIMIT_STD_MAX)        \
-       ? GET_GVAR_PREC1(lim->offset, -LIMIT_STD_MAX, +LIMIT_STD_MAX, \
-                        mixerCurrentFlightMode)                      \
-       : lim->offset)
+#define LIMIT_MAX(lim)      (GV_IS_GV_VALUE(lim->max, -GV_RANGELARGE, GV_RANGELARGE) ? GET_GVAR_PREC1(lim->max, -LIMIT_EXT_MAX, LIMIT_EXT_MAX, mixerCurrentFlightMode) : lim->max+1000)
+#define LIMIT_MIN(lim)      (GV_IS_GV_VALUE(lim->min, -GV_RANGELARGE, GV_RANGELARGE) ? GET_GVAR_PREC1(lim->min, -LIMIT_EXT_MAX, LIMIT_EXT_MAX, mixerCurrentFlightMode) : lim->min-1000)
+#define LIMIT_OFS(lim)      (GV_IS_GV_VALUE(lim->offset, -1000, 1000) ? GET_GVAR_PREC1(lim->offset, -1000, 1000, mixerCurrentFlightMode) : lim->offset)
 #define LIMIT_MAX_RESX(lim) calc1000toRESX(LIMIT_MAX(lim))
 #define LIMIT_MIN_RESX(lim) calc1000toRESX(LIMIT_MIN(lim))
 #define LIMIT_OFS_RESX(lim) calc1000toRESX(LIMIT_OFS(lim))
-
-#define LIMITS_MIN_MAX_OFFSET LIMIT_STD_MAX
 
 #define TRIM_OFF    (1)
 #define TRIM_ON     (0)
@@ -166,20 +139,13 @@ enum CurveRefType {
   #define TRIM_LAST TRIM_AIL
 #endif
 
-enum MixerMultiplex {
-  MLTPX_ADD  = 0,
-  MLTPX_MUL  = 1,
-  MLTPX_REPL = 2,
-};
-
-enum TrainerMultiplex {
-  TRAINER_OFF  = 0,
-  TRAINER_ADD  = 1,
-  TRAINER_REPL = 2,
-};
+#define MLTPX_ADD   0
+#define MLTPX_MUL   1
+#define MLTPX_REP   2
 
 #define GV1_SMALL       128
 #define GV1_LARGE       1024
+#define GV_RANGE_WEIGHT 500
 #define GV_RANGE_OFFSET 500
 #define DELAY_MAX       250 /* 25 seconds */
 #define SLOW_MAX        250 /* 25 seconds */
@@ -212,8 +178,8 @@ enum LogicalSwitchesFunctions {
   LS_FUNC_ADIFFEGREATER,
   LS_FUNC_TIMER,
   LS_FUNC_STICKY,
-  LS_FUNC_COUNT SKIP,
-  LS_FUNC_MAX SKIP = LS_FUNC_COUNT-1
+  LS_FUNC_COUNT,
+  LS_FUNC_MAX = LS_FUNC_COUNT-1
 };
 
 #define MAX_LS_DURATION 250 /*25s*/
@@ -237,7 +203,7 @@ enum TelemetrySensorFormula
   TELEM_FORMULA_CELL,
   TELEM_FORMULA_CONSUMPTION,
   TELEM_FORMULA_DIST,
-  TELEM_FORMULA_LAST SKIP = TELEM_FORMULA_DIST
+  TELEM_FORMULA_LAST = TELEM_FORMULA_DIST
 };
 
 enum SwashType {
@@ -246,12 +212,12 @@ enum SwashType {
   SWASH_TYPE_120X,
   SWASH_TYPE_140,
   SWASH_TYPE_90,
-  SWASH_TYPE_MAX SKIP = SWASH_TYPE_90
+  SWASH_TYPE_MAX = SWASH_TYPE_90
 };
 
-#define TRIM_EXTENDED_MAX 512
+#define TRIM_EXTENDED_MAX 500
 #define TRIM_EXTENDED_MIN (-TRIM_EXTENDED_MAX)
-#define TRIM_MAX 128
+#define TRIM_MAX 125
 #define TRIM_MIN (-TRIM_MAX)
 
 #define TRIMS_ARRAY_SIZE  8
@@ -260,12 +226,38 @@ enum SwashType {
 #define IS_MANUAL_RESET_TIMER(idx)     (g_model.timers[idx].persistent == 2)
 
 #if !defined(PCBSKY9X)
-#define TIMER_COUNTDOWN_START(x)       (g_model.timers[x].countdownStart == 0 ? 20 : (g_model.timers[x].countdownStart == 1 ? 30 : (g_model.timers[x].countdownStart == -1 ? 10 : 5)))
+#define TIMER_COUNTDOWN_START(x)       (g_model.timers[x].countdownStart > 0 ? 5 : 10 - g_model.timers[x].countdownStart * 10)
 #else
 #define TIMER_COUNTDOWN_START(x)       10
 #endif
 
 #include "pulses/modules_constants.h"
+
+enum ThrottleSources {
+  THROTTLE_SOURCE_THR,
+  THROTTLE_SOURCE_FIRST_POT,
+#if defined(PCBX9E)
+  THROTTLE_SOURCE_F1 = THROTTLE_SOURCE_FIRST_POT,
+  THROTTLE_SOURCE_F2,
+  THROTTLE_SOURCE_F3,
+  THROTTLE_SOURCE_F4,
+  THROTTLE_SOURCE_S1,
+  THROTTLE_SOURCE_S2,
+  THROTTLE_SOURCE_LS,
+  THROTTLE_SOURCE_RS,
+#elif defined(PCBTARANIS)
+  THROTTLE_SOURCE_S1 = THROTTLE_SOURCE_FIRST_POT,
+  THROTTLE_SOURCE_S2,
+  THROTTLE_SOURCE_S3,
+  THROTTLE_SOURCE_LS,
+  THROTTLE_SOURCE_RS,
+#else
+  THROTTLE_SOURCE_P1 = THROTTLE_SOURCE_FIRST_POT,
+  THROTTLE_SOURCE_P2,
+  THROTTLE_SOURCE_P3,
+#endif
+  THROTTLE_SOURCE_CH1,
+};
 
 enum DisplayTrims
 {

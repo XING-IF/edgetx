@@ -32,8 +32,6 @@
 #include "logicalswitches.h"
 #include "customfunctions.h"
 #include "telemetry.h"
-#include "colorcustomscreens.h"
-#include "telemetry_customscreens.h"
 #include "appdata.h"
 #include "compounditemmodels.h"
 
@@ -49,7 +47,6 @@ ModelEdit::ModelEdit(QWidget * parent, RadioData & radioData, int modelId, Firmw
 
   ui->setupUi(this);
   setWindowIcon(CompanionIcon("edit.png"));
-  setAttribute(Qt::WA_DeleteOnClose);
   restoreGeometry(g.modelEditGeo());
   ui->pushButton->setIcon(CompanionIcon("simulate.png"));
 
@@ -105,15 +102,6 @@ ModelEdit::ModelEdit(QWidget * parent, RadioData & radioData, int modelId, Firmw
   if (firmware->getCapability(Telemetry)) {
     addTab(new TelemetryPanel(this, model, generalSettings, firmware, sharedItemModels), tr("Telemetry"));
     s1.report("Telemetry");
-  }
-
-  if (Boards::getCapability(firmware->getBoard(), Board::HasColorLcd)) {
-    addTab(new ColorCustomScreensPanel(this, model, generalSettings, firmware, sharedItemModels), tr("Custom Screens"));
-    s1.report("ColorLcd Custom Screens");
-  }
-  else if (firmware->getCapability(TelemetryCustomScreens)) {
-    addTab(new TelemetryCustomScreensPanel(this, model, generalSettings, firmware, sharedItemModels), tr("Custom Screens"));
-    s1.report("Telemetry Custom Screens");
   }
 
   connect(setupPanel, &SetupPanel::extendedLimitsToggled, channelsPanel, &ChannelsPanel::refreshExtendedLimits);

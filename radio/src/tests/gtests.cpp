@@ -1,9 +1,8 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
- *   th9x - http://code.google.com/p/th9x
+ *   th9x - http://code.google.com/p/th9x 
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
  *
@@ -160,13 +159,12 @@ int main(int argc, char **argv)
 {
   QCoreApplication app(argc, argv);
   simuInit();
-  startEepromThread(nullptr);
+  StartEepromThread(nullptr);
 #if defined(EEPROM_SIZE)
   eeprom = (uint8_t *)malloc(EEPROM_SIZE);
 #endif
-#if !defined(COLORLCD)
   menuLevel = 0;
-#endif
+  menuHandlers[0] = menuMainView;
   InitGoogleTest(&argc, argv);
 
   // use --verbose option to revert to gtest's default output format

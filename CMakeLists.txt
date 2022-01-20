@@ -1,59 +1,41 @@
-project(EdgeTX)
+project(OpenTX)
 
 set(VERSION_MAJOR "2")
-set(VERSION_MINOR "7")
-set(VERSION_REVISION "0")
-set(CODENAME "dev")
+set(VERSION_MINOR "3")
+set(VERSION_REVISION "14")
+if(TEST_BUILD_WARNING OR ALLOW_NIGHTLY_BUILDS)
+  math(EXPR VERSION_REVISION "${VERSION_REVISION} + 1")
+endif()
 set(VERSION_SUFFIX $ENV{OPENTX_VERSION_SUFFIX})
 set(VERSION_FAMILY ${VERSION_MAJOR}.${VERSION_MINOR})
 set(VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_REVISION}${VERSION_SUFFIX})
+set(SDCARD_REVISION "0038")
+set(SDCARD_VERSION  ${VERSION_MAJOR}.${VERSION_MINOR}V${SDCARD_REVISION})
 
-cmake_minimum_required(VERSION 3.13)
-
-# Automatically link Qt executables to qtmain target on Windows
-# https://cmake.org/cmake/help/latest/policy/CMP0020.html
+cmake_minimum_required(VERSION 2.8)
 cmake_policy(SET CMP0020 NEW)
-
-# Allow keyword and plain target_link_libraries() signatures to be mixed
-# https://cmake.org/cmake/help/latest/policy/CMP0023.html
 cmake_policy(SET CMP0023 OLD)
-
-# Use @rpath in a target's install name on MacOS X for locating shared libraries
-# https://cmake.org/cmake/help/latest/policy/CMP0042.html
 if(POLICY CMP0042)
   cmake_policy(SET CMP0042 NEW)
 endif()
-
-# Ignore COMPILE_DEFINITIONS_<Config> properties (prefer generator expressions)
-# https://cmake.org/cmake/help/latest/policy/CMP0043.html
 if(POLICY CMP0043)
   cmake_policy(SET CMP0043 NEW)
 endif()
-
-# Only interpret if() arguments as variables or keywords when unquoted
-# https://cmake.org/cmake/help/latest/policy/CMP0054.html
 if(POLICY CMP0054)
   cmake_policy(SET CMP0054 NEW)
 endif()
-
-# Custom command byproducts must be explicit - for ninja
-# https://cmake.org/cmake/help/latest/policy/CMP0058.html
 if(POLICY CMP0058)
-  cmake_policy(SET CMP0058 NEW)
+  cmake_policy(SET CMP0058 NEW)  # for ninja
 endif()
 
 set(CMAKE_COLOR_MAKEFILE ON)
 
 set(CMAKE_CXX_STANDARD 11)
-add_definitions(-D_GLIBCXX_USE_C99=1) # proper to_string definition
 
 set(RADIO_DIRECTORY ${PROJECT_SOURCE_DIR}/radio)
-set(RADIO_SRC_DIR ${RADIO_DIRECTORY}/src)
+set(RADIO_SRC_DIRECTORY ${RADIO_DIRECTORY}/src)
 set(COMPANION_SRC_DIRECTORY ${PROJECT_SOURCE_DIR}/companion/src)
 set(SIMU_SRC_DIRECTORY ${COMPANION_SRC_DIRECTORY}/simulation)
-set(TOOLS_DIR ${PROJECT_SOURCE_DIR}/tools)
-set(UTILS_DIR ${PROJECT_SOURCE_DIR}/radio/util)
-set(LIBOPENUI_TOOLS_DIR ${RADIO_SRC_DIR}/thirdparty/libopenui/tools)
 
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
@@ -64,7 +46,7 @@ today(DATE)
 now(TIME)
 git_id(GIT_STR)
 
-message(STATUS "EdgeTX ${VERSION} @ ${GIT_STR}")
+message(STATUS "OpenTX ${VERSION} @${GIT_STR}")
 
 # options shared by all targets
 
@@ -83,20 +65,8 @@ if(WIN32)
   list(APPEND CMAKE_PREFIX_PATH "${WIN_EXTRA_LIBS_PATH}" "${WIN_EXTRA_LIBS_PATH}/SDL")  # hints for FindSDL
 endif()
 
-if(APPLE)
-  execute_process(COMMAND xcrun --show-sdk-path
-    OUTPUT_VARIABLE SDKROOT
-    ERROR_QUIET
-    OUTPUT_STRIP_TRAILING_WHITESPACE)
-
-  message("-- SDKROOT: ${SDKROOT}")
-  set(CMAKE_OSX_SYSROOT ${SDKROOT})
-  set(SYSROOT_ARG -isysroot ${SDKROOT})
-endif()
-
-
 # Python check
-find_package(PythonInterp 3 REQUIRED)
+find_package("PythonInterp")
 if(PYTHONINTERP_FOUND)
   message(STATUS "Python found, version: ${PYTHON_VERSION_STRING}")
   get_filename_component(PYTHON_DIRECTORY ${PYTHON_EXECUTABLE} DIRECTORY)
@@ -204,26 +174,24 @@ endif()
 endif(NOT DISABLE_COMPANION)
 
 # Check for a file that is typically left from a OpenTX 2.1 build and abort if found
-if (EXISTS ${RADIO_SRC_DIR}/stamp.h OR EXISTS ${RADIO_SRC_DIR}/translations/en.h)
+if (EXISTS ${RADIO_SRC_DIRECTORY}/stamp.h OR EXISTS ${RADIO_SRC_DIRECTORY}/translations/en.h)
    message(FATAL_ERROR "Source directory contains files leftover from a OpenTX 2.1 build. Please run `git clean -f` in source directory (Careful: Will remove any extra files) or do a new clean git checkout")
 endif()
 
 # Windows-specific includes and libs shared by sub-projects
 if(WIN32)
-  list(APPEND WIN_INCLUDE_DIRS "${RADIO_SRC_DIR}/thirdparty/windows/dirent")
+  list(APPEND WIN_INCLUDE_DIRS "${RADIO_SRC_DIRECTORY}/thirdparty/windows/dirent")
   if(MSVC)
-    list(APPEND WIN_INCLUDE_DIRS "${RADIO_SRC_DIR}/thirdparty/windows/msinttypes")
-    #set(WIN_PTHREAD_BASE_PATH "${WIN_EXTRA_LIBS_PATH}/pthreads/Pre-built.2" CACHE PATH "Where to find pthreads include and lib folders.")
-    #list(APPEND WIN_INCLUDE_DIRS "${WIN_PTHREAD_BASE_PATH}/include")
-    #find_file(WIN_PTHREAD_LIB pthreadVC2.lib PATHS "${WIN_PTHREAD_BASE_PATH}" PATH_SUFFIXES lib/x86 lib NO_DEFAULT_PATH)
-    #find_file(WIN_PTHREAD_DLL pthreadVC2.dll PATHS "${WIN_PTHREAD_BASE_PATH}" PATH_SUFFIXES lib/x86 lib dll/x86 dll NO_DEFAULT_PATH)
-    #if(WIN_PTHREAD_LIB)
-    #  list(APPEND WIN_LINK_LIBRARIES "${WIN_PTHREAD_LIB}")
-    #else()
-    #  message(SEND_ERROR "pthreadVC2.lib not found!")
-    #endif()
-    find_package(pthreads)
-    #target_link_libraries(mytarget pthreads)
+    list(APPEND WIN_INCLUDE_DIRS "${RADIO_SRC_DIRECTORY}/thirdparty/windows/msinttypes")
+    set(WIN_PTHREAD_BASE_PATH "${WIN_EXTRA_LIBS_PATH}/pthreads/Pre-built.2" CACHE PATH "Where to find pthreads include and lib folders.")
+    list(APPEND WIN_INCLUDE_DIRS "${WIN_PTHREAD_BASE_PATH}/include")
+    find_file(WIN_PTHREAD_LIB pthreadVC2.lib PATHS "${WIN_PTHREAD_BASE_PATH}" PATH_SUFFIXES lib/x86 lib NO_DEFAULT_PATH)
+    find_file(WIN_PTHREAD_DLL pthreadVC2.dll PATHS "${WIN_PTHREAD_BASE_PATH}" PATH_SUFFIXES lib/x86 lib dll/x86 dll NO_DEFAULT_PATH)
+    if(WIN_PTHREAD_LIB)
+      list(APPEND WIN_LINK_LIBRARIES "${WIN_PTHREAD_LIB}")
+    else()
+      message(SEND_ERROR "pthreadVC2.lib not found!")
+    endif()
   else()
     set(CMAKE_C_USE_RESPONSE_FILE_FOR_INCLUDES OFF)
     set(CMAKE_C_USE_RESPONSE_FILE_FOR_LIBRARIES OFF)
@@ -242,23 +210,23 @@ if(NOT GTEST_INCDIR OR NOT GTEST_SRCDIR)
 
   set(GTEST_VERSION 1.8.1)
 
-  set(GTEST_SRCDIR "${RADIO_SRC_DIR}/tests/googletest-release-${GTEST_VERSION}/googletest")
+  set(GTEST_SRCDIR "${RADIO_SRC_DIRECTORY}/tests/googletest-release-${GTEST_VERSION}/googletest")
   set(GTEST_INCDIR "${GTEST_SRCDIR}/include")
 
   set(GTEST_URL     "https://github.com/google/googletest/archive/release-${GTEST_VERSION}.tar.gz")
-  set(GTEST_ARCHIVE "${RADIO_SRC_DIR}/tests/gtest-${GTEST_VERSION}.tar.gz")
+  set(GTEST_ARCHIVE "${RADIO_SRC_DIRECTORY}/tests/gtest-${GTEST_VERSION}.tar.gz")
 
   if (NOT EXISTS "${GTEST_SRCDIR}")
     file(DOWNLOAD "${GTEST_URL}" ${GTEST_ARCHIVE} SHOW_PROGRESS)
     execute_process(
       COMMAND ${CMAKE_COMMAND} -E tar -xf ${GTEST_ARCHIVE}
-      WORKING_DIRECTORY ${RADIO_SRC_DIR}/tests)
+      WORKING_DIRECTORY ${RADIO_SRC_DIRECTORY}/tests)
     execute_process(
       COMMAND ${CMAKE_COMMAND} -E remove -f ${GTEST_ARCHIVE})
   endif()
 endif()
 
-add_subdirectory(${RADIO_SRC_DIR})
+add_subdirectory(${RADIO_SRC_DIRECTORY})
 
 add_custom_target(tests-radio
   COMMAND ${CMAKE_CURRENT_BINARY_DIR}/gtests-radio

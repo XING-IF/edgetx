@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -36,7 +35,7 @@ void menuGhostModuleConfig(event_t event)
 #if defined(ROTARY_ENCODER_NAVIGATION)
     case EVT_ROTARY_LEFT:
 #elif defined(KEYS_GPIO_REG_UP)
-      case EVT_KEY_BREAK(KEY_UP):
+    case EVT_KEY_BREAK(KEY_UP):
 #elif defined(KEYS_GPIO_REG_PLUS)
       case EVT_KEY_BREAK(KEY_PLUS):
 #endif

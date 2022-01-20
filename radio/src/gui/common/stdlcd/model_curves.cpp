@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -32,18 +31,18 @@
 void drawCurve(coord_t offset)
 {
   drawFunction(applyCurrentCurve, offset);
-
-  CurveHeader & crv = g_model.curves[s_currIdxSubMenu];
-  for (uint8_t i = 0; i < crv.points + 5; i++) {
+  
+  uint8_t i = 0;
+  do {
     point_t point = getPoint(i);
-    lcdDrawFilledRect(point.x - 1 - offset, point.y - 1, 3, 3, SOLID, FORCE); // do markup square
-  }
+    i++;
+    if (point.x == 0) break;
+    lcdDrawFilledRect(point.x-offset, point.y-1, 3, 3, SOLID, FORCE); // do markup square
+  } while (1);
 }
 
 void menuModelCurvesAll(event_t event)
 {
-  uint8_t old_editMode = s_editMode;
-
 #if defined(GVARS_IN_CURVES_SCREEN)
   SIMPLE_MENU(STR_MENUCURVES, menuTabModel, MENU_MODEL_CURVES, HEADER_LINE+MAX_CURVES+MAX_GVARS);
 #else
@@ -85,8 +84,8 @@ void menuModelCurvesAll(event_t event)
 #endif
     {
       drawStringWithIndex(0, y, STR_CV, k+1, attr);
-      CurveHeader & crv = g_model.curves[k];
-      editName(4*FW, y, crv.name, sizeof(crv.name), 0, 0, 0, old_editMode);
+      CurveData & crv = g_model.curves[k];
+      editName(4*FW, y, crv.name, sizeof(crv.name), 0, 0);
 #if LCD_W >= 212
       lcdDrawNumber(11*FW, y, 5+crv.points, LEFT);
       lcdDrawText(lcdLastRightPos, y, STR_PTS, 0);

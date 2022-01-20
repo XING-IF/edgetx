@@ -54,18 +54,14 @@ bool GeneralSettings::switchSourceAllowedTaranis(int index) const
 
 bool GeneralSettings::isPotAvailable(int index) const
 {
-  int numPots = Boards::getCapability(getCurrentBoard(), Board::Pots);
-  if (getCurrentFirmware()->getCapability(HasFlySkyGimbals))
-    numPots -= 2;
-
-  if (index < 0 || index >= numPots)
+  if (index < 0 || index > Boards::getCapability(getCurrentBoard(), Board::Pots))
     return false;
   return potConfig[index] != Board::POT_NONE;
 }
 
 bool GeneralSettings::isSliderAvailable(int index) const
 {
-  if (index < 0 || index >= Boards::getCapability(getCurrentBoard(), Board::Sliders))
+  if (index < 0 || index > Boards::getCapability(getCurrentBoard(), Board::Sliders))
     return false;
   return sliderConfig[index] != Board::SLIDER_NONE;
 }
@@ -115,9 +111,6 @@ GeneralSettings::GeneralSettings()
   setDefaultControlTypes(board);
 
   backlightMode = 3; // keys and sticks
-  backlightDelay = 2; // 2 * 5 = 10 secs
-  inactivityTimer = 10;
-
   // backlightBright = 0; // 0 = 100%
 
   if (IS_FAMILY_HORUS_OR_T16(board)) {
@@ -125,20 +118,15 @@ GeneralSettings::GeneralSettings()
   }
 
   speakerVolume = 12;
-  wavVolume = 2;
-  backgroundVolume = 1;
-
-  if (IS_TARANIS(board))
-    contrast = 25;
 
   if (IS_JUMPER_T16(board))
     strcpy(bluetoothName, "t16");
-  else if (IS_FLYSKY_NV14(board))
-    strcpy(bluetoothName, "nv14");
-  else if (IS_FAMILY_HORUS_OR_T16(board))
+  else if (IS_FAMILY_HORUS_OR_T16(board)) {
     strcpy(bluetoothName, "horus");
-  else if (IS_TARANIS_X9E(board) || IS_TARANIS_SMALL(board))
+  }
+  else if (IS_TARANIS_X9E(board) || IS_TARANIS_SMALL(board)) {
     strcpy(bluetoothName, "taranis");
+  }
 
   for (uint8_t i = 0; i < 4; i++) {
     trainer.mix[i].mode = TrainerMix::TRN_MIX_MODE_SUBST;
@@ -245,10 +233,11 @@ GeneralSettings::GeneralSettings()
     }
   }
 
-  internalModule = g.profile[g.sessionId()].defaultInternalModule();
-
-  const char * themeName = IS_FLYSKY_NV14(board) ? "FlySky" : "EdgeTX";
-  RadioTheme::init(themeName, themeData);
+  strcpy(themeName, "default");
+  ThemeOptionData option1 = { 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0 };
+  memcpy(&themeOptionValue[0], option1, sizeof(ThemeOptionData));
+  ThemeOptionData option2 = { 0x03, 0xe1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0 };
+  memcpy(&themeOptionValue[1], option2, sizeof(ThemeOptionData));
 }
 
 void GeneralSettings::setDefaultControlTypes(Board::Type board)
@@ -262,14 +251,10 @@ void GeneralSettings::setDefaultControlTypes(Board::Type board)
     return;
 
   // TODO: move to Boards, like with switches
-  if (IS_FAMILY_HORUS_OR_T16(board) && !IS_FLYSKY_NV14(board)) {
+  if (IS_FAMILY_HORUS_OR_T16(board)) {
     potConfig[0] = Board::POT_WITH_DETENT;
     potConfig[1] = Board::POT_MULTIPOS_SWITCH;
     potConfig[2] = Board::POT_WITH_DETENT;
-  }
-  else if (IS_FLYSKY_NV14(board)) {
-    potConfig[0] = Board::POT_WITHOUT_DETENT;
-    potConfig[1] = Board::POT_WITHOUT_DETENT;
   }
   else if (IS_TARANIS_XLITE(board)) {
     potConfig[0] = Board::POT_WITHOUT_DETENT;
@@ -278,10 +263,6 @@ void GeneralSettings::setDefaultControlTypes(Board::Type board)
   else if (IS_TARANIS_X7(board)) {
     potConfig[0] = Board::POT_WITHOUT_DETENT;
     potConfig[1] = Board::POT_WITH_DETENT;
-  }
-  else if(IS_RADIOMASTER_ZORRO(board)) {
-    potConfig[0] = Board::POT_WITHOUT_DETENT;
-    potConfig[1] = Board::POT_WITHOUT_DETENT;
   }
   else if (IS_FAMILY_T12(board)) {
     potConfig[0] = Board::POT_WITH_DETENT;
@@ -508,6 +489,20 @@ FieldRange GeneralSettings::getPPM_MultiplierRange()
   result.decimals = 1;
   result.step = 0.1;
   result.offset = 10;
+
+  return result;
+}
+
+//  static
+FieldRange GeneralSettings::getTxVoltageCalibrationRange()
+{
+  FieldRange result;
+
+  result.decimals = 1;
+  result.max = 9.9;
+  result.min = -result.max;
+  result.step = 0.1;
+  result.unit = tr("v");
 
   return result;
 }

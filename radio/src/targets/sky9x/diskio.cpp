@@ -1,9 +1,8 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
- *   th9x - http://code.google.com/p/th9x
+ *   th9x - http://code.google.com/p/th9x 
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
  *
@@ -82,24 +81,24 @@ uint32_t transSpeed;
 #if !defined(BOOT)
 static RTOS_MUTEX_HANDLE ioMutex;
 volatile int mutexCheck = 0;
-int ff_cre_syncobj (BYTE vol, FF_SYNC_t *mutex)
+int ff_cre_syncobj (BYTE vol, _SYNC_t *mutex)
 {
   *mutex = ioMutex;
   return 1;
 }
 
-int ff_req_grant (FF_SYNC_t mutex)
+int ff_req_grant (_SYNC_t mutex)
 {
   RTOS_LOCK_MUTEX(mutex);
   return 1;
 }
 
-void ff_rel_grant (FF_SYNC_t mutex)
+void ff_rel_grant (_SYNC_t mutex)
 {
   CoLeaveMutexSection(mutex);
 }
 
-int ff_del_syncobj (FF_SYNC_t mutex)
+int ff_del_syncobj (_SYNC_t mutex)
 {
   return 1;
 }

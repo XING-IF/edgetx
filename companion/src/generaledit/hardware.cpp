@@ -33,7 +33,6 @@
 
 constexpr char FIM_SWITCHTYPE2POS[]  {"Switch Type 2 Pos"};
 constexpr char FIM_SWITCHTYPE3POS[]  {"Switch Type 3 Pos"};
-constexpr char FIM_INTERNALMODULES[] {"Internal Modules"};
 
 HardwarePanel::HardwarePanel(QWidget * parent, GeneralSettings & generalSettings, Firmware * firmware, CompoundItemModelFactory * sharedItemModels):
   GeneralPanel(parent, generalSettings, firmware),
@@ -53,9 +52,6 @@ HardwarePanel::HardwarePanel(QWidget * parent, GeneralSettings & generalSettings
   int auxmodelid = editorItemModels->registerItemModel(GeneralSettings::auxSerialModeItemModel());
   int baudmodelid = editorItemModels->registerItemModel(GeneralSettings::telemetryBaudrateItemModel());
 
-  id = editorItemModels->registerItemModel(ModuleData::internalModuleItemModel());
-  tabFilteredModels->registerItemModel(new FilteredItemModel(editorItemModels->getItemModel(id)), FIM_INTERNALMODULES);
-
   grid = new QGridLayout(this);
   int count;
   int row = 0;
@@ -68,8 +64,7 @@ HardwarePanel::HardwarePanel(QWidget * parent, GeneralSettings & generalSettings
   }
 
   count = Boards::getCapability(board, Board::Pots);
-  count -= firmware->getCapability(HasFlySkyGimbals) ? 2 : 0;
-  if (count > 0) {
+  if (count) {
     for (int i = 0; i < count; i++) {
       addPot(i, row);
     }
@@ -90,6 +85,15 @@ HardwarePanel::HardwarePanel(QWidget * parent, GeneralSettings & generalSettings
     }
     addLine(row);
   }
+
+  addLabel(tr("Battery Offset"), row, 0);
+  AutoDoubleSpinBox *txVoltageCalibration = new AutoDoubleSpinBox(this);
+  FieldRange txVCRng = GeneralSettings::getTxVoltageCalibrationRange();
+  txVoltageCalibration->setDecimals(txVCRng.decimals);
+  txVoltageCalibration->setSingleStep(txVCRng.step);
+  txVoltageCalibration->setSuffix(txVCRng.unit);
+  txVoltageCalibration->setField(generalSettings.txVoltageCalibration);
+  addParams(row, txVoltageCalibration);
 
   if (Boards::getCapability(board, Board::HasRTC)) {
     addLabel(tr("RTC Battery Check"), row, 0);
@@ -131,24 +135,6 @@ HardwarePanel::HardwarePanel(QWidget * parent, GeneralSettings & generalSettings
     addParams(row, antennaMode);
   }
 
-  if (Boards::getCapability(board, Board::HasInternalModuleSupport)) {
-    m_internalModule = generalSettings.internalModule; // to permit undo
-    addLabel(tr("Internal module"), row, 0);
-    internalModule = new AutoComboBox(this);
-    internalModule->setModel(tabFilteredModels->getItemModel(FIM_INTERNALMODULES));
-    internalModule->setField(generalSettings.internalModule, this);
-    addParams(row, internalModule);
-    connect(internalModule, &AutoComboBox::currentDataChanged, this, &HardwarePanel::on_internalModuleChanged);
-  }
-
-  if (firmware->getCapability(HasTelemetryBaudrate)) {
-    addLabel(tr("Maximum Baud"), row, 0);
-    AutoComboBox *maxBaudRate = new AutoComboBox(this);
-    maxBaudRate->setModel(editorItemModels->getItemModel(baudmodelid));
-    maxBaudRate->setField(generalSettings.telemetryBaudrate, this);
-    addParams(row, maxBaudRate);
-  }
-
   if (firmware->getCapability(HasAuxSerialMode)) {
     QString lbl = "Serial Port";
     if (IS_RADIOMASTER_TX16S(board))
@@ -185,11 +171,19 @@ HardwarePanel::HardwarePanel(QWidget * parent, GeneralSettings & generalSettings
     addParams(row, sportPower);
   }
 
+  if (firmware->getCapability(HasTelemetryBaudrate)) {
+    addLabel(tr("Maximum Baud"), row, 0);
+    AutoComboBox *maxBaudRate = new AutoComboBox(this);
+    maxBaudRate->setModel(editorItemModels->getItemModel(baudmodelid));
+    maxBaudRate->setField(generalSettings.telemetryBaudrate, this);
+    addParams(row, maxBaudRate);
+  }
+
   if (firmware->getCapability(HastxCurrentCalibration)) {
     addLabel(tr("Current Offset"), row, 0);
     AutoSpinBox *txCurrentCalibration = new AutoSpinBox(this);
     FieldRange txCCRng = GeneralSettings::getTxCurrentCalibration();
-    txCurrentCalibration->setSuffix(txCCRng.unit);
+    txCurrentCalibration->setSuffix(txVCRng.unit);
     txCurrentCalibration->setField(generalSettings.txCurrentCalibration);
     addParams(row, txCurrentCalibration);
   }
@@ -202,21 +196,6 @@ HardwarePanel::HardwarePanel(QWidget * parent, GeneralSettings & generalSettings
 HardwarePanel::~HardwarePanel()
 {
   delete tabFilteredModels;
-}
-
-void HardwarePanel::on_internalModuleChanged()
-{
-  if (QMessageBox::warning(this, CPN_STR_APP_NAME,
-                       tr("Warning: Changing the Internal module may invalidate the internal module protocol of the models!"),
-                       QMessageBox::Cancel | QMessageBox::Ok, QMessageBox::Cancel) != QMessageBox::Ok) {
-
-    generalSettings.internalModule = m_internalModule;
-    internalModule->updateValue();
-  }
-  else {
-    m_internalModule = generalSettings.internalModule;
-    emit internalModuleChanged();
-  }
 }
 
 void HardwarePanel::addStick(int index, int & row)

@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -21,16 +20,6 @@
 
 #include "opentx.h"
 
-#include "hal/adc_driver.h"
-
-#if !defined(PCBX12S)
-  #include "../common/arm/stm32/stm32_hal_adc.h"
-  #define ADC_DRIVER stm32_hal_adc_driver
-#else
-  #include "x12s_adc_driver.h"
-  #define ADC_DRIVER x12s_adc_driver
-#endif
-
 #if defined(__cplusplus)
 extern "C" {
 #endif
@@ -40,12 +29,7 @@ extern "C" {
 }
 #endif
 
-extern void flysky_hall_stick_check_init(void);
-extern void flysky_hall_stick_init(void);
-extern void flysky_hall_stick_loop( void );
-
 HardwareOptions hardwareOptions;
-bool boardBacklightOn = false;
 
 void watchdogInit(unsigned int duration)
 {
@@ -124,14 +108,7 @@ void boardInit()
                          AUDIO_RCC_AHB1Periph |
                          KEYS_RCC_AHB1Periph |
                          ADC_RCC_AHB1Periph |
-#if defined(RADIO_FAMILY_T16)
-                         FLYSKY_HALL_RCC_AHB1Periph |
-#endif
-#if defined(IMU_LSM6DS33)
-                         I2C_B2_RCC_AHB1Periph |
-#else
                          AUX_SERIAL_RCC_AHB1Periph |
-#endif
                          AUX2_SERIAL_RCC_AHB1Periph |
                          TELEMETRY_RCC_AHB1Periph |
                          TRAINER_RCC_AHB1Periph |
@@ -140,7 +117,7 @@ void boardInit()
                          HAPTIC_RCC_AHB1Periph |
                          INTMODULE_RCC_AHB1Periph |
                          EXTMODULE_RCC_AHB1Periph |
-                         I2C_B1_RCC_AHB1Periph |
+                         I2C_RCC_AHB1Periph |
                          GPS_RCC_AHB1Periph |
                          SPORT_UPDATE_RCC_AHB1Periph |
                          TOUCH_INT_RCC_AHB1Periph |
@@ -152,21 +129,14 @@ void boardInit()
                          ADC_RCC_APB1Periph |
                          TIMER_2MHz_RCC_APB1Periph |
                          AUDIO_RCC_APB1Periph |
-#if defined(RADIO_FAMILY_T16)
-                         FLYSKY_HALL_RCC_APB1Periph |
-#endif
-#if defined(IMU_LSM6DS33)
-                         I2C_B2_RCC_APB1Periph |
-#else
                          AUX_SERIAL_RCC_APB1Periph |
-#endif
                          AUX2_SERIAL_RCC_APB1Periph |
                          TELEMETRY_RCC_APB1Periph |
                          TRAINER_RCC_APB1Periph |
                          AUDIO_RCC_APB1Periph |
                          INTMODULE_RCC_APB1Periph |
                          EXTMODULE_RCC_APB1Periph |
-                         I2C_B1_RCC_APB1Periph |
+                         I2C_RCC_APB1Periph |
                          MIXER_SCHEDULER_TIMER_RCC_APB1Periph |
                          GPS_RCC_APB1Periph |
                          BACKLIGHT_RCC_APB1Periph,
@@ -219,40 +189,12 @@ void boardInit()
   }
 #endif
 
+  adcInit();
   lcdInit();
   backlightInit();
 
-  globalData.flyskygimbals = false;
-#if defined(RADIO_FAMILY_T16) || defined(PCBNV14)
-  flysky_hall_stick_check_init();
-
-  // Wait 70ms for FlySky gimbals to respond. According to LA trace, minimally 23ms is required
-  for (uint8_t ui8 = 0; ui8 < 70; ui8++)
-  {
-      flysky_hall_stick_loop();
-      delay_ms(1);
-      if (globalData.flyskygimbals)
-      {
-          break;
-      }
-  }
-
-#endif
-
-  if (globalData.flyskygimbals)
-  {
-      flysky_hall_stick_init();
-  }
-
-  if (!adcInit(&ADC_DRIVER))
-      TRACE("adcInit failed");
-
-#if defined(IMU_LSM6DS33)
-  imu_lsm6ds33_init();
-#endif
-
   init2MhzTimer();
-  init1msTimer();
+  init5msTimer();
   usbInit();
   hapticInit();
 
@@ -318,26 +260,6 @@ void boardOff()
   RTC->BKP0R = SHUTDOWN_REQUEST;
 
   pwrOff();
-  
-  // We reach here only in forced power situations, such as hw-debugging with external power  
-  // Enter STM32 stop mode / deep-sleep
-  // Code snippet from ST Nucleo PWR_EnterStopMode example
-#define PDMode             0x00000000U
-#if defined(PWR_CR_MRUDS) && defined(PWR_CR_LPUDS) && defined(PWR_CR_FPDS)
-  MODIFY_REG(PWR->CR, (PWR_CR_PDDS | PWR_CR_LPDS | PWR_CR_FPDS | PWR_CR_LPUDS | PWR_CR_MRUDS), PDMode);
-#elif defined(PWR_CR_MRLVDS) && defined(PWR_CR_LPLVDS) && defined(PWR_CR_FPDS)
-  MODIFY_REG(PWR->CR, (PWR_CR_PDDS | PWR_CR_LPDS | PWR_CR_FPDS | PWR_CR_LPLVDS | PWR_CR_MRLVDS), PDMode);
-#else
-  MODIFY_REG(PWR->CR, (PWR_CR_PDDS| PWR_CR_LPDS), PDMode);
-#endif /* PWR_CR_MRUDS && PWR_CR_LPUDS && PWR_CR_FPDS */
-
-/* Set SLEEPDEEP bit of Cortex System Control Register */
-  SET_BIT(SCB->SCR, ((uint32_t)SCB_SCR_SLEEPDEEP_Msk));
-  
-  // To avoid HardFault at return address, end in an endless loop
-  while (1) {
-
-  }
 }
 
 #if defined (RADIO_TX16S)
@@ -350,11 +272,4 @@ uint16_t getBatteryVoltage()
 {
   int32_t instant_vbat = anaIn(TX_VOLTAGE);  // using filtered ADC value on purpose
   return (uint16_t)((instant_vbat * (1000 + g_eeGeneral.txVoltageCalibration)) / BATTERY_DIVIDER);
-}
-
-bool isBacklightEnabled()
-{
-  if(globalData.unexpectedShutdown)
-    return true;
-  return boardBacklightOn;
 }

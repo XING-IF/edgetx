@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -19,9 +18,10 @@
  * GNU General Public License for more details.
  */
 
-#pragma once
+#ifndef PULSES_AFHDS3_H_
+#define PULSES_AFHDS3_H_
 
-#include "libopenui/src/bitfield.h"
+#include "bitfield.h"
 #include "definitions.h"
 #include "dataconstants.h"
 #include "opentx_types.h"
@@ -84,7 +84,7 @@ struct Data
   uint32_t pulsesSize;
   uint16_t pulses[AFHDS_MAX_PULSES_TRANSITIONS];
   uint32_t total;
-#endif
+  #endif
 
   uint8_t frame_index;
   uint8_t crc;
@@ -94,25 +94,17 @@ struct Data
 
   void reset()
   {
-#if defined(EXTMODULE_USART) && defined(EXTMODULE_TX_INVERT_GPIO)
-#else
     pulsesSize = 0;
-#endif
   }
-
 #if defined(EXTMODULE_USART) && defined(EXTMODULE_TX_INVERT_GPIO)
   void sendByte(uint8_t b)
   {
-#if !defined(SIMU)
     *ptr++ = b;
-#endif
   }
-
   const uint8_t* getData()
   {
     return pulses;
   }
-
   void flush()
   {
   }
@@ -156,19 +148,14 @@ struct Data
     pulses[pulsesSize - 1] = 60000;
   }
 
-  const uint16_t * getData()
+  const uint16_t* getData()
   {
     return pulses;
   }
 #endif
-
-  uint32_t getSize() const
+  uint32_t getSize()
   {
-#if defined(EXTMODULE_USART) && defined(EXTMODULE_TX_INVERT_GPIO)
-    return ptr - pulses;
-#else
     return pulsesSize;
-#endif
   }
 };
 
@@ -224,7 +211,6 @@ enum DATA_TYPE
   MODULE_VERSION_DT,
   EMPTY_DT,
 };
-
 //enum used by command response -> translate to ModuleState
 enum MODULE_READY_E
 {
@@ -406,7 +392,7 @@ PACK(struct AfhdsFrame
   uint8_t command;
   uint8_t value;
 
-  AfhdsFrameData * GetData()
+  AfhdsFrameData* GetData()
   {
     return reinterpret_cast<AfhdsFrameData*>(&value);
   }
@@ -422,7 +408,7 @@ enum State
   IDLE
 };
 
-// one byte frames for request queue
+//one byte frames for request queue
 struct Frame
 {
   enum COMMAND command;
@@ -433,7 +419,7 @@ struct Frame
   uint8_t payloadSize;
 };
 
-// simple fifo implementation because Pulses is used as member of union and can not be non trivial type
+//simple fifo implementation because Pulses is used as member of union and can not be non trivial type
 struct CommandFifo
 {
   Frame commandFifo[8];
@@ -442,12 +428,12 @@ struct CommandFifo
 
   void clearCommandFifo();
 
-  inline uint32_t nextIndex(uint32_t idx) const
+  inline uint32_t nextIndex(uint32_t idx)
   {
     return (idx + 1) & (sizeof(commandFifo) / sizeof(commandFifo[0]) - 1);
   }
 
-  inline uint32_t prevIndex(uint32_t idx) const
+  inline uint32_t prevIndex(uint32_t idx)
   {
      if (idx == 0)
      {
@@ -501,7 +487,7 @@ class PulsesData: public Data, CommandFifo
     */
     void getPowerStatus(char* buffer) const;
 
-    RUN_POWER actualRunPower() const;
+    RUN_POWER actualRunPower();
 
     /**
     * Sends stop command to prevent any further module operations
@@ -542,9 +528,9 @@ class PulsesData: public Data, CommandFifo
     /**
     * Returns max power that currently can be set - use it to validate before synchronization of settings
     */
-    RUN_POWER getMaxRunPower() const;
+    RUN_POWER getMaxRunPower();
 
-    RUN_POWER getRunPower() const;
+    RUN_POWER getRunPower();
 
     bool isConnectedUnicast();
 
@@ -595,4 +581,4 @@ class PulsesData: public Data, CommandFifo
     ModuleVersion version;
 };
 } /* Namespace ahfds3 */
-
+#endif /* PULSES_AFHDS3_H_ */

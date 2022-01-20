@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -27,7 +26,7 @@ swsrc_t checkIncDecMovedSwitch(swsrc_t val)
   if (s_editMode>0) {
     swsrc_t swtch = getMovedSwitch();
     if (swtch) {
-#if defined(PCBFRSKY)
+#if defined(PCBTARANIS) || defined(PCBHORUS)
       div_t info = switchInfo(swtch);
       if (IS_CONFIG_TOGGLE(info.quot)) {
         if (info.rem != 0) {
@@ -56,7 +55,7 @@ int checkIncDecSelection = 0;
 void repeatLastCursorMove(event_t event)
 {
   if (CURSOR_MOVED_LEFT(event) || CURSOR_MOVED_RIGHT(event)) {
-    pushEvent(event);
+    putEvent(event);
   }
   else {
     menuHorizontalPosition = 0;
@@ -100,6 +99,17 @@ void onSourceLongEnterPress(const char * result)
   }
 }
 
+#if defined(NAVIGATION_HORUS)
+bool check_simple(event_t event, uint8_t curr, const MenuHandlerFunc *menuTab, uint8_t menuTabSize, int rowcount)
+{
+  return check(event, curr, menuTab, menuTabSize, NULL, 0, rowcount);
+}
+
+bool check_submenu_simple(event_t event, uint8_t rowcount)
+{
+  return check_simple(event, 0, NULL, 0, rowcount);
+}
+#else
 void check_submenu_simple(event_t event, uint8_t rowcount)
 {
   check_simple(event, 0, nullptr, 0, rowcount);
@@ -109,3 +119,4 @@ void check_simple(event_t event, uint8_t curr, const MenuHandlerFunc *menuTab, u
 {
   check(event, curr, menuTab, menuTabSize, 0, 0, rowcount);
 }
+#endif

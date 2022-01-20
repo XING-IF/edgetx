@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -19,7 +18,8 @@
  * GNU General Public License for more details.
  */
 
-#pragma once
+#ifndef OPENTX_MULTI_FIRMWARE_H
+#define OPENTX_MULTI_FIRMWARE_H
 
 #include "ff.h"
 
@@ -35,18 +35,15 @@
    For example: REM multi-stm-bcsid-01020176
 */
 
-class MultiFirmwareInformation
-{
+class MultiFirmwareInformation {
   public:
-    enum MultiFirmwareBoardType
-    {
+    enum MultiFirmwareBoardType {
       FIRMWARE_MULTI_AVR = 0,
       FIRMWARE_MULTI_STM,
       FIRMWARE_MULTI_ORX,
     };
 
-    enum MultiFirmwareTelemetryType
-    {
+    enum MultiFirmwareTelemetryType {
       FIRMWARE_MULTI_TELEM_NONE = 0,
       FIRMWARE_MULTI_TELEM_MULTI_STATUS,    // erSkyTX
       FIRMWARE_MULTI_TELEM_MULTI_TELEMETRY, // OpenTX
@@ -74,12 +71,12 @@ class MultiFirmwareInformation
 
     bool isMultiInternalFirmware() const
     {
-      return (boardType == FIRMWARE_MULTI_STM && optibootSupport && bootloaderCheck && telemetryType == FIRMWARE_MULTI_TELEM_MULTI_TELEMETRY);
+      return (boardType == FIRMWARE_MULTI_STM && optibootSupport == true && bootloaderCheck == true && telemetryType == FIRMWARE_MULTI_TELEM_MULTI_TELEMETRY);
     }
 
     bool isMultiExternalFirmware() const
     {
-      return ((telemetryInversion || boardType == FIRMWARE_MULTI_STM ) && optibootSupport && bootloaderCheck && telemetryType == FIRMWARE_MULTI_TELEM_MULTI_TELEMETRY);
+      return ((telemetryInversion == true || boardType == FIRMWARE_MULTI_STM ) && optibootSupport == true && bootloaderCheck == true && telemetryType == FIRMWARE_MULTI_TELEM_MULTI_TELEMETRY);
     }
 
     const char * readMultiFirmwareInformation(const char * filename);
@@ -104,24 +101,11 @@ class MultiFirmwareInformation
     const char * readV2Signature(const char * buffer);
 };
 
-enum MultiModuleType : short
-{
+enum MultiModuleType {
   MULTI_TYPE_MULTIMODULE = 0,
   MULTI_TYPE_ELRS,
 };
 
-class MultiDeviceFirmwareUpdate
-{
-  public:
-    explicit MultiDeviceFirmwareUpdate(ModuleIndex module, MultiModuleType type):
-      module(module),
-      type(type)
-    {
-    }
+bool multiFlashFirmware(uint8_t module, const char * filename, MultiModuleType type);
 
-    bool flashFirmware(const char * filename, ProgressHandler progressHandler);
-
-  protected:
-    ModuleIndex module;
-    MultiModuleType type;
-};
+#endif //OPENTX_MULTI_FIRMWARE_H

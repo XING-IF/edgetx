@@ -18,7 +18,8 @@
  * GNU General Public License for more details.
  */
 
-#pragma once
+#ifndef _MODELSLIST_H_
+#define _MODELSLIST_H_
 
 #include "eeprominterface.h"
 #include <QAbstractItemModel>
@@ -125,6 +126,7 @@ class TreeModel : public QAbstractItemModel
 
     QModelIndex getIndexForModel(const int modelIndex, QModelIndex parent = QModelIndex());
     QModelIndex getIndexForCategory(const int categoryIndex);
+    int getAvailableEEpromSize();
     int getModelIndex(const QModelIndex & index) const;
     int getCategoryIndex(const QModelIndex & index) const;
     int rowNumber(const QModelIndex & index = QModelIndex()) const;
@@ -151,6 +153,9 @@ class TreeModel : public QAbstractItemModel
 
     TreeItem * rootItem;
     RadioData * radioData;
+    int availableEEpromSize;
     MimeHeaderData mimeHeaderData;
     bool hasCategories;
 };
+
+#endif // _MODELSLIST_H_

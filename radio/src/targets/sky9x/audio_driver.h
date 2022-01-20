@@ -1,9 +1,8 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
- *   th9x - http://code.google.com/p/th9x
+ *   th9x - http://code.google.com/p/th9x 
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
  *
@@ -24,8 +23,8 @@
 
 #include <inttypes.h>
 
-void audioInit() ;
-void audioEnd() ;
+void audioInit( void ) ;
+void audioEnd( void ) ;
 void audioConsumeCurrentBuffer();
 #define audioDisableIrq()       __disable_irq()
 #define audioEnableIrq()        __enable_irq()
@@ -36,7 +35,5 @@ void setSampleRate( uint32_t frequency ) ;
 #define VOLUME_LEVEL_DEF  12
 
 void setScaledVolume(uint8_t volume);
-
-#define audioWaitReady()
 
 #endif // _AUDIO_DRIVER_H_

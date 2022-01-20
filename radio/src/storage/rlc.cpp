@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -22,8 +21,6 @@
 #include <inttypes.h>
 #include <assert.h>
 #include "debug.h"
-
-#include "rlc.h"
 
 #define CHECK_DST_SIZE() \
   if (cur-dst >= (int)dstsize) { \

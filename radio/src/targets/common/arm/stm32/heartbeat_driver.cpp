@@ -1,9 +1,8 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
- *   th9x - http://code.google.com/p/th9x
+ *   th9x - http://code.google.com/p/th9x 
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
  *
@@ -23,14 +22,10 @@
 #include "mixer_scheduler.h"
 
 #if defined(INTMODULE_HEARTBEAT_GPIO)
-
-#include "FreeRTOSConfig.h"
-
 volatile HeartbeatCapture heartbeatCapture;
 
 void init_intmodule_heartbeat()
 {
-  TRACE("init_intmodule_heartbeat");
   GPIO_InitTypeDef GPIO_InitStructure;
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
   GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
@@ -39,8 +34,7 @@ void init_intmodule_heartbeat()
   GPIO_InitStructure.GPIO_Pin = INTMODULE_HEARTBEAT_GPIO_PIN;
   GPIO_Init(INTMODULE_HEARTBEAT_GPIO, &GPIO_InitStructure);
 
-  SYSCFG_EXTILineConfig(INTMODULE_HEARTBEAT_EXTI_PortSource,
-                        INTMODULE_HEARTBEAT_EXTI_PinSource);
+  SYSCFG_EXTILineConfig(INTMODULE_HEARTBEAT_EXTI_PortSource, INTMODULE_HEARTBEAT_EXTI_PinSource);
 
   EXTI_InitTypeDef EXTI_InitStructure;
   EXTI_StructInit(&EXTI_InitStructure);
@@ -50,22 +44,16 @@ void init_intmodule_heartbeat()
   EXTI_InitStructure.EXTI_LineCmd = ENABLE;
   EXTI_Init(&EXTI_InitStructure);
 
-  NVIC_SetPriority(INTMODULE_HEARTBEAT_EXTI_IRQn,
-                   // Highest priority interrupt
-                   configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY);
-
+  NVIC_SetPriority(INTMODULE_HEARTBEAT_EXTI_IRQn, 0); // Highest priority interrupt
   NVIC_EnableIRQ(INTMODULE_HEARTBEAT_EXTI_IRQn);
   heartbeatCapture.valid = true;
 }
 
 void stop_intmodule_heartbeat()
 {
-  TRACE("stop_intmodule_heartbeat");
   heartbeatCapture.valid = false;
 
-#if !defined(INTMODULE_HEARTBEAT_REUSE_INTERRUPT_ROTARY_ENCODER)
-  NVIC_DisableIRQ(INTMODULE_HEARTBEAT_EXTI_IRQn);
-#endif
+  // Never disable EXTI_IRQ, just remove INTMODULE_HEARTBEAT_EXTI_LINE from configuration as EXTI can be reused
 
   EXTI_InitTypeDef EXTI_InitStructure;
   EXTI_StructInit(&EXTI_InitStructure);
@@ -79,7 +67,9 @@ void stop_intmodule_heartbeat()
 void check_intmodule_heartbeat()
 {
   if (EXTI_GetITStatus(INTMODULE_HEARTBEAT_EXTI_LINE) != RESET) {
-#if !defined(INTMODULE_USART)
+#if defined(INTMODULE_USART)
+    nextMixerTime[INTERNAL_MODULE] = RTOS_GET_MS();
+#else
     heartbeatCapture.timestamp = getTmr2MHz();
 #endif
 #if defined(DEBUG_LATENCY)
@@ -88,6 +78,7 @@ void check_intmodule_heartbeat()
     EXTI_ClearITPendingBit(INTMODULE_HEARTBEAT_EXTI_LINE);
 
     mixerSchedulerResetTimer();
+
     mixerSchedulerISRTrigger();
   }
 }
@@ -96,9 +87,11 @@ void check_intmodule_heartbeat()
 #if defined(INTMODULE_HEARTBEAT) && !defined(INTMODULE_HEARTBEAT_REUSE_INTERRUPT_ROTARY_ENCODER)
 extern "C" void INTMODULE_HEARTBEAT_EXTI_IRQHandler()
 {
+  // Check as first because it is the most critical one
+#if defined(TELEMETRY_EXTI_REUSE_INTERRUPT_INTMODULE_HEARTBEAT)
+  check_telemetry_exti();
+#endif
+
   check_intmodule_heartbeat();
-  #if defined(TELEMETRY_EXTI_REUSE_INTERRUPT_INTMODULE_HEARTBEAT)
-    check_telemetry_exti();
-  #endif
 }
 #endif

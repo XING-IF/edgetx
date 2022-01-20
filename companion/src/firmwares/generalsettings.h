@@ -25,7 +25,6 @@
 #include "customfunctiondata.h"
 #include "rawsource.h"
 #include "datahelpers.h"
-#include "customisation_data.h"
 
 #include <QtCore>
 
@@ -95,6 +94,7 @@ constexpr int OWNER_NAME_LEN          {10};
 constexpr int BLUETOOTH_NAME_LEN      {10};
 constexpr int TTS_LANGUAGE_LEN        {2};
 constexpr int HARDWARE_NAME_LEN       {3};
+constexpr int THEME_NAME_LEN          {8};
 constexpr int REGISTRATION_ID_LEN     {8};
 
 class GeneralSettings {
@@ -161,7 +161,6 @@ class GeneralSettings {
     int vBatMin;
     int vBatMax;
     int backlightMode;
-    unsigned int internalModule;  // Introducted in EdgeTX 2.6 yaml only
     TrainerData trainer;
     unsigned int view;    // main screen view // TODO enum
     bool disableThrottleWarning;
@@ -232,17 +231,18 @@ class GeneralSettings {
     char switchName[CPN_MAX_SWITCHES][HARDWARE_NAME_LEN + 1];
     unsigned int switchConfig[CPN_MAX_SWITCHES];
     char stickName[CPN_MAX_STICKS][HARDWARE_NAME_LEN + 1];
-    char potName[CPN_MAX_POTS][HARDWARE_NAME_LEN + 1];
-    unsigned int potConfig[CPN_MAX_POTS];
+    char potName[CPN_MAX_KNOBS][HARDWARE_NAME_LEN + 1];
+    unsigned int potConfig[CPN_MAX_KNOBS];
     char sliderName[CPN_MAX_SLIDERS][HARDWARE_NAME_LEN + 1];
     unsigned int sliderConfig[CPN_MAX_SLIDERS];
 
-    RadioTheme::ThemeData themeData;
+    char themeName[THEME_NAME_LEN + 1];
+    typedef uint8_t ThemeOptionData[8 + 1];
+    ThemeOptionData themeOptionValue[5];
 
     char registrationId[REGISTRATION_ID_LEN + 1];
     int gyroMax;
     int gyroOffset;
-    int uartSampleMode;
 
     int pwrOnSpeed;
     int pwrOffSpeed;
@@ -261,6 +261,7 @@ class GeneralSettings {
     static QString auxSerialModeToString(int value);
     static QString telemetryBaudrateToString(int value);
     static FieldRange getPPM_MultiplierRange();
+    static FieldRange getTxVoltageCalibrationRange();
     static FieldRange getTxCurrentCalibration();
     static AbstractStaticItemModel * antennaModeItemModel();
     static AbstractStaticItemModel * bluetoothModeItemModel();

@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -52,9 +51,9 @@ void drawStartupAnimation(uint32_t duration, uint32_t totalDuration)
   lcdClear();
 
   if (index == 0)
-    lcdDrawRleBitmap((LCD_W - ANIMATIONS_BITMAP_WIDTH) / 2, (LCD_H - ANIMATIONS_BITMAP_HEIGHT) / 2, bmp_lock, 0, ANIMATIONS_BITMAP_WIDTH);
+    lcdDrawBitmap((LCD_W - ANIMATIONS_BITMAP_WIDTH) / 2, (LCD_H - ANIMATIONS_BITMAP_HEIGHT) / 2, bmp_lock, 0, ANIMATIONS_BITMAP_WIDTH);
   else
-    lcdDrawRleBitmap((LCD_W - ANIMATIONS_BITMAP_WIDTH) / 2, (LCD_H - ANIMATIONS_BITMAP_HEIGHT) / 2, bmp_startup, (index - 1) * ANIMATIONS_BITMAP_WIDTH, ANIMATIONS_BITMAP_WIDTH);
+    lcdDrawBitmap((LCD_W - ANIMATIONS_BITMAP_WIDTH) / 2, (LCD_H - ANIMATIONS_BITMAP_HEIGHT) / 2, bmp_startup, (index - 1) * ANIMATIONS_BITMAP_WIDTH, ANIMATIONS_BITMAP_WIDTH);
 
   lcdRefresh();
 }
@@ -69,7 +68,7 @@ void drawShutdownAnimation(uint32_t duration, uint32_t totalDuration, const char
   lcdRefreshWait();
   lcdClear();
 
-  lcdDrawRleBitmap((LCD_W - ANIMATIONS_BITMAP_WIDTH) / 2, (LCD_H - ANIMATIONS_BITMAP_HEIGHT) / 2, bmp_shutdown, (3 - index) * ANIMATIONS_BITMAP_WIDTH, ANIMATIONS_BITMAP_WIDTH);
+  lcdDrawBitmap((LCD_W - ANIMATIONS_BITMAP_WIDTH) / 2, (LCD_H - ANIMATIONS_BITMAP_HEIGHT) / 2, bmp_shutdown, (3 - index) * ANIMATIONS_BITMAP_WIDTH, ANIMATIONS_BITMAP_WIDTH);
   if (message) {
     lcdDrawText((LCD_W - getTextWidth(message)) / 2, LCD_H - 2*FH, message);
   }
@@ -81,7 +80,7 @@ void drawSleepBitmap()
 {
   lcdRefreshWait();
   lcdClear();
-  lcdDrawRleBitmap((LCD_W - ANIMATIONS_BITMAP_WIDTH) / 2, (LCD_H - ANIMATIONS_BITMAP_HEIGHT) / 2, bmp_sleep, 0);
+  lcdDrawBitmap((LCD_W - ANIMATIONS_BITMAP_WIDTH) / 2, (LCD_H - ANIMATIONS_BITMAP_HEIGHT) / 2, bmp_sleep, 0);
   lcdRefresh();
   lcdRefreshWait();
 }

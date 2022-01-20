@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -38,8 +37,6 @@ inline void drawTimer(coord_t x, coord_t y, int32_t tme, LcdFlags att = 0)
 {
   drawTimer(x, y, tme, att, att);
 }
-
-void drawFlightMode(coord_t x, coord_t y, int8_t idx, LcdFlags att = 0);
 
 void drawStartupAnimation(uint32_t duration, uint32_t totalDuration);
 void drawShutdownAnimation(uint32_t duration, uint32_t totalDuration, const char * message);

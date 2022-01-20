@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -22,10 +21,7 @@
 #include <inttypes.h>
 #include <string.h>
 #include "opentx.h"
-#include "../timers.h"
-
-#include "storage/eeprom_common.h"
-#include "storage/eeprom_rlc.h"
+#include "timers.h"
 #include "conversions/conversions.h"
 
 uint8_t   s_write_err = 0;    // error reasons
@@ -157,7 +153,6 @@ void eepromCheck()
   ENABLE_SYNC_WRITE(false);
 }
 
-#if !defined(SDCARD_RAW) && !defined(SDCARD_YAML)
 void storageFormat()
 {
   ENABLE_SYNC_WRITE(true);
@@ -183,7 +178,6 @@ void storageFormat()
 
   ENABLE_SYNC_WRITE(false);
 }
-#endif
 
 bool eepromOpen()
 {
@@ -449,7 +443,7 @@ bool RlcFile::copy(uint8_t i_fileDst, uint8_t i_fileSrc)
   return true;
 }
 
-#if defined(SDCARD) && !defined(SDCARD_RAW) && !defined(SDCARD_YAML)
+#if defined(SDCARD)
 const char * eeBackupModel(uint8_t i_fileSrc)
 {
   char * buf = reusableBuffer.modelsel.mainname;
@@ -471,11 +465,13 @@ const char * eeBackupModel(uint8_t i_fileSrc)
 
   uint8_t i = sizeof(MODELS_PATH)+sizeof(g_model.header.name)-1;
   uint8_t len = 0;
-  while (i > sizeof(MODELS_PATH)-1) {
+  while (i>sizeof(MODELS_PATH)-1) {
     if (!len && buf[i])
       len = i+1;
     if (len) {
-      if (!buf[i])
+      if (buf[i])
+        buf[i] = zchar2char(buf[i]);
+      else
         buf[i] = '_';
     }
     i--;
@@ -508,7 +504,7 @@ const char * eeBackupModel(uint8_t i_fileSrc)
   EFile theFile2;
   theFile2.openRd(FILE_MODEL(i_fileSrc));
 
-  *(uint32_t*)&buf[0] = ETX_FOURCC;
+  *(uint32_t*)&buf[0] = OTX_FOURCC;
   buf[4] = g_eeGeneral.version;
   buf[5] = 'M';
   *(uint16_t*)&buf[6] = eeModelSize(i_fileSrc);
@@ -561,7 +557,7 @@ const char * eeRestoreModel(uint8_t i_fileDst, char *model_name)
   }
 
   uint8_t version = (uint8_t)buf[4];
-  if (*(uint32_t*)&buf[0] != ETX_FOURCC || version < FIRST_CONV_EEPROM_VER || version > EEPROM_VER || buf[5] != 'M') {
+  if (*(uint32_t*)&buf[0] != OTX_FOURCC || version < FIRST_CONV_EEPROM_VER || version > EEPROM_VER || buf[5] != 'M') {
     f_close(&g_oLogFile);
     return STR_INCOMPATIBLE;
   }
@@ -600,7 +596,7 @@ const char * eeRestoreModel(uint8_t i_fileDst, char *model_name)
 
   f_close(&g_oLogFile);
 
-#if defined(STORAGE_CONVERSIONS)
+#if defined(EEPROM_CONVERSIONS)
   if (version < EEPROM_VER) {
     storageCheck(true);
     eeConvertModel(i_fileDst, version);
@@ -746,48 +742,19 @@ void RlcFile::flush()
   ENABLE_SYNC_WRITE(false);
 }
 
-static uint16_t eeLoadData(uint8_t idx, uint8_t* data, unsigned size)
-{
-  memset(data, 0, size);
-  theFile.openRlc(idx);
-  return theFile.readRlc(data, size);
-}
-
-static void eeWriteData(uint8_t idx, uint8_t typ, uint8_t* data,
-                        unsigned size, bool immediately)
-{
-  theFile.writeRlc(idx, typ, data, size, immediately);
-}
-
 // For conversions ...
-void eeWriteGeneralSettingData(uint8_t* data, unsigned size, bool immediately)
-{
-  eeWriteData(FILE_GENERAL, FILE_TYP_GENERAL, data, size, immediately);
-}
-
-uint16_t eeLoadGeneralSettingsData(uint8_t* data, unsigned size)
-{
-  return eeLoadData(FILE_GENERAL, data, size);
-}
-
 uint16_t eeLoadGeneralSettingsData()
 {
-  return eeLoadGeneralSettingsData((uint8_t*)&g_eeGeneral, sizeof(g_eeGeneral));
-}
-
-void eeWriteModelData(uint8_t index, uint8_t* data, unsigned size, bool immediately)
-{
-  eeWriteData(FILE_MODEL(index), FILE_TYP_MODEL, data, size, immediately);
-}
-
-uint16_t eeLoadModelData(uint8_t index, uint8_t* data, unsigned size)
-{
-  return eeLoadData(FILE_MODEL(index), data, size);
+  memset(&g_eeGeneral, 0, sizeof(g_eeGeneral));
+  theFile.openRlc(FILE_GENERAL);
+  return theFile.readRlc((uint8_t*)&g_eeGeneral, sizeof(g_eeGeneral));
 }
 
 uint16_t eeLoadModelData(uint8_t index)
 {
-  return eeLoadModelData(index, (uint8_t*)&g_model, sizeof(g_model));
+  memset(&g_model, 0, sizeof(g_model));
+  theFile.openRlc(FILE_MODEL(index));
+  return theFile.readRlc((uint8_t*)&g_model, sizeof(g_model));
 }
 
 bool eeLoadGeneral(bool allowFixes)
@@ -837,7 +804,7 @@ bool eeLoadGeneral(bool allowFixes)
   }
 #endif
 
-#if defined(STORAGE_CONVERSIONS)
+#if defined(EEPROM_CONVERSIONS)
   if (g_eeGeneral.version != EEPROM_VER) {
     TRACE("EEPROM version %d instead of %d", g_eeGeneral.version, EEPROM_VER);
     if (!allowFixes)
@@ -861,16 +828,11 @@ void eeLoadModelName(uint8_t id, char *name)
   }
 }
 
-#if defined(SDCARD_RAW) || defined(SDCARD_YAML)
-bool eeModelExistsRlc(uint8_t id)
-#else
 bool eeModelExists(uint8_t id)
-#endif
 {
   return EFile::exists(FILE_MODEL(id));
 }
 
-#if !defined(SDCARD_RAW) && !defined(SDCARD_YAML)
 void storageCheck(bool immediately)
 {
   if (immediately) {
@@ -890,7 +852,6 @@ void storageCheck(bool immediately)
     theFile.writeRlc(FILE_MODEL(g_eeGeneral.currModel), FILE_TYP_MODEL, (uint8_t*)&g_model, sizeof(g_model), immediately);
   }
 }
-#endif
 
 void eeLoadModelHeader(uint8_t id, ModelHeader *header)
 {

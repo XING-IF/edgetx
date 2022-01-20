@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -24,9 +23,6 @@
 
 #if defined(LUA)
 
-// prevent C++ code to be included from lua.h
-#include "rtos.h"
-
 extern "C" {
   #include <lua.h>
   #include <lauxlib.h>
@@ -34,9 +30,6 @@ extern "C" {
   #include <lrotable.h>
   #include <lgc.h>
 }
-
-#include "dataconstants.h"
-#include "opentx_types.h"
 
 #ifndef LUA_SCRIPT_LOAD_MODE
   // Can force loading of binary (.luac) or plain-text (.lua) versions of scripts specifically, and control
@@ -54,43 +47,32 @@ extern Fifo<uint8_t, LUA_FIFO_SIZE> * luaRxFifo;
 #endif
 
 extern lua_State * lsScripts;
-
-extern bool luaLcdAllowed;
-
-#define EVENT_BUFFER_SIZE 4
-extern event_t events[EVENT_BUFFER_SIZE];
-
-#if defined(COLORLCD)
 extern lua_State * lsWidgets;
+extern bool luaLcdAllowed;
+#if defined(COLORLCD)
 extern uint32_t luaExtraMemoryUsage;
-void luaInitThemesAndWidgets();
 #endif
 
 void luaInit();
-void luaEmptyEventBuffer();
-
+void luaInitThemesAndWidgets();
 #define LUA_INIT_THEMES_AND_WIDGETS()  luaInitThemesAndWidgets()
+
 #define lua_registernumber(L, n, i)    (lua_pushnumber(L, (i)), lua_setglobal(L, (n)))
 #define lua_registerint(L, n, i)       (lua_pushinteger(L, (i)), lua_setglobal(L, (n)))
 #define lua_pushtablenil(L, k)         (lua_pushstring(L, (k)), lua_pushnil(L), lua_settable(L, -3))
 #define lua_pushtableboolean(L, k, v)  (lua_pushstring(L, (k)), lua_pushboolean(L, (v)), lua_settable(L, -3))
 #define lua_pushtableinteger(L, k, v)  (lua_pushstring(L, (k)), lua_pushinteger(L, (v)), lua_settable(L, -3))
 #define lua_pushtablenumber(L, k, v)   (lua_pushstring(L, (k)), lua_pushnumber(L, (v)), lua_settable(L, -3))
-
-// size based string (possibly no null-termination)
-#define __lua_strncpy(s)              \
-  char tmp[sizeof(s) + 1];            \
-  strncpy(tmp, (s), sizeof(tmp) - 1); \
-  tmp[sizeof(s)] = '\0';
-
-// size based string (possibly no null-termination)
-#define lua_pushnstring(L, s)          { __lua_strncpy(s); lua_pushstring(L, tmp); }
-#define lua_pushtablenstring(L, k, v)  { __lua_strncpy(v); lua_pushstring(L, (k)); lua_pushstring(L, tmp); lua_settable(L, -3); }
-
-// null-terminated string
 #define lua_pushtablestring(L, k, v)   (lua_pushstring(L, (k)), lua_pushstring(L, (v)), lua_settable(L, -3))
-
+#define lua_pushtablenzstring(L, k, v) { char tmp[sizeof(v)+1]; strncpy(tmp, (v), sizeof(tmp)-1); tmp[sizeof(v)] = '\0'; lua_pushstring(L, (k)); lua_pushstring(L, tmp); lua_settable(L, -3); }
+#define lua_pushtablezstring(L, k, v)  { char tmp[sizeof(v)+1]; zchar2str(tmp, (v), sizeof(tmp)-1); lua_pushstring(L, (k)); lua_pushstring(L, tmp); lua_settable(L, -3); }
 #define lua_registerlib(L, name, tab)  (luaL_newmetatable(L, name), luaL_setfuncs(L, tab, 0), lua_setglobal(L, name))
+
+#define RUN_MIX_SCRIPT        (1 << 0)
+#define RUN_FUNC_SCRIPT       (1 << 1)
+#define RUN_TELEM_BG_SCRIPT   (1 << 2)
+#define RUN_TELEM_FG_SCRIPT   (1 << 3)
+#define RUN_STNDAL_SCRIPT     (1 << 4)
 
 enum luaScriptInputType {
   INPUT_TYPE_FIRST = 0,
@@ -106,35 +88,27 @@ struct ScriptInput {
   int16_t max;
   int16_t def;
 };
-
 struct ScriptOutput {
   const char *name;
   int16_t value;
 };
-
 enum ScriptState {
   SCRIPT_OK,
   SCRIPT_NOFILE,
   SCRIPT_SYNTAX_ERROR,
-  SCRIPT_PANIC
+  SCRIPT_PANIC,
+  SCRIPT_KILLED
 };
-
 enum ScriptReference {
-#if defined(LUA_MODEL_SCRIPTS)
   SCRIPT_MIX_FIRST,
   SCRIPT_MIX_LAST=SCRIPT_MIX_FIRST+MAX_SCRIPTS-1,
-#endif
   SCRIPT_FUNC_FIRST,
   SCRIPT_FUNC_LAST=SCRIPT_FUNC_FIRST+MAX_SPECIAL_FUNCTIONS-1,    // model functions
   SCRIPT_GFUNC_FIRST,
   SCRIPT_GFUNC_LAST=SCRIPT_GFUNC_FIRST+MAX_SPECIAL_FUNCTIONS-1,  // global functions
-#if defined(PCBTARANIS)
   SCRIPT_TELEMETRY_FIRST,
-  SCRIPT_TELEMETRY_LAST=SCRIPT_TELEMETRY_FIRST+MAX_SCRIPTS,      // telem0 and telem1 .. telem7
-#endif
-  SCRIPT_STANDALONE                                              // Standalone script
+  SCRIPT_TELEMETRY_LAST=SCRIPT_TELEMETRY_FIRST+MAX_SCRIPTS, // telem0 and telem1 .. telem7
 };
-
 struct ScriptInternalData {
   uint8_t reference;
   uint8_t state;
@@ -142,54 +116,40 @@ struct ScriptInternalData {
   int background;
   uint8_t instructions;
 };
-
 struct ScriptInputsOutputs {
   uint8_t inputsCount;
   ScriptInput inputs[MAX_SCRIPT_INPUTS];
   uint8_t outputsCount;
   ScriptOutput outputs[MAX_SCRIPT_OUTPUTS];
 };
-
-
-enum InterpreterState {
-  INTERPRETER_RELOAD_PERMANENT_SCRIPTS = 1,
-  INTERPRETER_LOADING,
-  INTERPRETER_START_RUNNING,
-  INTERPRETER_RUNNING,
-  INTERPRETER_PANIC = 255
-};
-
+#define INTERPRETER_RUNNING_STANDALONE_SCRIPT 1
+#define INTERPRETER_RELOAD_PERMANENT_SCRIPTS  2
+#define INTERPRETER_PANIC                     255
 extern uint8_t luaState;
 extern uint8_t luaScriptsCount;
-extern bool    luaLcdAllowed;
-
+extern ScriptInternalData standaloneScript;
 extern ScriptInternalData scriptInternalData[MAX_SCRIPTS];
 extern ScriptInputsOutputs scriptInputsOutputs[MAX_SCRIPTS];
-
 void luaClose(lua_State ** L);
-bool luaTask(event_t evt, bool allowLcdUsage);
+bool luaTask(event_t evt, uint8_t scriptType, bool allowLcdUsage);
 void checkLuaMemoryUsage();
 void luaExec(const char * filename);
 void luaDoGc(lua_State * L, bool full);
+void luaError(lua_State * L, uint8_t error, bool acknowledge=true);
 uint32_t luaGetMemUsed(lua_State * L);
 void luaGetValueAndPush(lua_State * L, int src);
-bool isTelemetryScriptAvailable();
-
 #define luaGetCpuUsed(idx) scriptInternalData[idx].instructions
-#define LUA_LOAD_MODEL_SCRIPTS()   luaState = INTERPRETER_RELOAD_PERMANENT_SCRIPTS
-#define LUA_LOAD_MODEL_SCRIPT(idx) luaState = INTERPRETER_RELOAD_PERMANENT_SCRIPTS
-
+uint8_t isTelemetryScriptAvailable(uint8_t index);
+#define LUA_LOAD_MODEL_SCRIPTS()   luaState |= INTERPRETER_RELOAD_PERMANENT_SCRIPTS
+#define LUA_LOAD_MODEL_SCRIPT(idx) luaState |= INTERPRETER_RELOAD_PERMANENT_SCRIPTS
 // Lua PROTECT/UNPROTECT
 #include <setjmp.h>
-
 struct our_longjmp {
   struct our_longjmp *previous;
   jmp_buf b;
   volatile int status;  /* error code */
 };
-
 extern struct our_longjmp * global_lj;
-
 #define PROTECT_LUA()   { struct our_longjmp lj; \
                         lj.previous = global_lj;  /* chain new error handler */ \
                         global_lj = &lj;  \
@@ -201,29 +161,20 @@ extern uint16_t maxLuaDuration;
 extern uint8_t instructionsPercent;
 
 #if defined(KEYS_GPIO_REG_PAGE)
-  #define IS_MASKABLE(key) ((key) != KEY_EXIT && (key) != KEY_ENTER && ((scriptInternalData[0].reference ==  SCRIPT_STANDALONE) || (key) != KEY_PAGE))
+  #define IS_MASKABLE(key) ((key) != KEY_EXIT && (key) != KEY_ENTER && ((luaState & INTERPRETER_RUNNING_STANDALONE_SCRIPT) || (key) != KEY_PAGE))
 #else
   #define IS_MASKABLE(key) ((key) != KEY_EXIT && (key) != KEY_ENTER)
 #endif
-
 struct LuaField {
   uint16_t id;
-  char name[20];
   char desc[50];
 };
-
 bool luaFindFieldByName(const char * name, LuaField & field, unsigned int flags=0);
-bool luaFindFieldById(int id, LuaField & field, unsigned int flags=0);
 void luaLoadThemes();
 void luaRegisterLibraries(lua_State * L);
 void registerBitmapClass(lua_State * L);
 void luaSetInstructionsLimit(lua_State* L, int count);
 int luaLoadScriptFileToState(lua_State * L, const char * filename, const char * mode);
-void luaPushDateTime(lua_State * L, uint32_t year, uint32_t mon, uint32_t day,
-                            uint32_t hour, uint32_t min, uint32_t sec);
-
-// Unregister LUA widget factories
-void luaUnregisterWidgets();
 
 #if LCD_W > 350
   #define RADIO_TOOL_NAME_MAXLEN  40
@@ -242,24 +193,8 @@ struct LuaMemTracer {
 };
 
 void * tracer_alloc(void * ud, void * ptr, size_t osize, size_t nsize);
+void luaHook(lua_State * L, lua_Debug *ar);
 
-inline bool isLuaStandaloneRunning() {
-  return scriptInternalData[0].reference == SCRIPT_STANDALONE;
-}
-
-#if defined(HARDWARE_TOUCH)
-struct LuaTouchData {
-  coord_t touchX;
-  coord_t touchY;
-  coord_t startX;
-  coord_t startY;
-  coord_t slideX;
-  coord_t slideY;
-  short tapCount;
-};
-
-extern LuaTouchData touches[EVENT_BUFFER_SIZE];
-#endif
 
 #else  // defined(LUA)
 

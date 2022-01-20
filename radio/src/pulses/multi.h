@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -25,8 +24,8 @@
 #include "pulses_common.h"
 
 void multiPatchCustom(uint8_t moduleIdx);
-void convertEtxProtocolToMulti(int *protocol, int *subprotocol);
-void convertMultiProtocolToEtx(int *protocol, int *subprotocol);
+void convertOtxProtocolToMulti(int *protocol, int *subprotocol);
+void convertMultiProtocolToOtx(int *protocol, int *subprotocol);
 
 class UartMultiPulses: public DataBuffer<uint8_t, 64>
 {

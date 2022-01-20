@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -20,7 +19,6 @@
  */
 
 #include "opentx.h"
-#include "switches.h"
 
 enum LogicalSwitchFields {
   LS_FIELD_FUNCTION,
@@ -142,7 +140,7 @@ void menuModelLogicalSwitches(event_t event)
       }
       else {
         INCDEC_SET_FLAG(EE_MODEL);
-        INCDEC_ENABLE_CHECK(nullptr);
+        INCDEC_ENABLE_CHECK(NULL);
       }
     }
     else if (cstate == LS_FAMILY_COMP) {
@@ -158,7 +156,7 @@ void menuModelLogicalSwitches(event_t event)
       v1_min = v2_min = -128;
       v1_max = v2_max = 122;
       INCDEC_SET_FLAG(EE_MODEL);
-      INCDEC_ENABLE_CHECK(nullptr);
+      INCDEC_ENABLE_CHECK(NULL);
     }
     else {
       v1_val = cs->v1;
@@ -169,7 +167,7 @@ void menuModelLogicalSwitches(event_t event)
       }
       else {
         INCDEC_SET_FLAG(EE_MODEL);
-        INCDEC_ENABLE_CHECK(nullptr);
+        INCDEC_ENABLE_CHECK(NULL);
       }
       LcdFlags lf = attr2 | LEFT;
       getMixSrcRange(v1_val, v2_min, v2_max, &lf);

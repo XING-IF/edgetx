@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -19,19 +18,8 @@
  * GNU General Public License for more details.
  */
 
-#include <stdio.h>
 #include "opentx.h"
 #include "frsky_firmware_update.h"
-
-#if defined(LIBOPENUI)
-  #include "libopenui.h"
-#else
-  #include "libopenui/src/libopenui_file.h"
-#endif
-
-#if defined(INTMODULE_USART)
-#include "intmodule_serial_driver.h"
-#endif
 
 #define PRIM_REQ_POWERUP    0
 #define PRIM_REQ_VERSION    1
@@ -305,7 +293,7 @@ const char * FrskyDeviceFirmwareUpdate::sendReqVersion()
 // X9D / X9D+ / X9E / XLite IXJT = use S.PORT @ 57600 bauds
 // XLite PRO / X9Lite / X9D+ 2019 ISRM = use TX + RX @ 57600 bauds
 
-const char * FrskyDeviceFirmwareUpdate::doFlashFirmware(const char * filename, ProgressHandler progressHandler)
+const char * FrskyDeviceFirmwareUpdate::doFlashFirmware(const char * filename)
 {
   FIL file;
   const char * result;
@@ -333,16 +321,10 @@ const char * FrskyDeviceFirmwareUpdate::doFlashFirmware(const char * filename, P
   if (module == INTERNAL_MODULE && information.productId == FIRMWARE_ID_MODULE_XJT) {
     INTERNAL_MODULE_ON();
     RTOS_WAIT_MS(1);
-
-    etx_serial_init params;
-    params.baudrate = 38400;
-    params.rx_enable = true;
-    intmoduleSerialStart(&params);
-
+    intmoduleSerialStart(38400, true, USART_Parity_No, USART_StopBits_1, USART_WordLength_8b);
     GPIO_SetBits(INTMODULE_BOOTCMD_GPIO, INTMODULE_BOOTCMD_GPIO_PIN);
-    result = uploadFileToHorusXJT(filename, &file, progressHandler);
+    result = uploadFileToHorusXJT(filename, &file);
     GPIO_ResetBits(INTMODULE_BOOTCMD_GPIO, INTMODULE_BOOTCMD_GPIO_PIN);
-
     f_close(&file);
     return result;
   }
@@ -350,12 +332,9 @@ const char * FrskyDeviceFirmwareUpdate::doFlashFirmware(const char * filename, P
 
   switch (module) {
 #if defined(INTERNAL_MODULE_PXX2)
-    case INTERNAL_MODULE: {
-      etx_serial_init params;
-      params.baudrate = 57600;
-      params.rx_enable = true;
-      intmoduleSerialStart(&params);
-    } break;
+    case INTERNAL_MODULE:
+      intmoduleSerialStart(57600, true, USART_Parity_No, USART_StopBits_1, USART_WordLength_8b);
+      break;
 #endif
 
     default:
@@ -370,13 +349,13 @@ const char * FrskyDeviceFirmwareUpdate::doFlashFirmware(const char * filename, P
   else
     SPORT_UPDATE_POWER_ON();
 
-  result = uploadFileNormal(filename, &file, progressHandler);
+  result = uploadFileNormal(filename, &file);
   f_close(&file);
   return result;
 }
 
 #if defined(PCBHORUS)
-const char * FrskyDeviceFirmwareUpdate::uploadFileToHorusXJT(const char * filename, FIL * file, ProgressHandler progressHandler)
+const char * FrskyDeviceFirmwareUpdate::uploadFileToHorusXJT(const char * filename, FIL * file)
 {
   uint32_t buffer[1024 / sizeof(uint32_t)];
   UINT count;
@@ -398,7 +377,7 @@ const char * FrskyDeviceFirmwareUpdate::uploadFileToHorusXJT(const char * filena
 
   uint8_t index = 0;
   while (true) {
-    progressHandler(getBasename(filename), STR_WRITING, file->fptr, file->obj.objsize);
+    drawProgressScreen(getBasename(filename), STR_WRITING, file->fptr, file->obj.objsize);
 
     if (f_read(file, buffer, 1024, &count) != FR_OK) {
       return "Error reading file";
@@ -434,7 +413,7 @@ const char * FrskyDeviceFirmwareUpdate::uploadFileToHorusXJT(const char * filena
 }
 #endif
 
-const char * FrskyDeviceFirmwareUpdate::uploadFileNormal(const char * filename, FIL * file, ProgressHandler progressHandler)
+const char * FrskyDeviceFirmwareUpdate::uploadFileNormal(const char * filename, FIL * file)
 {
   uint32_t buffer[1024 / sizeof(uint32_t)];
   UINT count;
@@ -472,7 +451,7 @@ const char * FrskyDeviceFirmwareUpdate::uploadFileNormal(const char * filename, 
       state = SPORT_DATA_TRANSFER,
       sendFrame();
       if (i == 0) {
-        progressHandler(getBasename(filename), STR_WRITING, file->fptr, file->obj.objsize);
+        drawProgressScreen(getBasename(filename), STR_WRITING, file->fptr, file->obj.objsize);
       }
     }
 
@@ -496,7 +475,7 @@ const char * FrskyDeviceFirmwareUpdate::endTransfer()
   return nullptr;
 }
 
-const char * FrskyDeviceFirmwareUpdate::flashFirmware(const char * filename, ProgressHandler progressHandler)
+const char * FrskyDeviceFirmwareUpdate::flashFirmware(const char * filename)
 {
   pausePulses();
 
@@ -510,25 +489,25 @@ const char * FrskyDeviceFirmwareUpdate::flashFirmware(const char * filename, Pro
   EXTERNAL_MODULE_OFF();
 #endif
 
-#if defined(SPORT_UPDATE_PWR_GPIO)
   uint8_t spuPwr = IS_SPORT_UPDATE_POWER_ON();
   SPORT_UPDATE_POWER_OFF();
-#endif
 
-  progressHandler(getBasename(filename), STR_DEVICE_RESET, 0, 0);
+  drawProgressScreen(getBasename(filename), STR_DEVICE_RESET, 0, 0);
 
   /* wait 2s off */
   watchdogSuspend(1000 /*10s*/);
   RTOS_WAIT_MS(2000);
 
-  const char * result = doFlashFirmware(filename, progressHandler);
+  const char * result = doFlashFirmware(filename);
 
   AUDIO_PLAY(AU_SPECIAL_SOUND_BEEP1 );
   BACKLIGHT_ENABLE();
 
   if (result) {
-    POPUP_WARNING(STR_FIRMWARE_UPDATE_ERROR, result);
-  } else {
+    POPUP_WARNING(STR_FIRMWARE_UPDATE_ERROR);
+    SET_WARNING_INFO(result, strlen(result), 0);
+  }
+  else {
     POPUP_INFORMATION(STR_FIRMWARE_UPDATE_SUCCESS);
   }
 
@@ -557,11 +536,9 @@ const char * FrskyDeviceFirmwareUpdate::flashFirmware(const char * filename, Pro
   }
 #endif
 
-#if defined(SPORT_UPDATE_PWR_GPIO)
   if (spuPwr) {
     SPORT_UPDATE_POWER_ON();
   }
-#endif
 
   state = SPORT_IDLE;
   resumePulses();
@@ -723,7 +700,7 @@ const char * FrskyChipFirmwareUpdate::sendUpgradeData(uint32_t index, uint8_t * 
   return status == 0x00 ? nullptr : "Upgrade failed";
 }
 
-const char * FrskyChipFirmwareUpdate::doFlashFirmware(const char * filename, ProgressHandler progressHandler)
+const char * FrskyChipFirmwareUpdate::doFlashFirmware(const char * filename)
 {
   const char * result;
   FIL file;
@@ -745,7 +722,7 @@ const char * FrskyChipFirmwareUpdate::doFlashFirmware(const char * filename, Pro
   }
 
   uint32_t packetsCount = (information->size + sizeof(buffer) - 1) / sizeof(buffer);
-  progressHandler(getBasename(filename), STR_FLASH_WRITE, 0, packetsCount);
+  drawProgressScreen(getBasename(filename), STR_FLASH_WRITE, 0, packetsCount);
 
   result = sendUpgradeCommand('A', packetsCount);
   if (result)
@@ -753,7 +730,7 @@ const char * FrskyChipFirmwareUpdate::doFlashFirmware(const char * filename, Pro
 
   uint32_t index = 0;
   while (1) {
-    progressHandler(getBasename(filename), STR_FLASH_WRITE, index, packetsCount);
+    drawProgressScreen(getBasename(filename), STR_FLASH_WRITE, index, packetsCount);
     if (f_read(&file, buffer, sizeof(buffer), &count) != FR_OK) {
       f_close(&file);
       return "Error reading file";
@@ -770,9 +747,9 @@ const char * FrskyChipFirmwareUpdate::doFlashFirmware(const char * filename, Pro
   return sendUpgradeCommand('E', packetsCount);
 }
 
-const char * FrskyChipFirmwareUpdate::flashFirmware(const char * filename, ProgressHandler progressHandler, bool wait)
+const char * FrskyChipFirmwareUpdate::flashFirmware(const char * filename, bool wait)
 {
-  progressHandler(getBasename(filename), STR_DEVICE_RESET, 0, 0);
+  drawProgressScreen(getBasename(filename), STR_DEVICE_RESET, 0, 0);
 
   pausePulses();
 
@@ -784,10 +761,8 @@ const char * FrskyChipFirmwareUpdate::flashFirmware(const char * filename, Progr
   uint8_t extPwr = IS_EXTERNAL_MODULE_ON();
   EXTERNAL_MODULE_OFF();
 
-#if defined(SPORT_UPDATE_PWR_GPIO)
   uint8_t spuPwr = IS_SPORT_UPDATE_POWER_ON();
   SPORT_UPDATE_POWER_OFF();
-#endif
 
   if (wait) {
     /* wait 2s off */
@@ -797,13 +772,14 @@ const char * FrskyChipFirmwareUpdate::flashFirmware(const char * filename, Progr
 
   telemetryInit(PROTOCOL_TELEMETRY_FRSKY_SPORT);
 
-  const char * result = doFlashFirmware(filename, progressHandler);
+  const char * result = doFlashFirmware(filename);
 
   AUDIO_PLAY(AU_SPECIAL_SOUND_BEEP1);
   BACKLIGHT_ENABLE();
 
   if (result) {
-    POPUP_WARNING(STR_FIRMWARE_UPDATE_ERROR, result);
+    POPUP_WARNING(STR_FIRMWARE_UPDATE_ERROR);
+    SET_WARNING_INFO(result, strlen(result), 0);
   }
   else {
     POPUP_INFORMATION(STR_FIRMWARE_UPDATE_SUCCESS);
@@ -827,11 +803,9 @@ const char * FrskyChipFirmwareUpdate::flashFirmware(const char * filename, Progr
   }
 #endif
 
-#if defined(SPORT_UPDATE_PWR_GPIO)
   if (spuPwr) {
     SPORT_UPDATE_POWER_ON();
   }
-#endif
 
   resumePulses();
 

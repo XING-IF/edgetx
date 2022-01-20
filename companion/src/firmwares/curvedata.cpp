@@ -19,7 +19,7 @@
  */
 
 #include "curvedata.h"
-#include "datahelpers.h"
+#include "radiodata.h"
 
 CurveData::CurveData()
 {
@@ -34,11 +34,15 @@ void CurveData::clear(int count)
 
 bool CurveData::isEmpty() const
 {
-  CurveData tmp;
-  return !memcmp(this, &tmp, sizeof(CurveData));
+  for (int i = 0; i < count; i++) {
+    if (points[i].y != 0) {
+      return false;
+    }
+  }
+  return true;
 }
 
 QString CurveData::nameToString(const int idx) const
 {
-  return DataHelpers::getElementName(tr("CV"), idx + 1, name);
+  return RadioData::getElementName(tr("CV"), idx + 1, name);
 }

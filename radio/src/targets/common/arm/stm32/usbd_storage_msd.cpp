@@ -1,9 +1,8 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
- *   th9x - http://code.google.com/p/th9x
+ *   th9x - http://code.google.com/p/th9x 
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
  *
@@ -262,9 +261,9 @@ int8_t STORAGE_GetMaxLun (void)
 /* Firmware.txt */
 const char firmware_txt[] =
 #if defined(BOOT)
-  "EdgeTX Bootloader"
+  "OpenTX Bootloader"
 #else
-  "EdgeTX Firmware"
+  "OpenTX Firmware"
 #endif
   " for " FLAVOUR "\r\n\r\n"
 #if defined(BOOT)
@@ -272,13 +271,14 @@ const char firmware_txt[] =
 #else
   "FWVERSION  "
 #endif
-  "edgetx-" FLAVOUR "-" VERSION " (" GIT_STR ")\r\n"
+  "opentx-" FLAVOUR "-" VERSION " (" GIT_STR ")\r\n"
   "DATE       " DATE "\r\n"
   "TIME       " TIME "\r\n"
+  "req SD ver " REQUIRED_SDCARD_VERSION "\r\n"
 #if !defined(BOOT)
-  "BOOTVER   "
+"BOOTVER    "
 #else
-  "FWVERSION "
+"FWVERSION  "
 #endif
   ;
 

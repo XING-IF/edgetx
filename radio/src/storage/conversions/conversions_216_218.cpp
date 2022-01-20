@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -201,7 +200,7 @@ PACK(typedef struct {
   uint8_t smooth:1;
   uint8_t spare:4;
   int8_t  points;
-}) CurveHeader_v216;
+}) CurveData_v216;
 
 #if defined(PCBTARANIS)
 PACK(typedef struct {
@@ -587,7 +586,7 @@ PACK(typedef struct {
   LimitData_v216 limitData[MAX_OUTPUT_CHANNELS_218];
   ExpoData_v216  expoData[MAX_EXPOS_218];
 
-  CurveHeader_v216 curves[MAX_CURVES_218];
+  CurveData_v216 curves[MAX_CURVES_218];
   int8_t    points[MAX_CURVE_POINTS_218];
 
   LogicalSwitchData_v216 logicalSw[32];
@@ -633,7 +632,7 @@ PACK(typedef struct {
   LimitData limitData[MAX_OUTPUT_CHANNELS_218];
   ExpoData_v217  expoData[MAX_EXPOS_218];
 
-  CurveHeader_v216 curves[MAX_CURVES_218];
+  CurveData_v216 curves[MAX_CURVES_218];
   int8_t    points[MAX_CURVE_POINTS_218];
 
   LogicalSwitchData_v217 logicalSw[MAX_LOGICAL_SWITCHES_218];
@@ -920,8 +919,8 @@ void convertModelData_216_to_217(ModelData &model)
 
   for (uint8_t i=0; i<2; i++) {
     TimerData_v217 & timer = newModel.timers[i];
-    if (oldModel.timers[i].mode >= 5)
-      timer.mode = 5 + convertSwitch_216_to_217(oldModel.timers[i].mode - 5 + 1) - 1;
+    if (oldModel.timers[i].mode >= TMRMODE_COUNT)
+      timer.mode = TMRMODE_COUNT + convertSwitch_216_to_217(oldModel.timers[i].mode - TMRMODE_COUNT + 1) - 1;
     else
       timer.mode = convertSwitch_216_to_217(oldModel.timers[i].mode);
     timer.start = oldModel.timers[i].start;
@@ -1089,8 +1088,8 @@ void convertModelData_217_to_218(ModelData &model)
 
   newModel.header = oldModel.header;
   for (uint8_t i=0; i<MAX_TIMERS; i++) {
-    if (oldModel.timers[i].mode >= 5)
-      newModel.timers[i].mode = 5 + convertSwitch_217_to_218(oldModel.timers[i].mode - 5 + 1) - 1;
+    if (oldModel.timers[i].mode >= TMRMODE_COUNT)
+      newModel.timers[i].mode = TMRMODE_COUNT + convertSwitch_217_to_218(oldModel.timers[i].mode - TMRMODE_COUNT + 1) - 1;
     else
       newModel.timers[i].mode = convertSwitch_217_to_218(oldModel.timers[i].mode);
     if (oldModel.timers[i].mode)

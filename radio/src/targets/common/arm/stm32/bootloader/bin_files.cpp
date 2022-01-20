@@ -1,24 +1,3 @@
-/*
- * Copyright (C) EdgeTX
- *
- * Based on code named
- *   opentx - https://github.com/opentx/opentx
- *   th9x - http://code.google.com/p/th9x
- *   er9x - http://code.google.com/p/er9x
- *   gruvin9x - http://code.google.com/p/gruvin9x
- *
- * License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- */
-
 #include "opentx.h"
 #include "boot.h"
 #include "bin_files.h"
@@ -108,7 +87,7 @@ unsigned int fetchBinFiles(unsigned int index)
 
 FRESULT openBinFile(MemoryType mt, unsigned int index)
 {
-  TCHAR full_path[FF_MAX_LFN+1];
+  TCHAR full_path[_MAX_LFN+1];
   FRESULT fr;
 
   // build full_path: [bin path]/[filename]
@@ -142,19 +121,15 @@ void extractFirmwareVersion(VersionTag* tag)
     if (!vers || (vers[0] == 'n' && vers[1] == 'o')) { // "no version found"
       memcpy(tag->flavour, "unknown", sizeof("unknown"));
       tag->version = "unknown";
-      return;
     }
 
-    tag->fork = vers;
-    
-    // skip 'edgetx-' / 'opentx-'
-    vers += sizeof("edgetx-") - 1;
+    // skip "opentx-"
+    vers += sizeof("opentx-") - 1;
 
     char* fl = tag->flavour;
     while(*vers != '-')
         *(fl++) = *(vers++);
 
-    // skip '-'
     tag->version = ++vers;
 }
 

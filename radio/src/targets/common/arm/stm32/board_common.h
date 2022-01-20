@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -30,47 +29,47 @@
 #else
 
 #if __clang__
-  // clang is very picky about the use of "register"
-  // Tell clang to ignore the warnings for the following files
-  #pragma clang diagnostic push
-  #pragma clang diagnostic ignored "-Wdeprecated-register"
+// clang is very picky about the use of "register"
+// Tell clang to ignore the warnings for the following files
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-register"
 #endif
 
 #if defined(STM32F4)
-  #include "stm32f4xx.h"
-  #include "stm32f4xx_rcc.h"
-  #include "stm32f4xx_syscfg.h"
-  #include "stm32f4xx_gpio.h"
-  #include "stm32f4xx_exti.h"
-  #include "stm32f4xx_tim.h"
-  #include "stm32f4xx_adc.h"
-  #include "stm32f4xx_spi.h"
-  #include "stm32f4xx_i2c.h"
-  #include "stm32f4xx_rtc.h"
-  #include "stm32f4xx_pwr.h"
-  #include "stm32f4xx_dma.h"
-  #include "stm32f4xx_usart.h"
-  #include "stm32f4xx_flash.h"
-  #include "stm32f4xx_dbgmcu.h"
-  #include "misc.h"
+
+#include "STM32F4xx_DSP_StdPeriph_Lib_V1.4.0/Libraries/CMSIS/Device/ST/STM32F4xx/Include/stm32f4xx.h"
+#include "STM32F4xx_DSP_StdPeriph_Lib_V1.4.0/Libraries/STM32F4xx_StdPeriph_Driver/inc/stm32f4xx_rcc.h"
+#include "STM32F4xx_DSP_StdPeriph_Lib_V1.4.0/Libraries/STM32F4xx_StdPeriph_Driver/inc/stm32f4xx_syscfg.h"
+#include "STM32F4xx_DSP_StdPeriph_Lib_V1.4.0/Libraries/STM32F4xx_StdPeriph_Driver/inc/stm32f4xx_gpio.h"
+#include "STM32F4xx_DSP_StdPeriph_Lib_V1.4.0/Libraries/STM32F4xx_StdPeriph_Driver/inc/stm32f4xx_exti.h"
+#include "STM32F4xx_DSP_StdPeriph_Lib_V1.4.0/Libraries/STM32F4xx_StdPeriph_Driver/inc/stm32f4xx_tim.h"
+#include "STM32F4xx_DSP_StdPeriph_Lib_V1.4.0/Libraries/STM32F4xx_StdPeriph_Driver/inc/stm32f4xx_adc.h"
+#include "STM32F4xx_DSP_StdPeriph_Lib_V1.4.0/Libraries/STM32F4xx_StdPeriph_Driver/inc/stm32f4xx_spi.h"
+#include "STM32F4xx_DSP_StdPeriph_Lib_V1.4.0/Libraries/STM32F4xx_StdPeriph_Driver/inc/stm32f4xx_i2c.h"
+#include "STM32F4xx_DSP_StdPeriph_Lib_V1.4.0/Libraries/STM32F4xx_StdPeriph_Driver/inc/stm32f4xx_rtc.h"
+#include "STM32F4xx_DSP_StdPeriph_Lib_V1.4.0/Libraries/STM32F4xx_StdPeriph_Driver/inc/stm32f4xx_pwr.h"
+#include "STM32F4xx_DSP_StdPeriph_Lib_V1.4.0/Libraries/STM32F4xx_StdPeriph_Driver/inc/stm32f4xx_dma.h"
+#include "STM32F4xx_DSP_StdPeriph_Lib_V1.4.0/Libraries/STM32F4xx_StdPeriph_Driver/inc/stm32f4xx_usart.h"
+#include "STM32F4xx_DSP_StdPeriph_Lib_V1.4.0/Libraries/STM32F4xx_StdPeriph_Driver/inc/stm32f4xx_flash.h"
+#include "STM32F4xx_DSP_StdPeriph_Lib_V1.4.0/Libraries/STM32F4xx_StdPeriph_Driver/inc/stm32f4xx_dbgmcu.h"
+#include "STM32F4xx_DSP_StdPeriph_Lib_V1.4.0/Libraries/STM32F4xx_StdPeriph_Driver/inc/misc.h"
 #else
-  #include "stm32f2xx.h"
-  #include "stm32f2xx_rcc.h"
-  #include "stm32f2xx_syscfg.h"
-  #include "stm32f2xx_gpio.h"
-  #include "stm32f2xx_exti.h"
-  #include "stm32f2xx_tim.h"
-  #include "stm32f2xx_adc.h"
-  #include "stm32f2xx_spi.h"
-  #include "stm32f2xx_i2c.h"
-  #include "stm32f2xx_rtc.h"
-  #include "stm32f2xx_pwr.h"
-  #include "stm32f2xx_dma.h"
-  #include "stm32f2xx_usart.h"
-  #include "stm32f2xx_flash.h"
-  #include "stm32f2xx_dbgmcu.h"
-  #include "misc.h"
-  #include "dwt.h"    // the old ST library that we use does not define DWT register for STM32F2xx
+#include "STM32F2xx_StdPeriph_Lib_V1.1.0/Libraries/CMSIS/Device/ST/STM32F2xx/Include/stm32f2xx.h"
+  #include "STM32F2xx_StdPeriph_Lib_V1.1.0/Libraries/STM32F2xx_StdPeriph_Driver/inc/stm32f2xx_rcc.h"
+  #include "STM32F2xx_StdPeriph_Lib_V1.1.0/Libraries/STM32F2xx_StdPeriph_Driver/inc/stm32f2xx_syscfg.h"
+  #include "STM32F2xx_StdPeriph_Lib_V1.1.0/Libraries/STM32F2xx_StdPeriph_Driver/inc/stm32f2xx_gpio.h"
+  #include "STM32F2xx_StdPeriph_Lib_V1.1.0/Libraries/STM32F2xx_StdPeriph_Driver/inc/stm32f2xx_exti.h"
+  #include "STM32F2xx_StdPeriph_Lib_V1.1.0/Libraries/STM32F2xx_StdPeriph_Driver/inc/stm32f2xx_tim.h"
+  #include "STM32F2xx_StdPeriph_Lib_V1.1.0/Libraries/STM32F2xx_StdPeriph_Driver/inc/stm32f2xx_adc.h"
+  #include "STM32F2xx_StdPeriph_Lib_V1.1.0/Libraries/STM32F2xx_StdPeriph_Driver/inc/stm32f2xx_spi.h"
+  #include "STM32F2xx_StdPeriph_Lib_V1.1.0/Libraries/STM32F2xx_StdPeriph_Driver/inc/stm32f2xx_i2c.h"
+  #include "STM32F2xx_StdPeriph_Lib_V1.1.0/Libraries/STM32F2xx_StdPeriph_Driver/inc/stm32f2xx_rtc.h"
+  #include "STM32F2xx_StdPeriph_Lib_V1.1.0/Libraries/STM32F2xx_StdPeriph_Driver/inc/stm32f2xx_pwr.h"
+  #include "STM32F2xx_StdPeriph_Lib_V1.1.0/Libraries/STM32F2xx_StdPeriph_Driver/inc/stm32f2xx_dma.h"
+  #include "STM32F2xx_StdPeriph_Lib_V1.1.0/Libraries/STM32F2xx_StdPeriph_Driver/inc/stm32f2xx_usart.h"
+  #include "STM32F2xx_StdPeriph_Lib_V1.1.0/Libraries/STM32F2xx_StdPeriph_Driver/inc/stm32f2xx_flash.h"
+  #include "STM32F2xx_StdPeriph_Lib_V1.1.0/Libraries/STM32F2xx_StdPeriph_Driver/inc/stm32f2xx_dbgmcu.h"
+  #include "STM32F2xx_StdPeriph_Lib_V1.1.0/Libraries/STM32F2xx_StdPeriph_Driver/inc/misc.h"
 #endif
 
 #if __clang__
@@ -104,7 +103,12 @@ extern "C" {
 #include "../simu/simpgmspace.h"
 #endif
 
-uint16_t getBatteryVoltage();
+// ADC driver
+void adcInit();
+void adcRead();
+uint16_t getAnalogValue(uint8_t index);
+uint16_t getBatteryVoltage();   // returns current battery voltage in 10mV steps
+uint16_t getRTCBatteryVoltage();
 
 // STM32 uses a 25K+25K voltage divider bridge to measure the battery voltage
 // Measuring VBAT puts considerable drain (22 µA) on the battery instead of normal drain (~10 nA)
@@ -124,28 +128,13 @@ static inline bool isVBatBridgeEnabled()
 }
 
 // Delays driver
-#define SYSTEM_TICKS_1MS  ((CPU_FREQ + 500) / 1000)
-#define SYSTEM_TICKS_1US  ((CPU_FREQ + 500000)  / 1000000)
-#define SYSTEM_TICKS_01US ((CPU_FREQ + 5000000) / 10000000)
-
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-static inline uint32_t ticksNow()
-{
-#if defined(SIMU)
-  return 0;
-#else
-  return DWT->CYCCNT;
-#endif
-}
-
-void delaysInit();
-void delay_01us(uint32_t count);
-void delay_us(uint32_t count);
-void delay_ms(uint32_t count);
-
+void delaysInit(void);
+void delay_01us(uint16_t nb);
+void delay_us(uint16_t nb);
+void delay_ms(uint32_t ms);
 #ifdef __cplusplus
 }
 #endif

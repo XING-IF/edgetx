@@ -31,10 +31,7 @@ namespace Ui {
   class Setup;
   class Timer;
   class Module;
-  class FunctionSwitches;
 }
-
-class AutoLineEdit;
 
 class TimerPanel : public ModelPanel
 {
@@ -53,7 +50,6 @@ class TimerPanel : public ModelPanel
     void onItemModelAboutToBeUpdated();
     void onItemModelUpdateComplete();
     void onCountdownBeepChanged(int index);
-    void onModeChanged(int index);
 
   signals:
     void nameChanged();
@@ -129,31 +125,6 @@ class ModulePanel : public ModelPanel
     QMap<int, ChannelFailsafeWidgetsGroup> failsafeGroupsMap;
     static quint8 failsafesValueDisplayType;  // FailsafeValueDisplayTypes
     void updateFailsafeUI(unsigned channel, quint8 updtSb);
-};
-
-class FunctionSwitchesPanel : public ModelPanel
-{
-    Q_OBJECT
-
-  public:
-    FunctionSwitchesPanel(QWidget * parent, ModelData & model, GeneralSettings & generalSettings, Firmware * firmware);
-    virtual ~FunctionSwitchesPanel();
-
-    virtual void update();
-    void update(int index);
-
-  private slots:
-    void on_configCurrentIndexChanged(int index);
-    void on_startPosnCurrentIndexChanged(int index);
-    void on_groupChanged(int value);
-
-  private:
-    Ui::FunctionSwitches * ui;
-    QVector<AutoLineEdit *> aleNames;
-    QVector<QComboBox *> cboConfigs;
-    QVector<QComboBox *> cboStartupPosns;
-    QVector<QSpinBox *> sbGroups;
-    int switchcnt;
 };
 
 class SetupPanel : public ModelPanel

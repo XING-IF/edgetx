@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -31,8 +30,7 @@ PACK(struct GlobalData {
   uint8_t authenticationCount:2;
   uint8_t upgradeModulePopup:1;
   uint8_t internalModuleVersionChecked:1;
-  uint8_t flyskygimbals:1;
-  uint8_t spare:1;
+  uint8_t spare:2;
 });
 
 extern GlobalData globalData;
@@ -62,7 +60,7 @@ enum MainRequest {
 extern uint8_t mainRequestFlags;
 
 #define DELAY_POS_MARGIN   3
-
+typedef int16_t delayval_t;
 PACK(struct SwOn {
   uint16_t delay:14; // max = 2550
   uint8_t  activeMix:1;

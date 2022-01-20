@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -71,8 +70,6 @@ void menuModelGVarOne(event_t event)
   drawGVarValue(32*FW, 0, s_currIdx, getGVarValue(s_currIdx, getFlightMode()));
   lcdDrawFilledRect(0, 0, LCD_W, FH, SOLID, FILL_WHITE|GREY_DEFAULT);
 
-  uint8_t old_editMode = s_editMode;
-  
   SIMPLE_SUBMENU(STR_GVARS, GVAR_FIELD_LAST);
 
   for (int i=0; i<NUM_BODY_LINES; i++) {
@@ -82,7 +79,7 @@ void menuModelGVarOne(event_t event)
 
     switch (k) {
       case GVAR_FIELD_NAME:
-        editSingleName(GVAR_2ND_COLUMN, y, STR_NAME, gvar->name, LEN_GVAR_NAME, event, attr, old_editMode);
+        editSingleName(GVAR_2ND_COLUMN, y, STR_NAME, gvar->name, LEN_GVAR_NAME, event, attr);
         break;
 
       case GVAR_FIELD_UNIT:
@@ -106,7 +103,7 @@ void menuModelGVarOne(event_t event)
         break;
 
       case GVAR_FIELD_POPUP:
-        gvar->popup = editCheckBox(gvar->popup, GVAR_2ND_COLUMN, y, STR_POPUP, attr, event);
+        ON_OFF_MENU_ITEM(gvar->popup, GVAR_2ND_COLUMN, y, STR_POPUP, attr, event);
         break;
 
       default:
@@ -149,7 +146,7 @@ void menuModelGVars(event_t event)
     }
   }
   else {
-    menuTitle = STR_MENU_GLOBAL_VARS;
+    menuTitle = STR_MENUGLOBALVARS;
   }
 
   MENU_FLAGS(menuTitle, menuTabModel, MENU_MODEL_GVARS, after2seconds ? CHECK_FLAG_NO_SCREEN_INDEX : 0, MAX_GVARS, { GVARS_COLUMNS, GVARS_COLUMNS, GVARS_COLUMNS, GVARS_COLUMNS, GVARS_COLUMNS, GVARS_COLUMNS, GVARS_COLUMNS, GVARS_COLUMNS, GVARS_COLUMNS });

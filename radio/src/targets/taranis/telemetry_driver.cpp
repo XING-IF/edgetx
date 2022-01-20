@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -58,15 +57,12 @@ void telemetryPortInit(uint32_t baudrate, uint8_t mode)
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
   GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
   GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
-  GPIO_InitStructure.GPIO_Speed = baudrate <= 400000 ? GPIO_Speed_2MHz : GPIO_Speed_25MHz;
+  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
   GPIO_Init(TELEMETRY_GPIO, &GPIO_InitStructure);
 
   telemetryInitDirPin();
 
   USART_DeInit(TELEMETRY_USART);
-  
-  USART_OverSampling8Cmd(TELEMETRY_USART, baudrate <= 400000 ? DISABLE : ENABLE);
-  
   USART_InitTypeDef USART_InitStructure;
   USART_InitStructure.USART_BaudRate = baudrate;
   if (mode & TELEMETRY_SERIAL_8E2) {
@@ -81,9 +77,6 @@ void telemetryPortInit(uint32_t baudrate, uint8_t mode)
   }
   USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
   USART_InitStructure.USART_Mode = USART_Mode_Tx | USART_Mode_Rx;
-  if (g_eeGeneral.uartSampleMode == UART_SAMPLE_MODE_ONEBIT) {
-    USART_OneBitMethodCmd(TELEMETRY_USART, ENABLE);
-  }
   USART_Init(TELEMETRY_USART, &USART_InitStructure);
   USART_Cmd(TELEMETRY_USART, ENABLE);
 
@@ -173,13 +166,15 @@ void telemetryPortInvertedInit(uint32_t baudrate)
   //TODO:
   // - handle conflict with HEARTBEAT disabled for trainer input...
   // - probably need to stop trainer input/output and restore after this is closed
-#if !defined(TELEMETRY_EXTI_REUSE_INTERRUPT_ROTARY_ENCODER) && !defined(TELEMETRY_EXTI_REUSE_INTERRUPT_INTMODULE_HEARTBEAT)
   NVIC_SetPriority(TELEMETRY_EXTI_IRQn, 0);
-  NVIC_EnableIRQ(TELEMETRY_EXTI_IRQn);
-#endif
+
+  // In case shared IRQ is not enabled
+  if ((NVIC->ISER[(uint32_t)((int32_t)TELEMETRY_EXTI_IRQn) >> 5] & (uint32_t)(1 << ((uint32_t)((int32_t)TELEMETRY_EXTI_IRQn) & (uint32_t)0x1F))) == 0) {
+    NVIC_EnableIRQ(TELEMETRY_EXTI_IRQn);
+  }
 }
 
-void telemetryPortInvertedRxBit()
+inline void telemetryPortInvertedRxBit()
 {
   if (rxBitCount < 8) {
     if (rxBitCount == 0) {
@@ -196,15 +191,14 @@ void telemetryPortInvertedRxBit()
     ++rxBitCount;
   }
   else if (rxBitCount == 8) {
+    // disable timer
+    TELEMETRY_TIMER->CR1 &= ~TIM_CR1_CEN;
 
     telemetryFifo.push(rxByte);
     rxBitCount = 0;
 
-    // disable timer
-    TELEMETRY_TIMER->CR1 &= ~TIM_CR1_CEN;
-
     // re-enable start bit interrupt
-    EXTI->IMR |= EXTI_IMR_MR6;
+    EXTI->IMR |= TELEMETRY_EXTI_LINE;
   }
 }
 
@@ -315,11 +309,7 @@ extern "C" void TELEMETRY_DMA_TX_IRQHandler(void)
   DEBUG_INTERRUPT(INT_TELEM_DMA);
   if (DMA_GetITStatus(TELEMETRY_DMA_Stream_TX, TELEMETRY_DMA_TX_FLAG_TC)) {
     DMA_ClearITPendingBit(TELEMETRY_DMA_Stream_TX, TELEMETRY_DMA_TX_FLAG_TC);
-
-    // clear TC flag before enabling interrupt
-    TELEMETRY_USART->SR &= ~USART_SR_TC;
     TELEMETRY_USART->CR1 |= USART_CR1_TCIE;
-
     if (telemetryProtocol == PROTOCOL_TELEMETRY_FRSKY_SPORT) {
       outputTelemetryBuffer.reset();
     }
@@ -372,7 +362,7 @@ void check_telemetry_exti()
       TELEMETRY_TIMER->CR1 |= TIM_CR1_CEN;
     
       // disable start bit interrupt
-      EXTI->IMR &= ~EXTI_IMR_MR6;
+      EXTI->IMR &= ~TELEMETRY_EXTI_LINE;
     }
 
     EXTI_ClearITPendingBit(TELEMETRY_EXTI_LINE);

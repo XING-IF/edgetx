@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -24,11 +23,11 @@
 
 enum TouchEvent
 {
-    TE_NONE,
-    TE_DOWN,
-    TE_UP,
-    TE_SLIDE,
-    TE_SLIDE_END
+  TE_NONE,
+  TE_DOWN,
+  TE_UP,
+  TE_SLIDE,
+  TE_SLIDE_END
 };
 
 struct TouchState
@@ -42,12 +41,10 @@ struct TouchState
   short deltaY;
   short lastDeltaX;
   short lastDeltaY;
-  short tapCount;
 };
 
+constexpr uint8_t SLIDE_RANGE = 6;
 
-#define SLIDE_RANGE 6
-
-extern struct TouchState touchState;
+extern TouchState touchState;
 
 #endif // _TOUCH_H_

@@ -1,9 +1,8 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
- *   th9x - http://code.google.com/p/th9x
+ *   th9x - http://code.google.com/p/th9x 
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
  *
@@ -35,14 +34,14 @@ void checkTrainerSignalWarning()
 
   static uint8_t ppmInputValidState = PPM_IN_IS_NOT_USED;
 
-  if (ppmInputValidityTimer && (ppmInputValidState == PPM_IN_IS_NOT_USED)) {
+  if (ppmInputValidityTimer && ppmInputValidState == PPM_IN_IS_NOT_USED) {
     ppmInputValidState = PPM_IN_IS_VALID;
   }
-  else if (!ppmInputValidityTimer && (ppmInputValidState == PPM_IN_IS_VALID)) {
+  else if (!ppmInputValidityTimer && ppmInputValidState == PPM_IN_IS_VALID) {
     ppmInputValidState = PPM_IN_INVALID;
     AUDIO_TRAINER_LOST();
   }
-  else if (ppmInputValidityTimer && (ppmInputValidState == PPM_IN_INVALID)) {
+  else if (ppmInputValidityTimer && ppmInputValidState == PPM_IN_INVALID) {
     ppmInputValidState = PPM_IN_IS_VALID;
     AUDIO_TRAINER_BACK();
   }
@@ -168,7 +167,7 @@ void checkTrainerSettings()
 #if defined(HARDWARE_EXTERNAL_ACCESS_MOD)
     if (g_model.moduleData[EXTERNAL_MODULE].type != MODULE_TYPE_R9M_PXX2) // externalaccessmod 'bridges' HB and Ext module RX pins
       init_intmodule_heartbeat();
-#elif defined(INTMODULE_HEARTBEAT_GPIO)
+#else
     init_intmodule_heartbeat();
 #endif
 #endif

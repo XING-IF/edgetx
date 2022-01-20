@@ -14,14 +14,11 @@ set(simulation_SRCS
   simulateduiwidgetX12.cpp
   simulateduiwidgetJumperT12.cpp
   simulateduiwidgetJumperTLITE.cpp
-  simulateduiwidgetJumperTPRO.cpp
   simulateduiwidgetJumperT16.cpp
   simulateduiwidgetJumperT18.cpp
   simulateduiwidgetTX12.cpp
-  simulateduiwidgetZorro.cpp
   simulateduiwidgetT8.cpp
   simulateduiwidgetTX16S.cpp
-  simulateduiwidgetNV14.cpp
   simulatorinterface.cpp
   simulatormainwindow.cpp
   simulatorstartupdialog.cpp
@@ -30,7 +27,6 @@ set(simulation_SRCS
   trainersimu.cpp
   widgets/radiowidget.cpp
   widgets/virtualjoystickwidget.cpp
-  widgets/lcdwidget.cpp
 )
 
 set(simulation_UIS
@@ -47,14 +43,11 @@ set(simulation_UIS
   simulateduiwidgetX12.ui
   simulateduiwidgetJumperT12.ui
   simulateduiwidgetJumperTLITE.ui
-  simulateduiwidgetJumperTPRO.ui
   simulateduiwidgetJumperT16.ui
   simulateduiwidgetJumperT18.ui
   simulateduiwidgetTX12.ui
-  simulateduiwidgetZorro.ui
   simulateduiwidgetT8.ui
   simulateduiwidgetTX16S.ui
-  simulateduiwidgetNV14.ui
   simulatormainwindow.ui
   simulatorstartupdialog.ui
   simulatorwidget.ui
@@ -112,7 +105,7 @@ include_directories(
   ${COMPANION_SRC_DIRECTORY}
   ${COMPANION_SRC_DIRECTORY}/simulation
   ${COMPANION_SRC_DIRECTORY}/simulation/widgets
-  ${RADIO_SRC_DIR}/fonts/std
+  ${RADIO_SRC_DIRECTORY}/fonts/std
 )
 
 qt5_wrap_ui(simulation_SRCS ${simulation_UIS})
