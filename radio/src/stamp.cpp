@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -25,9 +24,13 @@
 #define STR2(s) #s
 #define DEFNUMSTR(s)  STR2(s)
 
-#define CFGV_STR DEFNUMSTR(EEPROM_VER);
+#define EEPROM_STR DEFNUMSTR(EEPROM_VER);
 
+#if defined(PCBHORUS)
+#define TAB "\037\075"
+#else
 #define TAB "\037\033"
+#endif
 
 #if defined(FRSKY_RELEASE)
 #define DISPLAY_VERSION "-frsky"
@@ -35,6 +38,8 @@
 #define DISPLAY_VERSION "-jumper"
 #elif defined(RADIOMASTER_RELEASE)
 #define DISPLAY_VERSION "-RM"
+#elif defined(iFlight_RELEASE)
+#define DISPLAY_VERSION "-iF"
 #elif defined(TBS_RELEASE)
 #define DISPLAY_VERSION "-tbs"
 #elif defined(IMRC_RELEASE)
@@ -44,7 +49,7 @@
 #endif
 
 #if defined(COLORLCD)
-  const char fw_stamp[]    =   "FW" TAB ": edgetx-" FLAVOUR;
+  const char fw_stamp[]    =   "FW" TAB ": opentx-" FLAVOUR;
 #if defined(RADIOMASTER_RELEASE) || defined(JUMPER_RELEASE)
   const char vers_stamp[]  =   "VERS" TAB ": Factory firmware (" GIT_STR ")";
 #else
@@ -52,15 +57,19 @@
 #endif
   const char date_stamp[]  =   "DATE" TAB ": " DATE;
   const char time_stamp[]  =   "TIME" TAB ": " TIME;
-  const char cfgv_stamp[]  = "CFGV" TAB ": " CFGV_STR;
+  const char eeprom_stamp[]  = "EEPR" TAB ": " EEPROM_STR;
 #elif defined(BOARD_NAME)
-  const char vers_stamp[]  = "FW" TAB ": edgetx-" BOARD_NAME "\036VERS" TAB ": " VERSION DISPLAY_VERSION " (" GIT_STR ")" "\036DATE" TAB ": " DATE " " TIME "\036CFGV" TAB ": " CFGV_STR;
+  const char vers_stamp[]  = "FW" TAB ": opentx-" BOARD_NAME "\036VERS" TAB ": " VERSION DISPLAY_VERSION " (" GIT_STR ")" "\036DATE" TAB ": " DATE " " TIME "\036EEPR" TAB ": " EEPROM_STR;
 #elif defined(RADIOMASTER_RELEASE)
-  const char vers_stamp[]  = "FW" TAB ": edgetx-" FLAVOUR    "\036VERS" TAB ": RM Factory (" GIT_STR ")" "\036BUILT BY : EdgeTX" "\036DATE" TAB ": " DATE " " TIME "\036CFGV" TAB ": " CFGV_STR;
+  const char vers_stamp[]  = "FW" TAB ": opentx-" FLAVOUR    "\036VERS" TAB ": RM Factory (" GIT_STR ")" "\036BUILT BY : OpenTX" "\036DATE" TAB ": " DATE " " TIME "\036EEPR" TAB ": " EEPROM_STR;
 #elif defined(JUMPER_RELEASE)
-  const char vers_stamp[]  = "FW" TAB ": edgetx-" FLAVOUR    "\036VERS" TAB ": Factory (" GIT_STR ")" "\036BUILT BY : EdgeTX" "\036DATE" TAB ": " DATE " " TIME "\036CFGV" TAB ": " CFGV_STR;
+  const char vers_stamp[]  = "FW" TAB ": opentx-" FLAVOUR    "\036VERS" TAB ": Factory (" GIT_STR ")" "\036BUILT BY : OpenTX" "\036DATE" TAB ": " DATE " " TIME "\036EEPR" TAB ": " EEPROM_STR;
+#elif defined(iFlight_RELEASE)
+  //#if defined(RADIO_T8)   //Modified T8 applies to commando8
+    const char vers_stamp[]  = "FW" TAB ": iFlight-Commando 8"  "\036VERS" TAB ": OpenTX-2.3.14" "\036BUILT BY : iFlight" "\036DATE" TAB ": " DATE " " TIME "\036EEPR" TAB ": " EEPROM_STR;
 #else
-  const char vers_stamp[]  = "FW" TAB ": edgetx-" FLAVOUR    "\036VERS" TAB ": " VERSION DISPLAY_VERSION " (" GIT_STR ")" "\036DATE" TAB ": " DATE " " TIME "\036CFGV" TAB ": " CFGV_STR;
+    const char vers_stamp[]  = "FW" TAB ": opentx-" FLAVOUR    "\036VERS" TAB ": " VERSION DISPLAY_VERSION " (" GIT_STR ")" "\036DATE" TAB ": " DATE " " TIME "\036EEPR" TAB ": " EEPROM_STR;
+  //#endif
 #endif
 
 /**
@@ -68,8 +77,8 @@
  * @return
  */
 #if defined(STM32) && !defined(SIMU)
-__SECTION_USED(".fwversiondata")   const char firmware_version[] = "edgetx-" FLAVOUR "-" VERSION DISPLAY_VERSION " (" GIT_STR ")";
-__SECTION_USED(".bootversiondata") const char boot_version[] =     "edgetx-" FLAVOUR "-" VERSION DISPLAY_VERSION " (" GIT_STR ")";
+__SECTION_USED(".fwversiondata")   const char firmware_version[] = "opentx-" FLAVOUR "-" VERSION DISPLAY_VERSION " (" GIT_STR ")";
+__SECTION_USED(".bootversiondata") const char boot_version[] =     "opentx-" FLAVOUR "-" VERSION DISPLAY_VERSION " (" GIT_STR ")";
 
 /**
  * Tries to find opentx version in the first 1024 byte of either firmware/bootloader (the one not running) or the buffer
@@ -86,8 +95,7 @@ const char * getFirmwareVersion(const char * buffer)
   }
 
   for (int i = 0; i < 1024; i++) {
-    if ((memcmp(buffer + i, "edgetx-", 7) == 0)
-        || memcmp(buffer + i, "opentx-", 7) == 0) {
+    if (memcmp(buffer + i, "opentx-", 7) == 0) {
       return buffer + i;
     }
   }

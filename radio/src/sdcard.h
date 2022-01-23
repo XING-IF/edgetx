@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -22,17 +21,13 @@
 #ifndef _SDCARD_H_
 #define _SDCARD_H_
 
+#if !defined(SIMU)
 #include "ff.h"
+#endif
 
-extern FATFS g_FATFS_Obj;
-extern FIL g_oLogFile;
+#include "opentx.h"
 
-#include "translations.h"
-
-#define FILE_COPY_PREFIX "cp_"
-
-#define PATH_SEPARATOR      "/"
-#define ROOT_PATH           PATH_SEPARATOR
+#define ROOT_PATH           "/"
 #define MODELS_PATH         ROOT_PATH "MODELS"      // no trailing slash = important
 #define RADIO_PATH          ROOT_PATH "RADIO"       // no trailing slash = important
 #define LOGS_PATH           ROOT_PATH "LOGS"
@@ -42,31 +37,24 @@ extern FIL g_oLogFile;
 #define SYSTEM_SUBDIR       "SYSTEM"
 #define BITMAPS_PATH        ROOT_PATH "IMAGES"
 #define FIRMWARES_PATH      ROOT_PATH "FIRMWARE"
-#define AUTOUPDATE_FILENAME FIRMWARES_PATH PATH_SEPARATOR "autoupdate.frsk"
+#define AUTOUPDATE_FILENAME FIRMWARES_PATH "/autoupdate.frsk"
 #define EEPROMS_PATH        ROOT_PATH "EEPROM"
-#define BACKUP_PATH         ROOT_PATH "BACKUP"
 #define SCRIPTS_PATH        ROOT_PATH "SCRIPTS"
-#define WIZARD_PATH         SCRIPTS_PATH PATH_SEPARATOR "WIZARD"
+#define WIZARD_PATH         SCRIPTS_PATH "/WIZARD"
 #define THEMES_PATH         ROOT_PATH "THEMES"
 #define LAYOUTS_PATH        ROOT_PATH "LAYOUTS"
 #define WIDGETS_PATH        ROOT_PATH "WIDGETS"
 #define WIZARD_NAME         "wizard.lua"
-#define SCRIPTS_MIXES_PATH  SCRIPTS_PATH PATH_SEPARATOR "MIXES"
-#define SCRIPTS_FUNCS_PATH  SCRIPTS_PATH PATH_SEPARATOR "FUNCTIONS"
-#define SCRIPTS_TELEM_PATH  SCRIPTS_PATH PATH_SEPARATOR "TELEMETRY"
-#define SCRIPTS_TOOLS_PATH  SCRIPTS_PATH PATH_SEPARATOR "TOOLS"
+#define SCRIPTS_MIXES_PATH  SCRIPTS_PATH "/MIXES"
+#define SCRIPTS_FUNCS_PATH  SCRIPTS_PATH "/FUNCTIONS"
+#define SCRIPTS_TELEM_PATH  SCRIPTS_PATH "/TELEMETRY"
+#define SCRIPTS_TOOLS_PATH  SCRIPTS_PATH "/TOOLS"
 
 #define LEN_FILE_PATH_MAX   (sizeof(SCRIPTS_TELEM_PATH)+1)  // longest + "/"
 
-#if defined(SDCARD_YAML) || defined(SDCARD_RAW)
-#define RADIO_FILENAME      "radio.bin"
-const char RADIO_MODELSLIST_PATH[] = RADIO_PATH PATH_SEPARATOR "models.txt";
-const char RADIO_SETTINGS_PATH[] = RADIO_PATH PATH_SEPARATOR RADIO_FILENAME;
-#if defined(SDCARD_YAML)
-const char MODELSLIST_YAML_PATH[] = MODELS_PATH PATH_SEPARATOR "models.yml";
-const char FALLBACK_MODELSLIST_YAML_PATH[] = RADIO_PATH PATH_SEPARATOR "models.yml";
-const char RADIO_SETTINGS_YAML_PATH[] = RADIO_PATH PATH_SEPARATOR "radio.yml";
-#endif
+#if defined(COLORLCD) || defined(EEPROM_SDCARD)
+const char RADIO_MODELSLIST_PATH[] = RADIO_PATH "/models.txt";
+const char RADIO_SETTINGS_PATH[] = RADIO_PATH "/radio.bin";
 #define    SPLASH_FILE             "splash.png"
 #endif
 
@@ -85,9 +73,10 @@ const char RADIO_SETTINGS_YAML_PATH[] = RADIO_PATH PATH_SEPARATOR "radio.yml";
 #define FRSKY_FIRMWARE_EXT  ".frsk"
 #define MULTI_FIRMWARE_EXT  ".bin"
 #define ELRS_FIRMWARE_EXT   ".elrs"
-#define YAML_EXT            ".yml"
 
-#if defined(COLORLCD)
+#define LEN_FILE_EXTENSION_MAX  5  // longest used, including the dot, excluding null term.
+
+#if defined(PCBHORUS) || defined(EEPROM_SDCARD)
 #define BITMAPS_EXT         BMP_EXT JPG_EXT PNG_EXT
 #define LEN_BITMAPS_EXT     4
 #else
@@ -107,6 +96,9 @@ const char RADIO_SETTINGS_YAML_PATH[] = RADIO_PATH PATH_SEPARATOR "radio.yml";
   memcpy(&filename[sizeof(path)], var, sizeof(var)); \
   filename[sizeof(path)+sizeof(var)] = '\0'; \
   strcat(&filename[sizeof(path)], ext)
+
+extern FATFS g_FATFS_Obj;
+extern FIL g_oLogFile;
 
 extern uint8_t logDelay;
 void logsInit();
@@ -130,52 +122,58 @@ inline const char * SDCARD_ERROR(FRESULT result)
 #endif
 
 // NOTE: 'size' must = 0 or be a valid character position within 'filename' array -- it is NOT validated
+const char * getFileExtension(const char * filename, uint8_t size=0, uint8_t extMaxLen=0, uint8_t * fnlen=nullptr, uint8_t * extlen=nullptr);
 const char * getBasename(const char * path);
 
 #if defined(PCBX12S)
-  #define ETX_FOURCC 0x3478746F // etx for X12S
+  #define OTX_FOURCC 0x3478746F // otx for X12S
 #elif defined(RADIO_T16)
-  #define ETX_FOURCC 0x3F78746F // etx for Jumper T16
+  #define OTX_FOURCC 0x3F78746F // otx for Jumper T16
 #elif defined(RADIO_T18)
-  #define ETX_FOURCC 0x4078746F // etx for Jumper T18
+  #define OTX_FOURCC 0x4078746F // otx for Jumper T18
 #elif defined(RADIO_TX16S)
-  #define ETX_FOURCC 0x3878746F // etx for Radiomaster TX16S
+  #define OTX_FOURCC 0x3878746F // otx for Radiomaster TX16S
 #elif defined(PCBX10)
-  #define ETX_FOURCC 0x3778746F // etx for X10
+  #define OTX_FOURCC 0x3778746F // otx for X10
 #elif defined(PCBX9E)
-  #define ETX_FOURCC 0x3578746F // etx for Taranis X9E
+  #define OTX_FOURCC 0x3578746F // otx for Taranis X9E
+#elif defined(RADIO_TANGO)
+  #define OTX_FOURCC 0x4478746F // otx for Tango
+#elif defined(RADIO_MAMBO)
+  #define OTX_FOURCC 0x4578746F // otx for Mambo
 #elif defined(PCBXLITES)
-  #define ETX_FOURCC 0x3B78746F // etx for Taranis X-Lite S
+  #define OTX_FOURCC 0x3B78746F // otx for Taranis X-Lite S
 #elif defined(PCBXLITE)
-  #define ETX_FOURCC 0x3978746F // etx for Taranis X-Lite
+  #define OTX_FOURCC 0x3978746F // otx for Taranis X-Lite
 #elif defined(RADIO_T12)
-  #define ETX_FOURCC 0x3D78746F // etx for Jumper T12
+  #define OTX_FOURCC 0x3D78746F // otx for Jumper T12
 #elif defined(RADIO_TLITE)
-  #define ETX_FOURCC 0x4278746F // etx for Jumper TLite
+  #define OTX_FOURCC 0x4278746F // otx for Jumper TLite
 #elif defined(RADIO_TPRO)
-  #define ETX_FOURCC 0x4678746F // etx for Jumper TPro
+  #define OTX_FOURCC 0x4678746F // otx for Jumper TPro
 #elif defined(RADIO_TX12)
-  #define ETX_FOURCC 0x4178746F // etx for Radiomaster TX12
+  #define OTX_FOURCC 0x4178746F // otx for Radiomaster TX12
 #elif defined(RADIO_ZORRO)
-  #define ETX_FOURCC 0x4778746F // otx for Radiomaster Zorro
+  #define OTX_FOURCC 0x4778746F // otx for Radiomaster Zorro
 #elif defined(RADIO_T8)
-  #define ETX_FOURCC 0x4378746F // etx for Radiomaster T8
+  #define OTX_FOURCC 0x4378746F // otx for Radiomaster T8
+#elif defined(RADIO_Commando8)
+  #define OTX_FOURCC 0x4478746F // otx for iFlight Commando8
 #elif defined(PCBX7)
-  #define ETX_FOURCC 0x3678746F // etx for Taranis X7 / X7S / X7 Express / X7S Express
+  #define OTX_FOURCC 0x3678746F // otx for Taranis X7 / X7S / X7 Express / X7S Express
 #elif defined(PCBX9LITES)
-  #define ETX_FOURCC 0x3E78746F // etx for Taranis X9-Lite S
+  #define OTX_FOURCC 0x3E78746F // otx for Taranis X9-Lite S
 #elif defined(PCBX9LITE)
-  #define ETX_FOURCC 0x3C78746F // etx for Taranis X9-Lite
+  #define OTX_FOURCC 0x3C78746F // otx for Taranis X9-Lite
 #elif defined(PCBX9D) || defined(PCBX9DP)
-  #define ETX_FOURCC 0x3378746F // etx for Taranis X9D
-#elif defined(PCBNV14)
-  #define ETX_FOURCC 0x3A78746F // etx for NV14
+  #define OTX_FOURCC 0x3378746F // otx for Taranis X9D
 #elif defined(PCBSKY9X)
-  #define ETX_FOURCC 0x3278746F // etx for sky9x
+  #define OTX_FOURCC 0x3278746F // otx for sky9x
 #endif
 
 bool isFileAvailable(const char * filename, bool exclDir = false);
-unsigned int findNextFileIndex(char * filename, uint8_t size, const char * directory);
+int findNextFileIndex(char * filename, uint8_t size, const char * directory);
+bool isExtensionMatching(const char * extension, const char * pattern, char * match = nullptr);
 
 const char * sdCopyFile(const char * src, const char * dest);
 const char * sdCopyFile(const char * srcFilename, const char * srcDir, const char * destFilename, const char * destDir);
@@ -183,5 +181,10 @@ const char * sdCopyFile(const char * srcFilename, const char * srcDir, const cha
 #define LIST_NONE_SD_FILE   1
 #define LIST_SD_FILE_EXT    2
 bool sdListFiles(const char * path, const char * extension, const uint8_t maxlen, const char * selection, uint8_t flags=0);
+
+void sdReadTextFile(const char * filename, char lines[NUM_BODY_LINES][LCD_COLS + 1], int & lines_count);
+
+bool isCwdAtRoot();
+FRESULT sdReadDir(DIR * dir, FILINFO * fno, bool & firstTime);
 
 #endif // _SDCARD_H_

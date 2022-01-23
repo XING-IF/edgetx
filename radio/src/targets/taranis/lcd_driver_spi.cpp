@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -21,7 +20,7 @@
 
 #include "opentx.h"
 
-#if defined(RADIO_FAMILY_JUMPER_T12) || defined(RADIO_TX12) || defined(RADIO_ZORRO) || defined(RADIO_T8) || defined(RADIO_TPRO)
+#if defined(RADIO_FAMILY_JUMPER_T12) || defined(RADIO_TX12) || defined(RADIO_ZORRO) || defined(RADIO_T8) || defined(RADIO_TPRO) || defined(RADIO_Commando8)
   #define LCD_CONTRAST_OFFSET            -10
 #else
   #define LCD_CONTRAST_OFFSET            160

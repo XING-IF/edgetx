@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -25,8 +24,8 @@
 #include "definitions.h"
 #include "opentx_types.h"
 #include "debounce.h"
+#include "globals.h"
 #include "opentx_helpers.h"
-#include "touch.h"
 
 #if defined(SIMU)
 #include "targets/simu/simpgmspace.h"
@@ -34,14 +33,15 @@
 
 #include "board.h"
 
-#if defined(STM32)
-#include "usbd_conf.h"
+
+//Modified T8 applies to commando8
+#if defined(RADIO_Commando8)
+#undef VARIO
 #endif
 
-#if defined(LIBOPENUI)
-  #include "libopenui.h"
-#else
-  #include "libopenui/src/libopenui_file.h"
+
+#if defined(STM32)
+#include "usbd_conf.h"
 #endif
 
 #if defined(SIMU)
@@ -252,7 +252,7 @@
 
 #include "debug.h"
 
-#if defined(PCBFRSKY) || defined(PCBFLYSKY)
+#if defined(PCBTARANIS) || defined(PCBHORUS)
   #define SWSRC_THR                    SWSRC_SB2
   #define SWSRC_GEA                    SWSRC_SG2
   #define SWSRC_ID0                    SWSRC_SA0
@@ -264,11 +264,17 @@
 #endif
 
 #include "myeeprom.h"
-#include "curves.h"
 
 void memswap(void * a, void * b, uint8_t size);
 
-#if defined(PCBX9D) || defined(PCBX9DP) || defined(PCBX9E) || defined(PCBHORUS)
+#if NUM_POTS == 0
+  #define POT_CONFIG(x)                (false)
+  #define IS_POT_MULTIPOS(x)           (false)
+  #define IS_POT_WITHOUT_DETENT(x)     (false)
+  #define IS_POT_AVAILABLE(x)          (false)
+  #define IS_POT_SLIDER_AVAILABLE(x)   (false)
+  #define IS_MULTIPOS_CALIBRATED(cal)  (false)
+#elif defined(PCBX9D) || defined(PCBX9DP) || defined(PCBX9E) || defined(PCBHORUS)
   #define POT_CONFIG(x)                ((g_eeGeneral.potsConfig >> (2*((x)-POT1)))&0x03)
   #define IS_POT_MULTIPOS(x)           (IS_POT(x) && POT_CONFIG(x)==POT_MULTIPOS_SWITCH)
   #define IS_POT_WITHOUT_DETENT(x)     (IS_POT(x) && POT_CONFIG(x)==POT_WITHOUT_DETENT)
@@ -276,7 +282,7 @@ void memswap(void * a, void * b, uint8_t size);
   #define IS_POT_AVAILABLE(x)          (IS_POT(x) && POT_CONFIG(x)!=POT_NONE)
   #define IS_POT_SLIDER_AVAILABLE(x)   (IS_POT_AVAILABLE(x) || IS_SLIDER_AVAILABLE(x))
   #define IS_MULTIPOS_CALIBRATED(cal)  (cal->count>0 && cal->count<XPOTS_MULTIPOS_COUNT)
-#elif defined(PCBX7) || defined(PCBXLITE) || defined(PCBNV14)
+#elif defined(PCBX7) || defined(PCBXLITE)
   #define POT_CONFIG(x)                ((g_eeGeneral.potsConfig >> (2*((x)-POT1)))&0x03)
   #define IS_POT_MULTIPOS(x)           (IS_POT(x) && POT_CONFIG(x)==POT_MULTIPOS_SWITCH)
   #define IS_POT_WITHOUT_DETENT(x)     (IS_POT(x) && POT_CONFIG(x)==POT_WITHOUT_DETENT)
@@ -300,6 +306,12 @@ void memswap(void * a, void * b, uint8_t size);
   #define pwrOffPressed()              pwrPressed()
 #else
   #define pwrOffPressed()              (!pwrPressed())
+#endif
+
+#if defined(RADIO_FAMILY_TBS)
+  #define PWR_PRESS_SHUTDOWN_THRESHOD  300 // 3s
+#else
+  #define PWR_PRESS_SHUTDOWN_THRESHOD  0   // 0s
 #endif
 
 #define GET_LOWRES_POT_POSITION(i)     (getValue(MIXSRC_FIRST_POT+(i)) >> 4)
@@ -372,7 +384,6 @@ extern const uint8_t modn12x3[];
 #endif
 
 extern uint8_t channelOrder(uint8_t x);
-extern uint8_t channelOrder(uint8_t setup, uint8_t x);
 
 #define THRCHK_DEADBAND                16
 
@@ -397,27 +408,26 @@ inline bool SPLASH_NEEDED()
   #define IS_ROTARY_ENCODER_NAVIGATION_ENABLE()  true
   extern volatile rotenc_t rotencValue;
   #define ROTARY_ENCODER_NAVIGATION_VALUE        rotencValue
+  extern uint8_t rotencSpeed;
   #define ROTENC_LOWSPEED              1
   #define ROTENC_MIDSPEED              5
   #define ROTENC_HIGHSPEED             50
   #define ROTENC_DELAY_MIDSPEED        32
   #define ROTENC_DELAY_HIGHSPEED       16
-#elif defined(RADIO_T8)
+#elif defined(RADIO_T8) || defined(RADIO_Commando8)
   constexpr uint8_t rotencSpeed = 1;
 #endif
 
 constexpr uint8_t HEART_TIMER_10MS = 0x01;
 constexpr uint8_t HEART_TIMER_PULSES = 0x02; // when multiple modules this is the first one
 
-constexpr uint8_t HEART_WDT_CHECK = HEART_TIMER_10MS
-#if defined(HARDWARE_INTERNAL_MODULE)
-                                    + (HEART_TIMER_PULSES << INTERNAL_MODULE)
+#if defined(HARDWARE_INTERNAL_MODULE) && defined(HARDWARE_EXTERNAL_MODULE)
+constexpr uint8_t HEART_WDT_CHECK = HEART_TIMER_10MS + (HEART_TIMER_PULSES << INTERNAL_MODULE) + (HEART_TIMER_PULSES << EXTERNAL_MODULE);
+#elif defined(HARDWARE_EXTERNAL_MODULE)
+constexpr uint8_t HEART_WDT_CHECK = HEART_TIMER_10MS + (HEART_TIMER_PULSES << EXTERNAL_MODULE);
+#elif defined(HARDWARE_INTERNAL_MODULE)
+constexpr uint8_t HEART_WDT_CHECK = HEART_TIMER_10MS + (HEART_TIMER_PULSES << INTERNAL_MODULE);
 #endif
-#if defined(HARDWARE_EXTERNAL_MODULE)
-                                    + (HEART_TIMER_PULSES << EXTERNAL_MODULE)
-#endif
-    ;  // end of HEART_WDT_CHECK
-
 extern uint8_t heartbeat;
 
 #if !defined(BOOT)
@@ -445,10 +455,18 @@ extern InactivityData inactivity;
 #define ZCHAR_MAX (LEN_STD_CHARS + LEN_SPECIAL_CHARS)
 #endif
 
+char hex2zchar(uint8_t hex);
+char zchar2char(int8_t idx);
+char char2lower(char c);
+int8_t char2zchar(char c);
+void str2zchar(char *dest, const char *src, int size);
+int zchar2str(char *dest, const char *src, int size);
+bool cmpStrWithZchar(const char * charString, const char * zcharString, int size);
+
 #include "keys.h"
 #include "pwr.h"
 
-#if defined(PCBFRSKY) || defined(PCBNV14)
+#if defined(PCBTARANIS) || defined(PCBHORUS)
 div_t switchInfo(int switchPosition);
 extern uint8_t potsPos[NUM_XPOTS];
 #endif
@@ -465,10 +483,15 @@ uint16_t evalChkSum();
 void alert(const char * title, const char * msg, uint8_t sound);
 
 #if !defined(GUI)
-
   #define RAISE_ALERT(...)
   #define ALERT(...)
+#else
+  inline void RAISE_ALERT(const char * title, const char * msg, const char * info, uint8_t sound)
+  {
+    showAlertBox(title, msg, info, sound);
+  }
 
+<<<<<<< Updated upstream
 #elif defined(COLORLCD)
 
 #define TELEMETRY_CHECK_DELAY10ms 150
@@ -502,6 +525,13 @@ inline void ALERT(const char *title, const char *msg, uint8_t sound)
 }
 
 #endif // !COLORLCD && GUI
+=======
+  inline void ALERT(const char * title, const char * msg, uint8_t sound)
+  {
+    alert(title, msg, sound);
+  }
+#endif
+>>>>>>> Stashed changes
 
 enum PerOutMode {
   e_perout_mode_normal = 0,
@@ -525,11 +555,13 @@ extern uint8_t flightModeTransitionLast;
   #define availableMemory() ((unsigned int)((unsigned char *)&_heap_end - heap))
 #endif
 
+extern uint32_t nextMixerTime[NUM_MODULES];
 
 void evalFlightModeMixes(uint8_t mode, uint8_t tick10ms);
 void evalMixes(uint8_t tick10ms);
 void doMixerCalculations();
 void doMixerPeriodicUpdates();
+void scheduleNextMixerCalculation(uint8_t module, uint32_t period_ms);
 
 void checkTrims();
 extern uint8_t currentBacklightBright;
@@ -547,7 +579,7 @@ void logicalSwitchesReset();
 void evalLogicalSwitches(bool isCurrentFlightmode=true);
 void logicalSwitchesCopyState(uint8_t src, uint8_t dst);
 
-#if defined(PCBFRSKY) || defined(PCBFLYSKY)
+#if defined(PCBTARANIS) || defined(PCBHORUS)
   void getSwitchesPosition(bool startup);
 #else
   #define getSwitchesPosition(...)
@@ -556,7 +588,8 @@ void logicalSwitchesCopyState(uint8_t src, uint8_t dst);
 extern swarnstate_t switches_states;
 swsrc_t getMovedSwitch();
 
-int8_t getMovedSource(uint8_t min);
+#define GET_MOVED_SOURCE_PARAMS uint8_t min
+int8_t getMovedSource(GET_MOVED_SOURCE_PARAMS);
 #define GET_MOVED_SOURCE(min, max) getMovedSource(min)
 
 #if defined(FLIGHT_MODES)
@@ -581,6 +614,8 @@ bool setTrimValue(uint8_t phase, uint8_t idx, int trim);
 
 #if defined(PCBSKY9X)
   #define ROTARY_ENCODER_GRANULARITY (2 << g_eeGeneral.rotarySteps)
+#elif defined(RADIO_FAMILY_TBS)
+  #define ROTARY_ENCODER_GRANULARITY (1)
 #else
   #define ROTARY_ENCODER_GRANULARITY (2)
 #endif
@@ -623,9 +658,15 @@ void flightReset(uint8_t check=true);
   void doSplash();
 #endif
 
-// disabled function (not used anywhere)
-#define READ_ONLY() false
-#define READ_ONLY_UNLOCKED() true
+#if MENUS_LOCK == 1
+  extern bool readonly;
+  extern bool readonlyUnlocked();
+  #define READ_ONLY() readonly
+  #define READ_ONLY_UNLOCKED() readonlyUnlocked()
+#else
+  #define READ_ONLY() false
+  #define READ_ONLY_UNLOCKED() true
+#endif
 
 void checkLowEEPROM();
 void checkThrottleStick();
@@ -645,6 +686,8 @@ static inline void GET_ADC_IF_MIXER_NOT_RUNNING()
 
 void resetBacklightTimeout();
 void checkBacklight();
+
+#define BITMASK(bit) (1<<(bit))
 
 uint16_t isqrt32(uint32_t n);
 
@@ -667,11 +710,23 @@ inline void resumeMixerCalculations()
 
 void setDefaultOwnerId();
 void generalDefault();
+void modelDefault(uint8_t id);
+
+#if defined(EEPROM)
+void checkModelIdUnique(uint8_t index, uint8_t module);
+uint8_t findNextUnusedModelId(uint8_t index, uint8_t module);
+#elif defined(EEPROM_SDCARD)
+void checkModelIdUnique(uint8_t module);
+#endif
 
 uint32_t hash(const void * ptr, uint32_t size);
-
-#define calc100to256_16Bits(x) calc100to256(x)
-#define calc100toRESX_16Bits(x) calc100toRESX(x)
+inline int divRoundClosest(const int n, const int d)
+{
+  if (d == 0)
+    return 0;
+  else
+    return ((n < 0) ^ (d < 0)) ? ((n - d/2)/d) : ((n + d/2)/d);
+}
 
 #define calc100to256_16Bits(x) calc100to256(x)
 #define calc100toRESX_16Bits(x) calc100toRESX(x)
@@ -701,12 +756,13 @@ inline int calcRESXto100(int x)
   return divRoundClosest(x*100, RESX);
 }
 
+
 #if defined(COLORLCD)
 extern const char fw_stamp[];
 extern const char vers_stamp[];
 extern const char date_stamp[];
 extern const char time_stamp[];
-extern const char cfgv_stamp[];
+extern const char eeprom_stamp[];
 #else
 extern const char vers_stamp[];
 #endif
@@ -782,6 +838,38 @@ inline void getGVarIncDecRange(int16_t & valMin, int16_t & valMax)
 }
 #endif
 
+// Curves
+enum BaseCurves {
+  CURVE_NONE,
+  CURVE_X_GT0,
+  CURVE_X_LT0,
+  CURVE_ABS_X,
+  CURVE_F_GT0,
+  CURVE_F_LT0,
+  CURVE_ABS_F,
+  CURVE_BASE
+};
+int8_t * curveAddress(uint8_t idx);
+struct point_t
+{
+  coord_t x;
+  coord_t y;
+};
+point_t getPoint(uint8_t i);
+typedef CurveData CurveInfo;
+void loadCurves();
+#define LOAD_MODEL_CURVES() loadCurves()
+int intpol(int x, uint8_t idx);
+int applyCurve(int x, CurveRef & curve);
+int applyCustomCurve(int x, uint8_t idx);
+int applyCurrentCurve(int x);
+int8_t getCurveX(int noPoints, int point);
+void resetCustomCurveX(int8_t * points, int noPoints);
+bool moveCurve(uint8_t index, int8_t shift); // TODO bool?
+
+void clearInputs();
+void defaultInputs();
+
 void applyExpos(int16_t * anas, uint8_t mode, uint8_t ovwrIdx=0, int16_t ovwrValue=0);
 int16_t applyLimits(uint8_t channel, int32_t value);
 
@@ -804,15 +892,34 @@ void copySticksToOffset(uint8_t ch);
 void copyMinMaxToOutputs(uint8_t ch);
 void moveTrimsToOffsets();
 
-inline bool isExpoActive(uint8_t expo)
-{
-  return swOn[expo].activeExpo;
-}
+#if defined(BOLD_FONT)
+  inline bool isExpoActive(uint8_t expo)
+  {
+    return swOn[expo].activeExpo;
+  }
 
-inline bool isMixActive(uint8_t mix)
-{
-  return swOn[mix].activeMix;
-}
+  inline bool isMixActive(uint8_t mix)
+  {
+    return swOn[mix].activeMix;
+  }
+#else
+  #define isExpoActive(x) false
+  #define isMixActive(x) false
+#endif
+
+enum LogicalSwitchFamilies {
+  LS_FAMILY_OFS,
+  LS_FAMILY_BOOL,
+  LS_FAMILY_COMP,
+  LS_FAMILY_DIFF,
+  LS_FAMILY_TIMER,
+  LS_FAMILY_STICKY,
+  LS_FAMILY_RANGE,
+  LS_FAMILY_EDGE
+};
+
+uint8_t lswFamily(uint8_t func);
+int16_t lswTimerValue(delayval_t val);
 
 enum FunctionsActive {
   FUNCTION_TRAINER_STICK1,
@@ -826,9 +933,6 @@ enum FunctionsActive {
   FUNCTION_BACKGND_MUSIC_PAUSE,
   FUNCTION_BACKLIGHT,
   FUNCTION_RACING_MODE,
-#if defined(HARDWARE_TOUCH)
-  FUNCTION_DISABLE_TOUCH,
-#endif
 };
 
 #define VARIO_FREQUENCY_ZERO   700/*Hz*/
@@ -890,18 +994,23 @@ enum AUDIO_SOUNDS {
   AU_STICK2_MIDDLE,
   AU_STICK3_MIDDLE,
   AU_STICK4_MIDDLE,
-#if defined(PCBFRSKY)
+#if !defined(HARDWARE_TRIMS)
+  AU_AILERON_TRIM,
+  AU_ELEVATOR_TRIM,
+  AU_THROTTLE_TRIM,
+  AU_RUDDER_TRIME,
+  AU_MAIN_MENU,
+#endif
+#if defined(RADIO_FAMILY_TBS)
+  AU_CATEGORY_ENABLED,
+  AU_CATEGORY_DISABLED,
+#endif
+#if defined(PCBTARANIS) || defined(PCBHORUS)
   AU_POT1_MIDDLE,
   AU_POT2_MIDDLE,
 #if defined(PCBX9E)
   AU_POT3_MIDDLE,
   AU_POT4_MIDDLE,
-#endif
-#if defined(PCBX10)
-  AU_POT4_MIDDLE,
-  AU_POT5_MIDDLE,
-  AU_POT6_MIDDLE,
-  AU_POT7_MIDDLE,
 #endif
   AU_SLIDER1_MIDDLE,
   AU_SLIDER2_MIDDLE,
@@ -940,7 +1049,7 @@ enum AUDIO_SOUNDS {
   AU_SPECIAL_SOUND_ALARMC,
   AU_SPECIAL_SOUND_LAST,
 
-  AU_NONE = 0xff
+  AU_NONE=0xff
 };
 
 #if defined(AUDIO)
@@ -949,6 +1058,7 @@ enum AUDIO_SOUNDS {
 
 #include "buzzer.h"
 #include "translations.h"
+#include "fonts.h"
 
 #if defined(HAPTIC)
 #include "haptic.h"
@@ -978,7 +1088,7 @@ constexpr uint8_t OPENTX_START_NO_CHECKS = 0x04;
 
 #if defined(STATUS_LEDS)
   #define LED_ERROR_BEGIN()            ledRed()
-#if defined(RADIO_T8)
+#if defined(RADIO_T8) ||  defined(RADIO_Commando8)
   // Because of green backlit logo, green is preferred on this radio
   #define LED_ERROR_END()              ledGreen()
   #define LED_BIND()                   ledBlue()
@@ -1009,10 +1119,10 @@ union ReusableBuffer
 #if defined(EEPROM_RLC) && LCD_W < 212
     uint16_t eepromfree;
 #endif
-#if defined(SDCARD) && !defined(COLORLCD)
+#if defined(SDCARD)
     char menu_bss[POPUP_MENU_MAX_LINES][MENU_LINE_LENGTH];
     char mainname[45]; // because reused for SD backup / restore, max backup filename 44 chars: "/MODELS/MODEL0134353-2014-06-19-04-51-27.bin"
-#elif !defined(COLORLCD)
+#else
     char mainname[LEN_MODEL_NAME];
 #endif
   } modelsel;
@@ -1024,7 +1134,24 @@ union ReusableBuffer
     uint8_t previousType;
     uint8_t newType;
     BindInformation bindInformation;
-    PXX2ModuleSetup pxx2;
+    struct {
+      union {
+        uint8_t registerStep;
+        uint8_t resetStep;
+      };
+      uint8_t registerPopupVerticalPosition;
+      uint8_t registerPopupHorizontalPosition;
+      int8_t registerPopupEditMode;
+      char registerRxName[PXX2_LEN_RX_NAME];
+      uint8_t registerLoopIndex; // will be removed later
+      union {
+        uint8_t shareReceiverIndex;
+        uint8_t resetReceiverIndex;
+      };
+      uint8_t resetReceiverFlags;
+      ModuleInformation moduleInformation;
+      ModuleSettings moduleSettings;
+    } pxx2;
 #if defined(BLUETOOTH)
     struct {
       char devices[MAX_BLUETOOTH_DISTANT_ADDR][LEN_BLUETOOTH_ADDR+1];
@@ -1038,7 +1165,7 @@ union ReusableBuffer
     int16_t loVals[NUM_STICKS+NUM_POTS+NUM_SLIDERS+STORAGE_NUM_MOUSE_ANALOGS];
     int16_t hiVals[NUM_STICKS+NUM_POTS+NUM_SLIDERS+STORAGE_NUM_MOUSE_ANALOGS];
     uint8_t state;
-#if defined(PCBFRSKY)
+#if defined(PCBTARANIS) || defined(PCBHORUS)
     struct {
       uint8_t stepsCount;
       int16_t steps[XPOTS_MULTIPOS_COUNT];
@@ -1060,20 +1187,16 @@ union ReusableBuffer
   } sdManager;
 #endif
 
-#if defined(STM32)
-  struct
-  {
-    char id[27];
-  } version;
-#endif
-
-  // moduleOptions, receiverOptions, radioVersion
-  PXX2HardwareAndSettings hardwareAndSettings;
+  struct {
+    ModuleInformation modules[NUM_MODULES];
+    uint32_t updateTime;
+    ModuleSettings moduleSettings;
+    ReceiverSettings receiverSettings; // when dealing with receiver settings, we also need module settings
+  } hardwareAndSettings; // moduleOptions, receiverOptions, radioVersion
 
   struct {
     ModuleInformation modules[NUM_MODULES];
     uint8_t linesCount;
-    char msg[64];
   } radioTools;
 
   struct {
@@ -1151,25 +1274,15 @@ extern ReusableBuffer reusableBuffer;
 
 uint8_t zlen(const char *str, uint8_t size);
 bool zexist(const char *str, uint8_t size);
-char * strcat_zchar(char *dest, const char *name, uint8_t size, const char spaceSym = 0, const char *defaultName=nullptr, uint8_t defaultNameSize=0, uint8_t defaultIdx=0);
-#define strcatFlightmodeName(dest, idx) strcat_zchar(dest, g_model.flightModeData[idx].name, LEN_FLIGHT_MODE_NAME, 0, STR_FM, PSIZE(TR_FM), idx+1)
-
-#if !defined(STORAGE_MODELSLIST)
-
-#define strcat_modelname(dest, idx)                                     \
-  strcat_zchar(dest, modelHeaders[idx].name, LEN_MODEL_NAME, 0, STR_MODEL, \
-               PSIZE(TR_MODEL), idx + 1)
-
-#define strcat_currentmodelname(dest, foo)      \
-  strcat_modelname(dest, g_eeGeneral.currModel)
-
+unsigned int effectiveLen(const char * str, unsigned int size);
+char * strcat_zchar(char *dest, const char *name, uint8_t size, const char *defaultName=nullptr, uint8_t defaultNameSize=0, uint8_t defaultIdx=0);
+#define strcatFlightmodeName(dest, idx) strcat_zchar(dest, g_model.flightModeData[idx].name, LEN_FLIGHT_MODE_NAME, STR_FM, PSIZE(TR_FM), idx+1)
+#if defined(EEPROM)
+#define strcat_modelname(dest, idx) strcat_zchar(dest, modelHeaders[idx].name, LEN_MODEL_NAME, STR_MODEL, PSIZE(TR_MODEL), idx+1)
+#define strcat_currentmodelname(dest) strcat_modelname(dest, g_eeGeneral.currModel)
 #else
-
-#define strcat_currentmodelname(dest, spaceSym)                         \
-  strcat_zchar(dest, g_model.header.name, LEN_MODEL_NAME, spaceSym)
-
+#define strcat_currentmodelname(dest) strcat_zchar(dest, g_model.header.name, LEN_MODEL_NAME)
 #endif
-
 #define ZLEN(s) zlen(s, sizeof(s))
 #define ZEXIST(s) zexist(s, sizeof(s))
 
@@ -1186,17 +1299,38 @@ inline getvalue_t convertTelemValue(source_t channel, ls_telemetry_value_t value
   return convert16bitsTelemValue(channel, value);
 }
 
+inline int div_and_round(int num, int den)
+{
+  if (den == 0) {
+    return 0;
+  }
+  else if (num >= 0) {
+    num += den / 2;
+  }
+  else {
+    num -= den / 2;
+  }
+  return num / den;
+}
+
 extern uint8_t g_vbat100mV;
 
 inline uint8_t GET_TXBATT_BARS(uint8_t barsMax)
 {
-  return limit<int8_t>(0, divRoundClosest(barsMax * (g_vbat100mV - g_eeGeneral.vBatMin - 90), 30 + g_eeGeneral.vBatMax - g_eeGeneral.vBatMin), barsMax);
+  return limit<int8_t>(0, div_and_round(barsMax * (g_vbat100mV - g_eeGeneral.vBatMin - 90), 30 + g_eeGeneral.vBatMax - g_eeGeneral.vBatMin), barsMax);
 }
 
 inline bool IS_TXBATT_WARNING()
 {
   return g_vbat100mV <= g_eeGeneral.vBatWarn;
 }
+
+#if defined(BATT_CRITICAL_SHUTDOWN)
+inline bool IS_TXBATT_CRITICAL()
+{
+  return g_vbat100mV <= BATTERY_CRITICAL;
+}
+#endif
 
 enum TelemetryViews {
   TELEMETRY_CUSTOM_SCREEN_1,
@@ -1230,6 +1364,12 @@ void usbPluggedIn();
 
 #include "lua/lua_api.h"
 
+#if defined(LUA)
+#define LUA_DEFINED() true
+#else
+#define LUA_DEFINED() false
+#endif
+
 #if defined(SDCARD)
 enum ClipboardType {
   CLIPBOARD_TYPE_NONE,
@@ -1260,7 +1400,7 @@ extern Clipboard clipboard;
 #endif
 
 #if !defined(SIMU)
-extern uint32_t s_anaFilt[NUM_ANALOGS];
+extern uint16_t s_anaFilt[NUM_ANALOGS];
 #endif
 
 #define JITTER_FILTER_STRENGTH  4         // tune this value, bigger value - more filtering (range: 1-5) (see explanation below)
@@ -1314,6 +1454,29 @@ inline bool isAsteriskDisplayed()
   return globalData.unexpectedShutdown;
 }
 
-#include "module.h"
+#if defined(INTERNAL_MODULE_CRSF)
+#include "./io/crsf/crsf_write.h"
+#include "./io/crsf/crsf_utilities.h"
+#include "./io/crsf/crossfire.h"
+#endif
 
-extern CircularBuffer<uint8_t, 8> luaSetStickySwitchBuffer;
+#if defined(ACCESS_LIB)
+#include "thirdparty/libACCESS/libAccess.h"
+#endif
+
+#define VBAT_MIN_OFFSET 90
+#define VBAT_MAX_OFFSET 120
+#define VBAT_MIN_DELTA (VBAT_MAX_OFFSET - VBAT_MIN_OFFSET - 1)
+
+#if defined(BATTERY_TYPE_FIXED)
+#define VBAT_MIN_ALLOWED  BATTERY_MIN
+#define VBAT_MAX_ALLOWED  BATTERY_MAX
+#define VBAT_WARNING_MIN_ALLOWED  BATTERY_MIN
+#define VBAT_WARNING_MAX_ALLOWED  (BATTERY_MIN + 5)
+#else
+#define VBAT_WARNING_MIN_ALLOWED  30  // 3.0v
+  #define VBAT_WARNING_MAX_ALLOWED  120 // 12v
+  #define VBAT_MIN_ALLOWED  30  // 3.0v
+  #define VBAT_MAX_ALLOWED  160 // 16v
+#endif
+

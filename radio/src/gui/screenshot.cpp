@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -63,9 +62,11 @@ const char * writeScreenshot()
     return error;
   }
 
+#if defined(RTCLOCK) //This is a bug. An error is reported when RTC is closed.
   char * tmp = strAppend(&filename[sizeof(SCREENSHOTS_PATH)-1], "/screen");
   tmp = strAppendDate(tmp, true);
   strcpy(tmp, BMP_EXT);
+#endif
 
   FRESULT result = f_open(&bmpFile, filename, FA_CREATE_ALWAYS | FA_WRITE);
   if (result != FR_OK) {
@@ -81,8 +82,7 @@ const char * writeScreenshot()
 #if defined(COLORLCD)
   for (int y = LCD_H - 1; y >= 0; y--) {
     for (int x = 0; x < LCD_W; x++) {
-      lcdFront->reset();
-      auto pixel = *(lcdFront->getPixelPtr(x, y));
+      display_t pixel = *lcd->getPixelPtr(x, y);
       uint32_t dst = (0xFF << 24) + (GET_RED(pixel) << 16) + (GET_GREEN(pixel) << 8) + (GET_BLUE(pixel) << 0);
       if (f_write(&bmpFile, &dst, sizeof(dst), &written) != FR_OK || written != sizeof(dst)) {
         f_close(&bmpFile);
@@ -91,9 +91,14 @@ const char * writeScreenshot()
     }
   }
 #else
+#if LCD_H > 64
+  for (int y=0; y<LCD_H; y++) {
+    for (int x=LCD_W-2; x>=0; x-=2) {
+#else
   for (int y=LCD_H-1; y>=0; y-=1) {
     for (int x=0; x<8*((LCD_W+7)/8); x+=2) {
-      pixel_t byte = getPixel(x+1, y) + (getPixel(x, y) << 4);
+#endif
+      display_t byte = getPixel(x+1, y) + (getPixel(x, y) << 4);
       if (f_write(&bmpFile, &byte, 1, &written) != FR_OK || written != 1) {
         f_close(&bmpFile);
         return SDCARD_ERROR(result);

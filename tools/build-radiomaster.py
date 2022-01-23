@@ -50,6 +50,18 @@ boards = {
         "PCBREV": "T8",
         "DEFAULT_MODE": "2",
         "RADIOMASTER_RTF_RELEASE": "YES",
+    },
+    "Commando8_1": {
+        "PCB": "X7",
+        "PCBREV": "Commando8",
+        "DEFAULT_MODE": "1",
+        "iFlight_RELEASE": "YES",
+    },
+    "Commando8_2": {
+        "PCB": "X7",
+        "PCBREV": "Commando8",
+        "DEFAULT_MODE": "2",
+        "iFlight_RELEASE": "YES",
     }
 }
 

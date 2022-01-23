@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -24,15 +23,8 @@
 #include "opentx.h"
 #include "stamp.h"
 #include "lua_api.h"
-#include "api_filesystem.h"
 #include "telemetry/frsky.h"
 #include "telemetry/multi.h"
-
-#if defined(LIBOPENUI)
-  #include "libopenui.h"
-  #include "api_colorlcd.h"
-  #include "standalone_lua.h"
-#endif
 
 #if defined(PCBX12S)
   #include "lua/lua_exports_x12s.inc"   // this line must be after lua headers
@@ -58,6 +50,12 @@
   #include "lua/lua_exports_zorro.inc"
 #elif defined(RADIO_T8)
   #include "lua/lua_exports_t8.inc"
+#elif defined(RADIO_Commando8)
+  #include "lua/lua_exports_Commando8.inc"
+#elif defined(RADIO_TANGO)
+  #include "lua/lua_exports_tango.inc"
+#elif defined(RADIO_MAMBO)
+  #include "lua/lua_exports_mambo.inc"
 #elif defined(PCBX9LITES)
   #include "lua/lua_exports_x9lites.inc"
 #elif defined(PCBX9LITE)
@@ -70,8 +68,6 @@
   #include "lua/lua_exports_x9d+2019.inc"
 #elif defined(PCBTARANIS)
   #include "lua/lua_exports_x9d.inc"
-#elif defined(PCBNV14)
-  #include "lua/lua_exports_nv14.inc"
 #endif
 
 #if defined(SIMU)
@@ -80,7 +76,7 @@
   #define RADIO_VERSION FLAVOUR
 #endif
 
-#define VERSION_OSNAME "EdgeTX"
+#define VERSION_OSNAME "OpenTX"
 
 #define FIND_FIELD_DESC  0x01
 
@@ -101,17 +97,16 @@ Return OpenTX version
 
 @retval string OpenTX version (ie "2.1.5")
 
-@retval multiple values (available since 2.1.7):
+@retval multiple (available since 2.1.7) returns 6 values:
  * (string) OpenTX version (ie "2.1.5")
  * (string) radio type: `x12s`, `x10`, `x9e`, `x9d+`, `x9d` or `x7`.
 If running in simulator the "-simu" is added
  * (number) major version (ie 2 if version 2.1.5)
  * (number) minor version (ie 1 if version 2.1.5)
  * (number) revision number (ie 5 if version 2.1.5)
-Since EdgeTX 2.4.0, sixth value added
- * (string) OS name (i.e. EdgeTX or nil if OpenTX)
+ * (string) OS name (ie "OpenTX" if OpenTX)
 
-@status current Introduced in 2.0.0, expanded in 2.1.7, radio type strings changed in 2.2.0, os name added in EdgeTX 2.4.0
+@status current Introduced in 2.0.0, expanded in 2.1.7, radio type strings changed in 2.2.0, OS name added in 2.3.14
 
 ### Example
 
@@ -133,12 +128,12 @@ return {  run=run }
 ```
 Output of the above script in simulator:
 ```
-version: 2.4.0
-radio: tx16s-simu
+version: 2.3.14
+radio: taranis-simu
 maj: 2
-minor: 4
-rev: 0
-osname: EdgeTX
+minor: 3
+rev: 14
+osname: OpenTX
 ```
 */
 static int luaGetVersion(lua_State * L)
@@ -171,7 +166,7 @@ static int luaGetTime(lua_State * L)
   return 1;
 }
 
-void luaPushDateTime(lua_State * L, uint32_t year, uint32_t mon, uint32_t day,
+static void luaPushDateTime(lua_State * L, uint32_t year, uint32_t mon, uint32_t day,
                             uint32_t hour, uint32_t min, uint32_t sec)
 {
   uint32_t hour12 = hour;
@@ -327,8 +322,6 @@ void luaGetValueAndPush(lua_State* L, int src)
 */
 bool luaFindFieldByName(const char * name, LuaField & field, unsigned int flags)
 {
-  strncpy(field.name, name, sizeof(field.name) - 1);
-  field.name[sizeof(field.name) - 1] = '\0';
   // TODO better search method (binary lookup)
   for (unsigned int n=0; n<DIM(luaSingleFields); ++n) {
     if (!strcmp(name, luaSingleFields[n].name)) {
@@ -351,25 +344,20 @@ bool luaFindFieldByName(const char * name, LuaField & field, unsigned int flags)
     unsigned int fieldLen = strlen(fieldName);
     if (!strncmp(name, fieldName, fieldLen)) {
       unsigned int index;
-      if (len >= fieldLen + 1 && isdigit(name[fieldLen])) {
-        index = name[fieldLen] - '0';
-        if (len >= fieldLen + 2 && isdigit(name[fieldLen + 1])) {
-          index = 10 * index + (name[fieldLen + 1] - '0');
-        }
-        index -= 1;
+      if (len == fieldLen+1 && isdigit(name[fieldLen])) {
+        index = name[fieldLen] - '1';
+      }
+      else if (len == fieldLen+2 && isdigit(name[fieldLen]) && isdigit(name[fieldLen+1])) {
+        index = 10 * (name[fieldLen] - '0') + (name[fieldLen+1] - '1');
       }
       else {
         continue;
       }
       if (index < luaMultipleFields[n].count) {
-        if(luaMultipleFields[n].id == MIXSRC_FIRST_TELEM) {
-          index *= 3;
-          if (name[len - 1] == '-')
-            index += 1;
-          else if (name[len - 1] == '+')
-            index += 2;
-        }
-        field.id = luaMultipleFields[n].id + index;
+        if(luaMultipleFields[n].id == MIXSRC_FIRST_TELEM)
+          field.id = luaMultipleFields[n].id + index*3;
+        else
+          field.id = luaMultipleFields[n].id + index;
         if (flags & FIND_FIELD_DESC) {
           snprintf(field.desc, sizeof(field.desc)-1, luaMultipleFields[n].desc, index+1);
           field.desc[sizeof(field.desc)-1] = '\0';
@@ -384,90 +372,25 @@ bool luaFindFieldByName(const char * name, LuaField & field, unsigned int flags)
 
   // search in telemetry
   field.desc[0] = '\0';
-  for (int i = 0; i < MAX_TELEMETRY_SENSORS; i++) {
+  for (int i=0; i<MAX_TELEMETRY_SENSORS; i++) {
     if (isTelemetryFieldAvailable(i)) {
-      const char* sensorName = g_model.telemetrySensors[i].label;
-      int len = strnlen(sensorName, TELEM_LABEL_LEN);
+      char sensorName[TELEM_LABEL_LEN+1];
+      int len = zchar2str(sensorName, g_model.telemetrySensors[i].label, TELEM_LABEL_LEN);
       if (!strncmp(sensorName, name, len)) {
         if (name[len] == '\0') {
-          field.id = MIXSRC_FIRST_TELEM + 3 * i;
-          field.desc[0] = '\0';
-          return true;
-        } else if (name[len] == '-' && name[len + 1] == '\0') {
-          field.id = MIXSRC_FIRST_TELEM + 3 * i + 1;
-          field.desc[0] = '\0';
-          return true;
-        } else if (name[len] == '+' && name[len + 1] == '\0') {
-          field.id = MIXSRC_FIRST_TELEM + 3 * i + 2;
+          field.id = MIXSRC_FIRST_TELEM + 3*i;
           field.desc[0] = '\0';
           return true;
         }
-      }
-    }
-  }
-
-  return false;  // not found
-}
-
-// Return field data for a given field id
-bool luaFindFieldById(int id, LuaField & field, unsigned int flags)
-{
-  field.id = id;
-  field.name[sizeof(field.name) - 1] = '\0';
-  field.desc[0] = '\0';
-
-  // TODO better search method (binary lookup)
-  for (unsigned int n = 0; n < DIM(luaSingleFields); ++n) {
-    if (id == luaSingleFields[n].id) {
-      strncpy(field.name, luaSingleFields[n].name, sizeof(field.name) - 1);
-      if (flags & FIND_FIELD_DESC) {
-        strncpy(field.desc, luaSingleFields[n].desc, sizeof(field.desc) - 1);
-        field.desc[sizeof(field.desc) - 1] = '\0';
-      }
-      return true;
-    }
-  }
-
-  // search in multiples
-  for (unsigned int n = 0; n < DIM(luaMultipleFields); ++n) {
-    int index = id - luaMultipleFields[n].id;
-    if (0 <= index && index < luaMultipleFields[n].count) {
-      int index2 = 0;
-      if(luaMultipleFields[n].id == MIXSRC_FIRST_TELEM) {
-        index2 = index % 3;
-        index /= 3;
-      }
-      switch (index2) {
-        case 0:
-          snprintf(field.name, sizeof(field.name), "%s%i", luaMultipleFields[n].name, index + 1);
-          break;
-        case 1:
-          snprintf(field.name, sizeof(field.name), "%s%i-", luaMultipleFields[n].name, index + 1);
-          break;
-        case 2:
-          snprintf(field.name, sizeof(field.name), "%s%i+", luaMultipleFields[n].name, index + 1);
-      }
-      if (flags & FIND_FIELD_DESC)
-        snprintf(field.desc, sizeof(field.desc), luaMultipleFields[n].desc, index + 1);
-      return true;
-    }
-  }
-
-  // search in telemetry
-  for (int i = 0; i < MAX_TELEMETRY_SENSORS; i++) {
-    if (isTelemetryFieldAvailable(i)) {
-      int index = id - (MIXSRC_FIRST_TELEM + 3 * i);
-      if (0 <= index && index < 3) {
-        const char* sensorName = g_model.telemetrySensors[i].label;
-        switch (index) {
-          case 0:
-            snprintf(field.name, sizeof(field.name), "%s", sensorName);
-            break;
-          case 1:
-            snprintf(field.name, sizeof(field.name), "%s-", sensorName);
-            break;
-          case 2:
-            snprintf(field.name, sizeof(field.name), "%s+", sensorName);
+        else if (name[len] == '-' && name[len+1] == '\0') {
+          field.id = MIXSRC_FIRST_TELEM + 3*i + 1;
+          field.desc[0] = '\0';
+          return true;
+        }
+        else if (name[len] == '+' && name[len+1] == '\0') {
+          field.id = MIXSRC_FIRST_TELEM + 3*i + 2;
+          field.desc[0] = '\0';
+          return true;
         }
       }
     }
@@ -572,8 +495,7 @@ When called without parameters, it will only return the status of the output buf
 
 static int luaSportTelemetryPush(lua_State * L)
 {
-  // dirty hack until 2 simultanous protocols are supported
-  if (isModuleCrossfire(INTERNAL_MODULE) || !IS_FRSKY_SPORT_PROTOCOL()) {
+  if (!IS_FRSKY_SPORT_PROTOCOL()) {
     lua_pushnil(L);
     return 1;
   }
@@ -775,10 +697,38 @@ When called without parameters, it will only return the status of the output buf
 */
 static int luaCrossfireTelemetryPush(lua_State * L)
 {
-  bool sport = (telemetryProtocol == PROTOCOL_TELEMETRY_CROSSFIRE);
-  bool internal = (moduleState[INTERNAL_MODULE].protocol == PROTOCOL_CHANNELS_CROSSFIRE);
-
-  if (!internal && !sport) {
+#if defined(RADIO_FAMILY_TBS)
+  if (IS_INTERNAL_MODULE_ENABLED()) {
+    if (lua_gettop(L) == 0) {
+      lua_pushboolean(L, outputTelemetryBuffer.isAvailable());
+    }
+    else if (outputTelemetryBuffer.isAvailable()) {
+      uint8_t command = luaL_checkunsigned(L, 1);
+      luaL_checktype(L, 2, LUA_TTABLE);
+      uint8_t length = luaL_len(L, 2);
+      outputTelemetryBuffer.pushByte(MODULE_ADDRESS);
+      outputTelemetryBuffer.pushByte(2 + length); // 1(COMMAND) + data length + 1(CRC)
+      outputTelemetryBuffer.pushByte(command); // COMMAND
+      for (int i = 0; i < length; i++) {
+        lua_rawgeti(L, 2, i + 1);
+        outputTelemetryBuffer.pushByte(luaL_checkunsigned(L, -1));
+      }
+      outputTelemetryBuffer.pushByte(crc8(outputTelemetryBuffer.data + 2, 1 + length));
+      telemetryOutputSetTrigger(command);
+#if !defined(SIMU)
+      libCrsfRouting(DEVICE_INTERNAL, outputTelemetryBuffer.data);
+      outputTelemetryBuffer.reset();
+      outputTelemetryBufferTrigger = 0x00;
+#endif
+      lua_pushboolean(L, true);
+    }
+    else {
+      lua_pushboolean(L, false);
+    }
+    return 1;
+  }
+#endif
+  if (telemetryProtocol != PROTOCOL_TELEMETRY_CROSSFIRE) {
     lua_pushnil(L);
     return 1;
   }
@@ -801,8 +751,8 @@ static int luaCrossfireTelemetryPush(lua_State * L)
       lua_rawgeti(L, 2, i+1);
       outputTelemetryBuffer.pushByte(luaL_checkunsigned(L, -1));
     }
-    outputTelemetryBuffer.pushByte(crc8(outputTelemetryBuffer.data + 2, 1 + length));
-    outputTelemetryBuffer.setDestination(internal ? 0 : TELEMETRY_ENDPOINT_SPORT);
+    outputTelemetryBuffer.pushByte(crc8(outputTelemetryBuffer.data+2, 1 + length));
+    outputTelemetryBuffer.setDestination(TELEMETRY_ENDPOINT_SPORT);
     lua_pushboolean(L, true);
   }
   else {
@@ -812,8 +762,118 @@ static int luaCrossfireTelemetryPush(lua_State * L)
 }
 #endif
 
+#if defined(GHOST)
 /*luadoc
-@function getFieldInfo(source)
+@function ghostTelemetryPop()
+Pops a received Ghost Telemetry packet from the queue.
+@retval nil queue does not contain any (or enough) bytes to form a whole packet
+@retval multiple returns 2 values:
+ * type (number)
+ * packet (table) data bytes
+@status current Introduced in 2.3.15
+*/
+static int luaGhostTelemetryPop(lua_State * L)
+{
+  if (!luaInputTelemetryFifo) {
+    luaInputTelemetryFifo = new Fifo<uint8_t, LUA_TELEMETRY_INPUT_FIFO_SIZE>();
+    if (!luaInputTelemetryFifo) {
+      return 0;
+    }
+  }
+
+  uint8_t length = 0, data = 0;
+  if (luaInputTelemetryFifo->probe(length) && luaInputTelemetryFifo->size() >= uint32_t(length)) {
+    // length value includes type(1B), payload, crc(1B)
+    luaInputTelemetryFifo->pop(length);
+    luaInputTelemetryFifo->pop(data); // type
+    lua_pushnumber(L, data);          // return type
+    lua_newtable(L);
+    for (uint8_t i=0; i<length-2; i++) {
+      luaInputTelemetryFifo->pop(data);
+      lua_pushinteger(L, i+1);
+      lua_pushinteger(L, data);
+      lua_settable(L, -3);
+    }
+    return 2;
+  }
+
+  return 0;
+}
+
+/*luadoc
+@function ghostTelemetryPush()
+This functions allows for sending telemetry data toward the Ghost link.
+When called without parameters, it will only return the status of the output buffer without sending anything.
+@param command command
+@param data table of data bytes
+@retval boolean  data queued in output buffer or not.
+@retval nil      incorrect telemetry protocol.
+@status current Introduced in 2.3.15
+*/
+static int luaGhostTelemetryPush(lua_State * L)
+{
+  bool sport = (telemetryProtocol == PROTOCOL_TELEMETRY_GHOST);
+
+  if (!sport) {
+    lua_pushnil(L);
+    return 1;
+  }
+
+  if (lua_gettop(L) == 0) {
+    lua_pushboolean(L, outputTelemetryBuffer.isAvailable());
+  }
+  else if (lua_gettop(L) > TELEMETRY_OUTPUT_BUFFER_SIZE ) {
+    lua_pushboolean(L, false);
+    return 1;
+  }
+  else if (outputTelemetryBuffer.isAvailable()) {
+    uint8_t type = luaL_checkunsigned(L, 1);
+    luaL_checktype(L, 2, LUA_TTABLE);
+    uint8_t length = luaL_len(L, 2);              // payload length
+
+    if( length > 10 ) {                           // max 10B payload
+      lua_pushboolean(L, false);
+      return 1;
+    }
+
+    // Ghost frames are fixed 14B
+    outputTelemetryBuffer.pushByte(getGhostModuleAddr());         // addr (1B)
+    outputTelemetryBuffer.pushByte(12);           // len = payload length(10B) + type(1B) + crc(1B)
+    outputTelemetryBuffer.pushByte(type);         // type (1B)
+    for (int i=0; i<length; i++) {                // data, max 10B
+      lua_rawgeti(L, 2, i+1);
+      outputTelemetryBuffer.pushByte(luaL_checkunsigned(L, -1));
+    }
+    for (int i=0; i<10-length; i++) {             // fill zeroes to frame size
+      outputTelemetryBuffer.pushByte(0);
+    }
+    outputTelemetryBuffer.pushByte(crc8(outputTelemetryBuffer.data + 2, 11 ));  // Start at type, CRC over type (1B) + payload (10B)
+    outputTelemetryBuffer.setDestination(TELEMETRY_ENDPOINT_SPORT);
+    lua_pushboolean(L, true);
+  }
+  else {
+    lua_pushboolean(L, false);
+  }
+  return 1;
+}
+#endif
+
+#if defined(RADIO_FAMILY_TBS)
+static uint8_t devId = 0;
+int luaSetDevId(lua_State* L){
+  devId = lua_tointeger(L, -1);
+  lua_pop(L, 1);
+  return 1;
+}
+
+int luaGetDevId(lua_State* L){
+  lua_pushnumber(L, devId);
+  return 1;
+}
+#endif
+
+/*luadoc
+@function getFieldInfo(name)
 
 Return detailed information about field (source)
 
@@ -826,7 +886,7 @@ The list of valid sources is available:
 | 2.2 | [X9D and X9D+](http://downloads.open-tx.org/2.2/release/firmware/lua_fields_x9d.txt), [X9E](http://downloads.open-tx.org/2.2/release/firmware/lua_fields_x9e.txt), [Horus](http://downloads.open-tx.org/2.2/release/firmware/lua_fields_x12s.txt) |
 | 2.3 | [X9D and X9D+](http://downloads.open-tx.org/2.3/release/firmware/lua_fields_x9d.txt), [X9E](http://downloads.open-tx.org/2.3/release/firmware/lua_fields_x9e.txt), [X7](http://downloads.open-tx.org/2.3/release/firmware/lua_fields_x7.txt), [Horus](http://downloads.open-tx.org/2.3/release/firmware/lua_fields_x12s.txt) |
 
-@param source can be an index (number) (which was obtained by `getFieldInfo` or `getSourceIndex`) or a name (string) of the source.
+@param name (string) name of the field
 
 @retval table information about requested field, table elements:
  * `id`   (number) field identifier
@@ -836,22 +896,17 @@ The list of valid sources is available:
 
 @retval nil the requested field was not found
 
-@status current Introduced in 2.0.8, 'unit' field added in 2.2.0, and argument also can be an index number as of 2.6.0
+@status current Introduced in 2.0.8, 'unit' field added in 2.2.0
 */
 static int luaGetFieldInfo(lua_State * L)
 {
-  bool found;
+  const char * what = luaL_checkstring(L, 1);
   LuaField field;
-  
-  if (lua_type(L, 1) == LUA_TNUMBER)
-    found = luaFindFieldById(luaL_checkinteger(L, 1), field, FIND_FIELD_DESC);
-  else
-    found = luaFindFieldByName(luaL_checkstring(L, 1), field, FIND_FIELD_DESC);
-  
+  bool found = luaFindFieldByName(what, field, FIND_FIELD_DESC);
   if (found) {
     lua_newtable(L);
     lua_pushtableinteger(L, "id", field.id);
-    lua_pushtablestring(L, "name", field.name);
+    lua_pushtablestring(L, "name", what);
     lua_pushtablestring(L, "desc", field.desc);
     if (field.id >= MIXSRC_FIRST_TELEM && field.id <= MIXSRC_LAST_TELEM) {
       TelemetrySensor & telemetrySensor = g_model.telemetrySensors[(int)((field.id-MIXSRC_FIRST_TELEM)/3)];
@@ -885,7 +940,8 @@ To get a telemetry value simply use it's sensor name. For example:
  * to get the current altitude use the source "Alt"
  * to get the minimum altitude use the source "Alt-", to get the maximum use "Alt+"
 
-@param source can be an index (number) (which was obtained by `getFieldInfo` or `getSourceIndex`) or a name (string) of the source.
+@param source  can be an identifier (number) (which was obtained by the getFieldInfo())
+or a name (string) of the source.
 
 @retval value current source value (number). Zero is returned for:
  * non-existing sources
@@ -1017,8 +1073,7 @@ static int luaGetFlightMode(lua_State * L)
   }
   lua_pushnumber(L, mode);
   char name[sizeof(g_model.flightModeData[0].name)+1];
-  strncpy(name, g_model.flightModeData[mode].name, sizeof(g_model.flightModeData[0].name));
-  name[sizeof(g_model.flightModeData[0].name)] = '\0';
+  zchar2str(name, g_model.flightModeData[mode].name, sizeof(g_model.flightModeData[0].name));
   lua_pushstring(L, name);
   return 2;
 }
@@ -1171,13 +1226,12 @@ Stops key state machine. See [Key Events](../key_events.md) for the detailed des
 */
 static int luaKillEvents(lua_State * L)
 {
-  event_t key = EVT_KEY_MASK(luaL_checkinteger(L, 1));
+  uint8_t key = EVT_KEY_MASK(luaL_checkinteger(L, 1));
   // prevent killing maskable keys (only in telemetry scripts)
-  // TODO add which type of script is running before lua_resume()
+  // TODO add which tpye of script is running before p_call()
   if (IS_MASKABLE(key)) {
     killEvents(key);
-    luaEmptyEventBuffer();
-   }
+  }
   return 0;
 }
 
@@ -1257,7 +1311,6 @@ static int luaGetGlobalTimer(lua_State * L)
   return 1;
 }
 
-#if defined(ENABLE_LUA_POPUP_INPUT)
 /*luadoc
 @function popupInput(title, event, input, min, max)
 
@@ -1284,6 +1337,8 @@ Run function (key pressed)
 
 @status current Introduced in 2.0.0
 */
+
+/* TODO : fix, broken by popups rewrite
 static int luaPopupInput(lua_State * L)
 {
   event_t event = luaL_checkinteger(L, 2);
@@ -1292,9 +1347,7 @@ static int luaPopupInput(lua_State * L)
   warningInputValueMax = luaL_checkinteger(L, 5);
   warningText = luaL_checkstring(L, 1);
   warningType = WARNING_TYPE_INPUT;
-
   runPopupWarning(event);
-
   if (warningResult) {
     warningResult = 0;
     lua_pushstring(L, "OK");
@@ -1308,7 +1361,7 @@ static int luaPopupInput(lua_State * L)
   warningText = NULL;
   return 1;
 }
-#endif
+*/
 
 /*luadoc
 @function popupWarning(title, event)
@@ -1328,25 +1381,10 @@ Run function (key pressed)
 */
 static int luaPopupWarning(lua_State * L)
 {
-#if defined(COLORLCD)
-  const char* warningText = nullptr;
-  uint8_t     warningType = 0;
-  bool        warningResult = false;
-#endif
-
   event_t event = luaL_checkinteger(L, 2);
   warningText = luaL_checkstring(L, 1);
   warningType = WARNING_TYPE_ASTERISK;
-
-#if defined(COLORLCD)
-  if (StandaloneLuaWindow::instance()->displayPopup(event, warningType, warningText,
-                                                    nullptr, warningResult)) {
-    warningText = nullptr;
-  }
-#else
   runPopupWarning(event);
-#endif
-
   if (!warningText) {
     lua_pushstring(L, "CANCEL");
   }
@@ -1378,14 +1416,6 @@ Run function (key pressed)
 */
 static int luaPopupConfirmation(lua_State * L)
 {
-#if defined(COLORLCD)
-  // necessary to run the LUA pop-ups
-  uint8_t     warningType     = 0;
-  bool        warningResult   = false;
-  const char* warningText     = nullptr;
-  const char* warningInfoText = nullptr;
-#endif
-
   warningType = WARNING_TYPE_CONFIRM;
   event_t event;
 
@@ -1400,23 +1430,14 @@ static int luaPopupConfirmation(lua_State * L)
     event = luaL_optinteger(L, 3, 0);
   }
 
-#if defined(COLORLCD)
-  if (StandaloneLuaWindow::instance()->displayPopup(event, warningType, warningText,
-                                                    warningInfoText, warningResult)) {
-    warningText = nullptr;
-  }
-#else
   runPopupWarning(event);
-#endif
-
   if (!warningText) {
     lua_pushstring(L, warningResult ? "OK" : "CANCEL");
   }
   else {
-    warningText = nullptr;
+    warningText = NULL;
     lua_pushnil(L);
   }
-  
   return 1;
 }
 
@@ -1475,25 +1496,28 @@ static int luaSetTelemetryValue(lua_State * L)
   uint32_t unit = luaL_optunsigned(L, 5, 0);
   uint32_t prec = luaL_optunsigned(L, 6, 0);
 
-  char name_buf[TELEM_LABEL_LEN]; // 4
+  char zname[4];
   const char* name = luaL_optstring(L, 7, NULL);
-  if (name == NULL || strlen(name) > 0) {
-    name_buf[0] = hex2char((id & 0xf000) >> 12);
-    name_buf[1] = hex2char((id & 0x0f00) >> 8);
-    name_buf[2] = hex2char((id & 0x00f0) >> 4);
-    name_buf[3] = hex2char((id & 0x000f) >> 0);
+  if (name != NULL && strlen(name) > 0) {
+    str2zchar(zname, name, 4);
+  }
+  else {
+    zname[0] = hex2zchar((id & 0xf000) >> 12);
+    zname[1] = hex2zchar((id & 0x0f00) >> 8);
+    zname[2] = hex2zchar((id & 0x00f0) >> 4);
+    zname[3] = hex2zchar((id & 0x000f) >> 0);
   }
   if (id | subId | instance) {
-    int index = setTelemetryValue(PROTOCOL_TELEMETRY_LUA, id, subId, instance,
-                                  value, unit, prec);
+    int index = setTelemetryValue(PROTOCOL_TELEMETRY_LUA, id, subId, instance, value, unit, prec);
     if (index >= 0) {
       TelemetrySensor &telemetrySensor = g_model.telemetrySensors[index];
       telemetrySensor.id = id;
       telemetrySensor.subId = subId;
       telemetrySensor.instance = instance;
-      telemetrySensor.init(name ? name: name_buf, unit, prec);
+      telemetrySensor.init(zname, unit, prec);
       lua_pushboolean(L, true);
-    } else {
+    }
+    else {
       lua_pushboolean(L, false);
     }
     return 1;
@@ -1527,6 +1551,19 @@ static int luaDefaultChannel(lua_State * L)
   }
   lua_pushnil(L);
   return 1;
+}
+
+/*luadoc
+@function flushAudio()
+
+flushes audio queue
+
+@status experimental
+*/
+static int luaFlushAudio(lua_State * L)
+{
+  audioQueue.flush();
+  return 0;
 }
 
 /*luadoc
@@ -1585,7 +1622,7 @@ then the loaded script (or "chunk") is returned as a function. Otherwise, return
   as part of the file name and the .lua/.luac will be appended to that.
 
 @param mode (string) (optional) Controls whether to force loading the text (.lua) or pre-compiled binary (.luac)
-  version of the script. By default ETX will load the newest version and compile a new binary if necessary (overwriting any
+  version of the script. By default OTx will load the newest version and compile a new binary if necessary (overwriting any
   existing .luac version of the same script, and stripping some debug info like line numbers).
   You can use `mode` to control the loading behavior more specifically. Possible values are:
    * `b` only binary.
@@ -1797,7 +1834,11 @@ static int luaSerialWrite(lua_State * L)
     return 0;
 
 #if defined(USB_SERIAL)
+#if defined(DEBUG)
   if (getSelectedUsbMode() == USB_SERIAL_MODE) {
+#else
+  if (getSelectedUsbMode() == USB_TELEMETRY_MIRROR_MODE) {
+#endif
     size_t wr_len = len;
     const char* p = str;
     while(wr_len--) usbSerialPutc(*p++);
@@ -1875,375 +1916,6 @@ static int luaSerialRead(lua_State * L)
   return 1;
 }
 
-#if defined(COLORLCD)
-static int shmVar[16] = {0};
-
-/*luadoc
-@function setShmVar(id, value) 
-
-@param id: integer between 1 and 16 identifying the shared memory variable.
-
-@param value: integer. The value of the shared memory variable.
-
-Sets the value of a shared memory variable that can be used for passing data between Lua widgets and other Lua scripts.
-
-@status current Introduced in 2.6
-
-@notice Only available on radios with color display
-*/
-
-static int luaSetShmVar(lua_State * L)
-{
-  int id = luaL_checkinteger(L, 1);
-  int value = luaL_checkinteger(L, 2);
-  
-  if (1 <= id && id <= 16)
-    shmVar[id - 1] = value;
-  
-  return 0;
-}
-
-/*luadoc
-@function getShmVar(id)
-
-@param id: integer between 1 and 16 identifying the shared memory variable.
-
-@retval value: integer. The value of the shared memory variable.
-
-Gets the value of a shared memory variable that can be used for passing data between Lua widgets and other Lua scripts.
-
-@status current Introduced in 2.6
-
-@notice Only available on radios with color display
-*/
-
-static int luaGetShmVar(lua_State * L)
-{
-  int id = luaL_checkinteger(L, 1);
-  
-  if (1 <= id && id <= 16)
-    lua_pushinteger(L, shmVar[id - 1]);
-  else
-    lua_pushnil(L);
-
-  return 1;
-}
-#endif
-
-/*luadoc
-@function setStickySwitch(id, value) 
-
-@param id: integer identifying the sticky logical switch (zero for LS1 etc.).
-
-@param value: true/false. The new value of the sticky logical switch.
-
-@retval bufferFull: true/false. This function sends a message from Lua to the logical switch processor 
-via a buffer with eight slots that are read 10 times per second. If the buffer is full, then a true value 
-is returned and no messages was sent (i.e. the switch was not changed).
-
-Sets the value of a sticky logical switch.
-
-@status current Introduced in 2.6
-*/
-
-#if (MAX_LOGICAL_SWITCHES != 64)
-#warning "The following code assumes that MAX_LOGICAL_SWITCHES == 64!"
-#endif
-
-static int luaSetStickySwitch(lua_State * L)
-{
-  int id = luaL_checkinteger(L, 1);
-  bool value = lua_toboolean(L, 2);
-
-  uint8_t msg = (1 << 6);       // This bit is always set to have a non-zero value
-  if (value) msg |= (1 << 7);
-  msg |= (id & 0x3F);
-
-  lua_pushboolean(L, luaSetStickySwitchBuffer.write(msg));
-  return 1;
-}
-
-/*luadoc
-@function getLogicalSwitchValue(id)
-
-@param id: integer identifying the logical switch (zero for LS1 etc.).
-
-@retval value: true/false.
-
-Reads the value of a logical switch.
-
-@status current Introduced in 2.6
-*/
-
-static int luaGetLogicalSwitchValue(lua_State * L)
-{
-  int id = luaL_checkinteger(L, 1);
-
-  if (id >= 0 && id < MAX_LOGICAL_SWITCHES)
-    lua_pushboolean(L, getSwitch(SWSRC_FIRST_LOGICAL_SWITCH + id));
-  else
-    lua_pushnil(L);
-  return 1;
-}
-
-/*luadoc
-@function getSwitchIndex(positionName)
-
-@param positionName: string naming a switch position as it is shown on radio menus where you can select a switch. Notice that many names have 
-special characters in them like arrow up/down etc.
-
-@retval value: integer. The switchIndex, which can be used as input for `getSwitchName(switchIndex)` and `getSwitchValue(switchIndex)`. Also corresponds
-to the fields in the table returned by `model.getLogicalSwitch(switch)` identifying switches.
-
-@status current Introduced in 2.6
-*/
-
-static int luaGetSwitchIndex(lua_State * L)
-{
-  const char * name = luaL_checkstring(L, 1);
-  bool negate = false;
-  bool found = false;
-  swsrc_t idx;
-  
-  if (name[0] == '!') {
-    name++;
-    negate = true;
-  }
-  
-  for (idx = SWSRC_NONE; idx < SWSRC_COUNT; idx++) {
-    if (isSwitchAvailableInLogicalSwitches(idx)) {
-      char* s = getSwitchPositionName(idx);
-      if (!strncasecmp(s, name, 31)) {
-        found = true;
-        break;
-      }
-    }
-  }
-  
-  if (found) {
-    if (negate)
-      idx = -idx;
-    lua_pushinteger(L, idx);
-  }
-  else
-    lua_pushnil(L);
-
-  return 1;
-}
-
-/*luadoc
-@function getSwitchName(switchIndex)
-
-@param switchIndex: integer identifying a switch as returned by `getSwitchIndex(positionName)` or fields in the table returned by 
-`model.getLogicalSwitch(switch)` identifying switches.
-
-@retval value: string naming the switch position as it is shown on radio menus where a switch can be chosen.
-
-@status current Introduced in 2.6
-*/
-
-static int luaGetSwitchName(lua_State * L)
-{
-  swsrc_t idx = luaL_checkinteger(L, 1);
-  if (idx > -SWSRC_COUNT && idx < SWSRC_COUNT && isSwitchAvailableInLogicalSwitches(idx)) {
-    char* name = getSwitchPositionName(idx);
-    lua_pushstring(L, name);
-  }
-  else
-    lua_pushnil(L);
-  return 1;
-}
-
-/*luadoc
-@function getSwitchValue(switchIndex)
-
-@param switchIndex: integer identifying a switch as returned by `getSwitchIndex(positionName)` or fields in the table returned by 
-`model.getLogicalSwitch(switch)` identifying switches.
-
-@retval value: true/false. The value of the switch.
-
-@status current Introduced in 2.6
-*/
-
-static int luaGetSwitchValue(lua_State * L)
-{
-  swsrc_t idx = luaL_checkinteger(L, 1);
-  if (idx > -SWSRC_COUNT && idx < SWSRC_COUNT && isSwitchAvailableInLogicalSwitches(idx))
-    lua_pushboolean(L, getSwitch(idx));
-  else
-    lua_pushnil(L);
-  return 1;
-}
-
-/*luadoc
-@function switches([first[, last]])
-
-@param first: the first switch index. If `nil` or omitted, the first available switch is used.
-
-@param last: the last switch index. If `nil` or omitted, the last available switch is used.
-
-This is an iterator function over switch positions. `for switchIndex, switchName in switches() do ...` will iterate over all available switch positions.
-
-@status current Introduced in 2.6
-*/
-
-static int luaNextSwitch(lua_State * L)
-{
-  swsrc_t last = luaL_checkinteger(L, 1);
-  swsrc_t idx = luaL_checkinteger(L, 2);
-  
-  while (++idx <= last) {
-    if (isSwitchAvailableInLogicalSwitches(idx)) {
-      char* name = getSwitchPositionName(idx);
-      lua_pushinteger(L, idx);
-      lua_pushstring(L, name);
-      return 2;
-    }
-  }
-  
-  lua_pushnil(L);
-  return 1;
-}
-
-static int luaSwitches(lua_State * L)
-{
-  swsrc_t first;
-  swsrc_t last;
-  
-  if (lua_isnumber(L, 1)) {
-    first = luaL_checkinteger(L, 1) - 1;
-    if (first < SWSRC_FIRST - 1)
-      first = SWSRC_FIRST - 1;
-  } else
-    first = SWSRC_FIRST - 1;
-
-  if (lua_isnumber(L, 2)) {
-    last = luaL_checkinteger(L, 2);
-    if (last > SWSRC_LAST)
-      last = SWSRC_LAST;
-  } else
-    last = SWSRC_LAST;
-
-  lua_pushcfunction(L, luaNextSwitch);
-  lua_pushinteger(L, last);
-  lua_pushinteger(L, first);
-  return 3;
-}
-
-/*luadoc
-@function getSourceIndex(sourceName)
-
-@param sourceName: string naming a value source as it is shown on radio menus where you can select it. Notice that many names have special characters in them.
-
-@retval sourceIndex: integer. The source index, which can be used as input for `getSourceName(sourceIndex)`, `getValue(sourceIndex)`, and `getFieldInfo(sourceIndex)`.
-
-@notice the source names shown on the screen are not the same as the names used by `getFieldInfo` and `getValue`. But the indices are the same, so `getValue(index)` will work with the indices obtained here.
-This function is rather time consuming, and should not be used repeatedly in a script, if it can be avoided.
-
-@status current Introduced in 2.6
-*/
-
-static int luaGetSourceIndex(lua_State * L)
-{
-  const char * name = luaL_checkstring(L, 1);
-  bool found = false;
-  mixsrc_t idx;
-  
-  for (idx = MIXSRC_NONE; idx <= MIXSRC_LAST_TELEM; idx++) {
-    if (isSourceAvailable(idx)) {
-      char* s = getSourceString(idx);
-      if (!strncasecmp(s, name, 31)) {
-        found = true;
-        break;
-      }
-    }
-  }
-  
-  if (found)
-    lua_pushinteger(L, idx);
-  else
-    lua_pushnil(L);
-
-  return 1;
-}
-
-/*luadoc
-@function getSourceName(sourceIndex)
-
-@param sourceIndex: integer identifying a value source as returned by `getSourceIndex(sourceName)` or the `id` field in the table returned by `getFieldInfo`.
-
-@retval sourceName: string naming the value source as it is shown on radio menus where a source can be chosen.
-
-@notice the source names shown on the screen are not the same as the names used by `getFieldInfo` and `getValue`. But the indices are the same, so `getValue(index)` will work with the indices used here.
-
-@status current Introduced in 2.6
-*/
-
-static int luaGetSourceName(lua_State * L)
-{
-  mixsrc_t idx = luaL_checkinteger(L, 1);
-  if (idx <= MIXSRC_LAST_TELEM && isSourceAvailable(idx)) {
-    char* name = getSourceString(idx);
-    lua_pushstring(L, name);
-  }
-  else
-    lua_pushnil(L);
-  return 1;
-}
-
-/*luadoc
-@function sources([first[, last]])
-
-@param first: the first source index. If `nil` or omitted, the first available source is used.
-
-@param last: the last soure index. If `nil` or omitted, the last available source is used.
-
-This is an iterator function over value sources. `for sourceIndex, sourceName in sources() do ...` will iterate over all available value sources.
-
-@status current Introduced in 2.6
-*/
-
-static int luaNextSource(lua_State * L)
-{
-  mixsrc_t last = luaL_checkinteger(L, 1);
-  mixsrc_t idx = luaL_checkinteger(L, 2);
-  
-  while (++idx <= last) {
-    if (isSourceAvailable(idx)) {
-      char* name = getSourceString(idx);
-      lua_pushinteger(L, idx);
-      lua_pushstring(L, name);
-      return 2;
-    }
-  }
-
-  lua_pushnil(L);
-  return 1;
-}
-
-static int luaSources(lua_State * L)
-{
-  mixsrc_t first;
-  mixsrc_t last;
-
-  if (lua_isnumber(L, 1))
-    first = luaL_checkinteger(L, 1) - 1;
-  else
-    first = MIXSRC_NONE - 1;
-
-  if (lua_isnumber(L, 2)) {
-    last = luaL_checkinteger(L, 2);
-    if (last > INPUTSRC_LAST)
-      last = INPUTSRC_LAST;
-  } else
-    last = INPUTSRC_LAST;
-
-  lua_pushcfunction(L, luaNextSource);
-  lua_pushinteger(L, last);
-  lua_pushinteger(L, first);
-  return 3;
-}
-
 const luaL_Reg opentxLib[] = {
   { "getTime", luaGetTime },
   { "getDateTime", luaGetDateTime },
@@ -2264,17 +1936,14 @@ const luaL_Reg opentxLib[] = {
   { "playDuration", luaPlayDuration },
   { "playTone", luaPlayTone },
   { "playHaptic", luaPlayHaptic },
-#if defined(ENABLE_LUA_POPUP_INPUT)
-  { "popupInput", luaPopupInput },
-#endif
+  { "flushAudio", luaFlushAudio },
+  // { "popupInput", luaPopupInput },
   { "popupWarning", luaPopupWarning },
   { "popupConfirmation", luaPopupConfirmation },
   { "defaultStick", luaDefaultStick },
   { "defaultChannel", luaDefaultChannel },
   { "getRSSI", luaGetRSSI },
   { "killEvents", luaKillEvents },
-  { "dir", luaDir },
-  { "fstat", luaFstat },
   { "chdir", luaChdir },
   { "loadScript", luaLoadScript },
   { "getUsage", luaGetUsage },
@@ -2293,52 +1962,35 @@ const luaL_Reg opentxLib[] = {
   { "crossfireTelemetryPop", luaCrossfireTelemetryPop },
   { "crossfireTelemetryPush", luaCrossfireTelemetryPush },
 #endif
+#if defined(GHOST)
+  { "ghostTelemetryPop", luaGhostTelemetryPop },
+  { "ghostTelemetryPush", luaGhostTelemetryPush },
+#endif
+#if defined(RADIO_FAMILY_TBS)
+  { "SetDevId", luaSetDevId },
+  { "GetDevId", luaGetDevId },
+#endif
 #if defined(MULTIMODULE)
   { "multiBuffer", luaMultiBuffer },
 #endif
   { "setSerialBaudrate", luaSetSerialBaudrate },
   { "serialWrite", luaSerialWrite },
   { "serialRead", luaSerialRead },
-#if defined(COLORLCD)
-  { "setShmVar", luaSetShmVar },
-  { "getShmVar", luaGetShmVar },
-#endif
-  { "setStickySwitch", luaSetStickySwitch },
-  { "getLogicalSwitchValue", luaGetLogicalSwitchValue },
-  { "getSwitchIndex", luaGetSwitchIndex },
-  { "getSwitchName", luaGetSwitchName },
-  { "getSwitchValue", luaGetSwitchValue },
-  { "switches", luaSwitches },
-  { "getSourceIndex", luaGetSourceIndex },
-  { "getSourceName", luaGetSourceName },
-  { "sources", luaSources },
   { nullptr, nullptr }  /* sentinel */
 };
 
 const luaR_value_entry opentxConstants[] = {
   { "FULLSCALE", RESX },
-#if defined(COLORLCD)
-  { "XXLSIZE", FONT(XXL) },
-  { "DBLSIZE", FONT(XL) },
-  { "MIDSIZE", FONT(L) },
-  { "SMLSIZE", FONT(XS) },
-  { "TINSIZE", FONT(XXS) },
-  { "BLINK", BLINK },
-  { "INVERS", INVERS },
-#else
   { "XXLSIZE", XXLSIZE },
   { "DBLSIZE", DBLSIZE },
   { "MIDSIZE", MIDSIZE },
   { "SMLSIZE", SMLSIZE },
-  { "BLINK", BLINK },
-  { "INVERS", INVERS },
-#endif
 #if defined(COLORLCD)
-  { "BOLD", FONT(BOLD) },
-  { "VCENTER", VCENTERED },
-#else
-  { "BOLD", BOLD },
+  { "TINSIZE", TINSIZE },
 #endif
+  { "INVERS", INVERS },
+  { "BOLD", BOLD },
+  { "BLINK", BLINK },
   { "RIGHT", RIGHT },
   { "LEFT", LEFT },
   { "CENTER", CENTERED },
@@ -2346,7 +1998,7 @@ const luaR_value_entry opentxConstants[] = {
   { "PREC2", PREC2 },
   { "VALUE", INPUT_TYPE_VALUE },
   { "SOURCE", INPUT_TYPE_SOURCE },
-  { "REPLACE", MLTPX_REPL },
+  { "REPLACE", MLTPX_REP },
   { "MIXSRC_MAX", MIXSRC_MAX },
   { "MIXSRC_FIRST_INPUT", MIXSRC_FIRST_INPUT },
   { "MIXSRC_Rud", MIXSRC_Rud },
@@ -2357,135 +2009,65 @@ const luaR_value_entry opentxConstants[] = {
   { "MIXSRC_SB", MIXSRC_SB },
   { "MIXSRC_SC", MIXSRC_SC },
   { "MIXSRC_SD", MIXSRC_SD },
-#if !defined(PCBX7) && !defined(PCBXLITE) && !defined(PCBX9LITE)
+#if defined(HARDWARE_SWITCH_E)
   { "MIXSRC_SE", MIXSRC_SE },
-  { "MIXSRC_SG", MIXSRC_SG },
 #endif
 #if defined(HARDWARE_SWITCH_F)
   { "MIXSRC_SF", MIXSRC_SF },
+#endif
+#if defined(HARDWARE_SWITCH_G)
+  { "MIXSRC_SG", MIXSRC_SG },
 #endif
 #if defined(HARDWARE_SWITCH_H)
   { "MIXSRC_SH", MIXSRC_SH },
 #endif
   { "MIXSRC_CH1", MIXSRC_CH1 },
   { "SWSRC_LAST", SWSRC_LAST_LOGICAL_SWITCH },
-  { "SWITCH_COUNT", SWSRC_COUNT },
   { "MAX_SENSORS", MAX_TELEMETRY_SENSORS },
-
-  { "LS_FUNC_NONE", LS_FUNC_NONE },
-  { "LS_FUNC_VEQUAL", LS_FUNC_VEQUAL },
-  { "LS_FUNC_VALMOSTEQUAL", LS_FUNC_VALMOSTEQUAL },
-  { "LS_FUNC_VPOS", LS_FUNC_VPOS },
-  { "LS_FUNC_VNEG", LS_FUNC_VNEG },
-  { "LS_FUNC_RANGE", LS_FUNC_RANGE },
-  { "LS_FUNC_APOS", LS_FUNC_APOS },
-  { "LS_FUNC_ANEG", LS_FUNC_ANEG },
-  { "LS_FUNC_AND", LS_FUNC_AND },
-  { "LS_FUNC_OR", LS_FUNC_OR },
-  { "LS_FUNC_XOR", LS_FUNC_XOR },
-  { "LS_FUNC_EDGE", LS_FUNC_EDGE },
-  { "LS_FUNC_EQUAL", LS_FUNC_EQUAL },
-  { "LS_FUNC_GREATER", LS_FUNC_GREATER },
-  { "LS_FUNC_LESS", LS_FUNC_LESS },
-  { "LS_FUNC_DIFFEGREATER", LS_FUNC_DIFFEGREATER },
-  { "LS_FUNC_ADIFFEGREATER", LS_FUNC_ADIFFEGREATER },
-  { "LS_FUNC_TIMER", LS_FUNC_TIMER },
-  { "LS_FUNC_STICKY", LS_FUNC_STICKY },
-
-  { "FUNC_OVERRIDE_CHANNEL", FUNC_OVERRIDE_CHANNEL },
-  { "FUNC_TRAINER", FUNC_TRAINER },
-  { "FUNC_INSTANT_TRIM", FUNC_INSTANT_TRIM },
-  { "FUNC_RESET", FUNC_RESET },
-  { "FUNC_SET_TIMER", FUNC_SET_TIMER },
-  { "FUNC_ADJUST_GVAR", FUNC_ADJUST_GVAR },
-  { "FUNC_VOLUME", FUNC_VOLUME },
-  { "FUNC_SET_FAILSAFE", FUNC_SET_FAILSAFE },
-  { "FUNC_RANGECHECK", FUNC_RANGECHECK },
-  { "FUNC_BIND", FUNC_BIND },
-  { "FUNC_PLAY_SOUND", FUNC_PLAY_SOUND },
-  { "FUNC_PLAY_TRACK", FUNC_PLAY_TRACK },
-  { "FUNC_PLAY_VALUE", FUNC_PLAY_VALUE },
-  { "FUNC_PLAY_SCRIPT", FUNC_PLAY_SCRIPT },
-  { "FUNC_BACKGND_MUSIC", FUNC_BACKGND_MUSIC },
-  { "FUNC_BACKGND_MUSIC_PAUSE", FUNC_BACKGND_MUSIC_PAUSE },
-  { "FUNC_VARIO", FUNC_VARIO },
-  { "FUNC_HAPTIC", FUNC_HAPTIC },
-  { "FUNC_LOGS", FUNC_LOGS },
-  { "FUNC_BACKLIGHT", FUNC_BACKLIGHT },
-  { "FUNC_SCREENSHOT", FUNC_SCREENSHOT },
-  { "FUNC_RACING_MODE", FUNC_RACING_MODE },
 #if defined(COLORLCD)
-  { "FUNC_DISABLE_TOUCH", FUNC_DISABLE_TOUCH },
-
   { "SHADOWED", SHADOWED },
   { "COLOR", ZoneOption::Color },
   { "BOOL", ZoneOption::Bool },
   { "STRING", ZoneOption::String },
-  { "MENU_HEADER_HEIGHT", COLOR2FLAGS(MENU_HEADER_HEIGHT) },
-
-  // Colors gui/colorlcd/colors.h
-  { "COLOR_THEME_PRIMARY1", COLOR2FLAGS(COLOR_THEME_PRIMARY1_INDEX) },
-  { "COLOR_THEME_PRIMARY2", COLOR2FLAGS(COLOR_THEME_PRIMARY2_INDEX) },
-  { "COLOR_THEME_PRIMARY3", COLOR2FLAGS(COLOR_THEME_PRIMARY3_INDEX) },
-  { "COLOR_THEME_SECONDARY1", COLOR2FLAGS(COLOR_THEME_SECONDARY1_INDEX) },
-  { "COLOR_THEME_SECONDARY2", COLOR2FLAGS(COLOR_THEME_SECONDARY2_INDEX) },
-  { "COLOR_THEME_SECONDARY3", COLOR2FLAGS(COLOR_THEME_SECONDARY3_INDEX) },
-  { "COLOR_THEME_FOCUS", COLOR2FLAGS(COLOR_THEME_FOCUS_INDEX) },
-  { "COLOR_THEME_EDIT", COLOR2FLAGS(COLOR_THEME_EDIT_INDEX) },
-  { "COLOR_THEME_ACTIVE", COLOR2FLAGS(COLOR_THEME_ACTIVE_INDEX) },
-  { "COLOR_THEME_WARNING", COLOR2FLAGS(COLOR_THEME_WARNING_INDEX) },
-  { "COLOR_THEME_DISABLED", COLOR2FLAGS(COLOR_THEME_DISABLED_INDEX) },
-  { "CUSTOM_COLOR", COLOR2FLAGS(CUSTOM_COLOR_INDEX) },
-
-  // Old style theme color constants
-  { "ALARM_COLOR", COLOR2FLAGS(COLOR_THEME_WARNING_INDEX) },
-  { "BARGRAPH_BGCOLOR", COLOR2FLAGS(COLOR_THEME_SECONDARY3_INDEX) },
-  { "BARGRAPH1_COLOR", COLOR2FLAGS(COLOR_THEME_SECONDARY1_INDEX) },
-  { "BARGRAPH2_COLOR", COLOR2FLAGS(COLOR_THEME_SECONDARY2_INDEX) },
-  { "CURVE_AXIS_COLOR", COLOR2FLAGS(COLOR_THEME_SECONDARY2_INDEX) },
-  { "CURVE_COLOR", COLOR2FLAGS(COLOR_THEME_SECONDARY1_INDEX) },
-  { "CURVE_CURSOR_COLOR", COLOR2FLAGS(COLOR_THEME_WARNING_INDEX) },
-  { "HEADER_BGCOLOR", COLOR2FLAGS(COLOR_THEME_FOCUS_INDEX) },
-  { "HEADER_COLOR", COLOR2FLAGS(COLOR_THEME_SECONDARY1_INDEX) },
-  { "HEADER_CURRENT_BGCOLOR", COLOR2FLAGS(COLOR_THEME_FOCUS_INDEX) },
-  { "HEADER_ICON_BGCOLOR", COLOR2FLAGS(COLOR_THEME_SECONDARY1_INDEX) },
-  { "LINE_COLOR", COLOR2FLAGS(COLOR_THEME_PRIMARY3_INDEX) },
-  { "MAINVIEW_GRAPHICS_COLOR", COLOR2FLAGS(COLOR_THEME_SECONDARY1_INDEX) },
-  { "MAINVIEW_PANES_COLOR", COLOR2FLAGS(COLOR_THEME_PRIMARY2_INDEX) },
-  { "MENU_TITLE_BGCOLOR", COLOR2FLAGS(COLOR_THEME_SECONDARY1_INDEX) },
-  { "MENU_TITLE_COLOR", COLOR2FLAGS(COLOR_THEME_PRIMARY2_INDEX) },
-  { "MENU_TITLE_DISABLE_COLOR", COLOR2FLAGS(COLOR_THEME_PRIMARY3_INDEX) },
-  { "OVERLAY_COLOR", COLOR2FLAGS(COLOR_THEME_PRIMARY1_INDEX) },
-  { "SCROLLBOX_COLOR", COLOR2FLAGS(COLOR_THEME_SECONDARY3_INDEX) },
-  { "TEXT_BGCOLOR", COLOR2FLAGS(COLOR_THEME_SECONDARY3_INDEX) },
-  { "TEXT_COLOR", COLOR2FLAGS(COLOR_THEME_SECONDARY1_INDEX) },
-  { "TEXT_DISABLE_COLOR", COLOR2FLAGS(COLOR_THEME_DISABLED_INDEX) },
-  { "TEXT_INVERTED_BGCOLOR", COLOR2FLAGS(COLOR_THEME_FOCUS_INDEX) },
-  { "TEXT_INVERTED_COLOR", COLOR2FLAGS(COLOR_THEME_PRIMARY2_INDEX) },
-  { "TITLE_BGCOLOR", COLOR2FLAGS(COLOR_THEME_SECONDARY1_INDEX) },
-  { "TRIM_BGCOLOR", COLOR2FLAGS(COLOR_THEME_FOCUS_INDEX) },
-  { "TRIM_SHADOW_COLOR", COLOR2FLAGS(COLOR_THEME_PRIMARY1_INDEX) },
-  { "WARNING_COLOR", COLOR2FLAGS(COLOR_THEME_WARNING_INDEX) },
-
-  // Literal colors
-  { "BLACK", RGB2FLAGS(0x00, 0x00, 0x00) },
-  { "WHITE", RGB2FLAGS(0xFF, 0xFF, 0xFF) },
-  { "LIGHTWHITE", RGB2FLAGS(0xEA, 0xEA, 0xEA) },
-  { "YELLOW", RGB2FLAGS(0xFF, 0xFF, 0x00) },
-  { "BLUE", RGB2FLAGS(0x00, 0x00, 0xFF) },
-  { "DARKBLUE", RGB2FLAGS(0x00, 0x00, 0xA0) },
-  { "GREY", RGB2FLAGS(0x60, 0x60, 0x60) },
-  { "DARKGREY", RGB2FLAGS(0x40, 0x40, 0x40) },
-  { "LIGHTGREY", RGB2FLAGS(0xC0, 0xC0, 0xC0) },
-  { "RED", RGB2FLAGS(0xFF, 0x00, 0x00) },
-  { "DARKRED", RGB2FLAGS(0xA0, 0x00, 0x00) },
-  { "GREEN", RGB2FLAGS(0x00, 0xFF, 0x00) },
-  { "DARKGREEN", RGB2FLAGS(0x00, 0xA0, 0x00) },
-  { "LIGHTBROWN", RGB2FLAGS(0x9C, 0x6D, 0x20) },
-  { "DARKBROWN", RGB2FLAGS(0x6A, 0x48, 0x10) },
-  { "BRIGHTGREEN", RGB2FLAGS(0x00, 0xB4, 0x3C) },
-  { "ORANGE", RGB2FLAGS(0xE5, 0x64, 0x1E) },
-
+  { "TEXT_COLOR", TEXT_COLOR },
+  { "TEXT_BGCOLOR", TEXT_BGCOLOR },
+  { "TEXT_INVERTED_COLOR", TEXT_INVERTED_COLOR },
+  { "TEXT_INVERTED_BGCOLOR", TEXT_INVERTED_BGCOLOR },
+  { "LINE_COLOR", LINE_COLOR },
+  { "SCROLLBOX_COLOR", SCROLLBOX_COLOR },
+  { "MENU_TITLE_BGCOLOR", MENU_TITLE_BGCOLOR },
+  { "MENU_TITLE_COLOR", MENU_TITLE_COLOR },
+  { "MENU_TITLE_DISABLE_COLOR", MENU_TITLE_DISABLE_COLOR },
+  { "HEADER_COLOR", HEADER_COLOR },
+  { "ALARM_COLOR", ALARM_COLOR },
+  { "WARNING_COLOR", WARNING_COLOR },
+  { "TEXT_DISABLE_COLOR", TEXT_DISABLE_COLOR },
+  { "CURVE_AXIS_COLOR", CURVE_AXIS_COLOR },
+  { "CURVE_COLOR", CURVE_COLOR },
+  { "CURVE_CURSOR_COLOR", CURVE_CURSOR_COLOR },
+  { "TITLE_BGCOLOR", TITLE_BGCOLOR },
+  { "TRIM_BGCOLOR", TRIM_BGCOLOR },
+  { "TRIM_SHADOW_COLOR", TRIM_SHADOW_COLOR },
+  { "HEADER_BGCOLOR", HEADER_BGCOLOR },
+  { "HEADER_ICON_BGCOLOR", HEADER_ICON_BGCOLOR },
+  { "HEADER_CURRENT_BGCOLOR", HEADER_CURRENT_BGCOLOR },
+  { "MAINVIEW_PANES_COLOR", MAINVIEW_PANES_COLOR },
+  { "MAINVIEW_GRAPHICS_COLOR", MAINVIEW_GRAPHICS_COLOR },
+  { "OVERLAY_COLOR", OVERLAY_COLOR },
+  { "BARGRAPH1_COLOR", BARGRAPH1_COLOR },
+  { "BARGRAPH2_COLOR", BARGRAPH2_COLOR },
+  { "BARGRAPH_BGCOLOR", BARGRAPH_BGCOLOR },
+  { "CUSTOM_COLOR", CUSTOM_COLOR },
+  { "MENU_HEADER_HEIGHT", MENU_HEADER_HEIGHT },
+  { "WHITE", (double)WHITE },
+  { "GREY", (double)GREY },
+  { "DARKGREY", (double)DARKGREY },
+  { "BLACK", (double)BLACK },
+  { "YELLOW", (double)YELLOW },
+  { "BLUE", (double)BLUE },
+  { "LIGHTGREY", (double)LIGHTGREY },
+  { "RED", (double)RED },
+  { "DARKRED", (double)DARKRED },
 #else
   { "FIXEDWIDTH", FIXEDWIDTH },
 #endif
@@ -2499,7 +2081,7 @@ const luaR_value_entry opentxConstants[] = {
   { "ROTENC_LOWSPEED", ROTENC_LOWSPEED },
   { "ROTENC_MIDSPEED", ROTENC_MIDSPEED },
   { "ROTENC_HIGHSPEED", ROTENC_HIGHSPEED },
-#elif defined(PCBX9D) || defined(PCBX9DP) || defined(RADIO_T8) // key reverted between field nav and value change
+#elif defined(PCBX9D) || defined(PCBX9DP) || defined(RADIO_T8) || defined(RADIO_Commando8)// key reverted between field nav and value change
   { "EVT_VIRTUAL_PREV", EVT_KEY_FIRST(KEY_PLUS) },
   { "EVT_VIRTUAL_PREV_REPT", EVT_KEY_REPT(KEY_PLUS) },
   { "EVT_VIRTUAL_NEXT", EVT_KEY_FIRST(KEY_MINUS) },
@@ -2536,7 +2118,7 @@ const luaR_value_entry opentxConstants[] = {
   { "EVT_VIRTUAL_ENTER_LONG", EVT_KEY_LONG(KEY_ENTER) },
   { "EVT_VIRTUAL_EXIT", EVT_KEY_BREAK(KEY_EXIT) },
 #elif defined(NAVIGATION_X7) || defined(NAVIGATION_X9D)
-#if defined(RADIO_TX12) || defined(RADIO_ZORRO) || defined(RADIO_T8)
+#if defined(RADIO_TX12) || defined(RADIO_ZORRO) || defined(RADIO_T8) || defined(RADIO_Commando8)
   { "EVT_VIRTUAL_PREV_PAGE", EVT_KEY_BREAK(KEY_PAGEUP) },
   { "EVT_VIRTUAL_NEXT_PAGE", EVT_KEY_BREAK(KEY_PAGEDN) },
   { "EVT_VIRTUAL_MENU", EVT_KEY_BREAK(KEY_MODEL) },
@@ -2550,13 +2132,10 @@ const luaR_value_entry opentxConstants[] = {
   { "EVT_VIRTUAL_ENTER", EVT_KEY_BREAK(KEY_ENTER) },
   { "EVT_VIRTUAL_ENTER_LONG", EVT_KEY_LONG(KEY_ENTER) },
   { "EVT_VIRTUAL_EXIT", EVT_KEY_BREAK(KEY_EXIT) },
-#elif defined(COLORLCD)
+#elif defined(NAVIGATION_HORUS)
 #if defined(KEYS_GPIO_REG_PGUP)
   { "EVT_VIRTUAL_PREV_PAGE", EVT_KEY_BREAK(KEY_PGUP) },
   { "EVT_VIRTUAL_NEXT_PAGE", EVT_KEY_BREAK(KEY_PGDN) },
-#elif defined(PCBNV14)
-  { "EVT_VIRTUAL_PREV_PAGE", EVT_KEY_BREAK(KEY_LEFT) },
-  { "EVT_VIRTUAL_NEXT_PAGE", EVT_KEY_BREAK(KEY_RIGHT) },
 #else
   { "EVT_VIRTUAL_PREV_PAGE", EVT_KEY_LONG(KEY_PGDN) },
   { "EVT_VIRTUAL_NEXT_PAGE", EVT_KEY_BREAK(KEY_PGDN) },
@@ -2578,25 +2157,25 @@ const luaR_value_entry opentxConstants[] = {
   KEY_EVENTS(MENU, KEY_MENU),
 #endif
 
-#if defined(KEYS_GPIO_REG_RIGHT) && defined(COLORLCD)
+#if defined(KEYS_GPIO_REG_RIGHT) && defined(NAVIGATION_HORUS)
   KEY_EVENTS(TELEM, KEY_TELEM),
 #elif defined(KEYS_GPIO_REG_RIGHT)
   KEY_EVENTS(RIGHT, KEY_RIGHT),
 #endif
 
-#if defined(KEYS_GPIO_REG_UP) && defined(COLORLCD)
+#if defined(KEYS_GPIO_REG_UP) && defined(NAVIGATION_HORUS)
   KEY_EVENTS(MODEL, KEY_MODEL),
 #elif defined(KEYS_GPIO_REG_UP)
   KEY_EVENTS(UP, KEY_UP),
 #endif
 
-#if defined(KEYS_GPIO_REG_LEFT) && defined(COLORLCD)
+#if defined(KEYS_GPIO_REG_LEFT) && defined(NAVIGATION_HORUS)
   KEY_EVENTS(SYS, KEY_RADIO),
 #elif defined(KEYS_GPIO_REG_LEFT)
   KEY_EVENTS(LEFT, KEY_LEFT),
 #endif
 
-#if defined(KEYS_GPIO_REG_DOWN) && defined(COLORLCD)
+#if defined(KEYS_GPIO_REG_DOWN) && defined(NAVIGATION_HORUS)
   { "EVT_RTN_FIRST", EVT_KEY_BREAK(KEY_EXIT) },
 #else
   KEY_EVENTS(DOWN, KEY_DOWN),
@@ -2630,13 +2209,6 @@ const luaR_value_entry opentxConstants[] = {
   KEY_EVENTS(ROT, KEY_ENTER),
   { "EVT_ROT_LEFT", EVT_ROTARY_LEFT },
   { "EVT_ROT_RIGHT", EVT_ROTARY_RIGHT },
-#endif
-
-#if defined(HARDWARE_TOUCH)
-  { "EVT_TOUCH_FIRST", EVT_TOUCH_FIRST },
-  { "EVT_TOUCH_BREAK", EVT_TOUCH_BREAK },
-  { "EVT_TOUCH_SLIDE", EVT_TOUCH_SLIDE },
-  { "EVT_TOUCH_TAP", EVT_TOUCH_TAP },
 #endif
 
 #if LCD_DEPTH > 1 && !defined(COLORLCD)
@@ -2696,33 +2268,5 @@ const luaR_value_entry opentxConstants[] = {
   {"UNIT_BITFIELD", UNIT_BITFIELD},
   {"UNIT_TEXT", UNIT_TEXT},
 
-  {"AM_RDO", AM_RDO},
-  {"AM_HID", AM_HID},
-  {"AM_SYS", AM_SYS},
-  {"AM_DIR", AM_DIR},
-  {"AM_ARC", AM_ARC},
-
   { nullptr, 0 }  /* sentinel */
-};
-
-const luaR_string_entry edgetxStrings[] = {
-  { "CHAR_RIGHT", STR_CHAR_RIGHT },
-  { "CHAR_LEFT", STR_CHAR_LEFT },
-  { "CHAR_UP", STR_CHAR_UP },
-  { "CHAR_DOWN", STR_CHAR_DOWN },
-  { "CHAR_DELTA", STR_CHAR_DELTA },
-  { "CHAR_STICK", STR_CHAR_STICK },
-  { "CHAR_POT", STR_CHAR_POT },
-  { "CHAR_SLIDER", STR_CHAR_SLIDER },
-  { "CHAR_SWITCH", STR_CHAR_SWITCH },
-  { "CHAR_TRIM", STR_CHAR_TRIM },
-  { "CHAR_INPUT", STR_CHAR_INPUT },
-  { "CHAR_FUNCTION", STR_CHAR_FUNCTION },
-  { "CHAR_CYC", STR_CHAR_CYC },
-  { "CHAR_TRAINER", STR_CHAR_TRAINER },
-  { "CHAR_CHANNEL", STR_CHAR_CHANNEL },
-  { "CHAR_TELEMETRY", STR_CHAR_TELEMETRY },
-  { "CHAR_LUA", STR_CHAR_LUA },
-
-  { nullptr, "" }  /* sentinel */
 };

@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -43,15 +42,6 @@
 #define W2 LCD_W*LCD_ZOOM
 #define H2 LCD_H*LCD_ZOOM
 
-#if defined(HARDWARE_TOUCH)
-  #define TAP_TIME 25
-
-  tmr10ms_t now = 0;
-  tmr10ms_t downTime = 0;
-  tmr10ms_t tapTime = 0;
-  short tapCount = 0;
-#endif
-
 class OpenTxSim: public FXMainWindow
 {
   FXDECLARE(OpenTxSim)
@@ -62,9 +52,6 @@ class OpenTxSim: public FXMainWindow
     ~OpenTxSim();
     void updateKeysAndSwitches(bool start=false);
     long onKeypress(FXObject*, FXSelector, void*);
-    long onMouseDown(FXObject*,FXSelector,void*);
-    long onMouseUp(FXObject*,FXSelector,void*);
-    long onMouseMove(FXObject*,FXSelector,void*);
     long onTimeout(FXObject*, FXSelector, void*);
     void createBitmap(int index, uint16_t *data, int x, int y, int w, int h);
     void makeSnapshot(const FXDrawable* drawable);
@@ -86,9 +73,6 @@ FXDEFMAP(OpenTxSim) OpenTxSimMap[] = {
   // Message_Type   _______ID____Message_Handler_______
   FXMAPFUNC(SEL_TIMEOUT,   2,    OpenTxSim::onTimeout),
   FXMAPFUNC(SEL_KEYPRESS,  0,    OpenTxSim::onKeypress),
-  FXMAPFUNC(SEL_LEFTBUTTONPRESS, 0, OpenTxSim::onMouseDown),
-  FXMAPFUNC(SEL_LEFTBUTTONRELEASE, 0, OpenTxSim::onMouseUp),
-  FXMAPFUNC(SEL_MOTION,    0,    OpenTxSim::onMouseMove),
 };
 
 FXIMPLEMENT(OpenTxSim, FXMainWindow, OpenTxSimMap, ARRAYNUMBER(OpenTxSimMap))
@@ -96,7 +80,7 @@ FXIMPLEMENT(OpenTxSim, FXMainWindow, OpenTxSimMap, ARRAYNUMBER(OpenTxSimMap))
 OpenTxSim::OpenTxSim(FXApp* a):
   FXMainWindow(a, "OpenTX Simu", nullptr, nullptr, DECOR_ALL, 20, 90, 0, 0)
 {
-  lcdInit();
+  memset(displayBuf, 0, DISPLAY_BUFFER_SIZE * sizeof(display_t));
   bmp = new FXPPMImage(getApp(), nullptr, IMAGE_OWNED|IMAGE_KEEP|IMAGE_SHMI|IMAGE_SHMP, W2, H2);
 
 #if defined(SIMU_AUDIO)
@@ -156,13 +140,11 @@ OpenTxSim::OpenTxSim(FXApp* a):
 
 OpenTxSim::~OpenTxSim()
 {
-  TRACE("OpenTxSim::~OpenTxSim()");
-
-  simuStop();
-  stopAudioThread();
+  StopSimu();
+  StopAudioThread();
 
 #if defined(EEPROM)
-  stopEepromThread();
+  StopEepromThread();
 #endif
 
   delete bmp;
@@ -188,7 +170,7 @@ void OpenTxSim::createBitmap(int index, uint16_t *data, int x, int y, int w, int
 
   for (int i=0; i<w; i++) {
     for (int j=0; j<h; j++) {
-      pixel_t z = data[(y+j) * LCD_W + (x+i)];
+      display_t z = data[(y+j) * LCD_W + (x+i)];
       FXColor color = FXRGB(255*((z&0xF00)>>8)/0x0f, 255*((z&0x0F0)>>4)/0x0f, 255*(z&0x00F)/0x0f);
       snapshot.setPixel(i, j, color);
     }
@@ -262,88 +244,10 @@ long OpenTxSim::onKeypress(FXObject *, FXSelector, void * v)
   return 0;
 }
 
-long OpenTxSim::onMouseDown(FXObject *, FXSelector, void * v)
-{
-  FXEvent * evt = (FXEvent *)v;
-  UNUSED(evt);
-
-  TRACE_WINDOWS("[Mouse Press] %d %d", evt->win_x, evt->win_y);
-
-#if defined(HARDWARE_TOUCH)
-  now = get_tmr10ms();
-  simTouchState.tapCount = 0;
-
-  simTouchState.event = TE_DOWN;
-  simTouchState.startX = simTouchState.x = evt->win_x;
-  simTouchState.startY = simTouchState.y = evt->win_y;
-  downTime = now;
-  simTouchOccured = true;
-#endif
-
-  return 0;
-}
-
-long OpenTxSim::onMouseUp(FXObject*,FXSelector,void*v)
-{
-  FXEvent * evt = (FXEvent *)v;
-  UNUSED(evt);
-
-  TRACE_WINDOWS("[Mouse Release] %d %d", evt->win_x, evt->win_y);
-
-#if defined(HARDWARE_TOUCH)
-  now = get_tmr10ms();
-
-  if (simTouchState.event == TE_DOWN) {
-    simTouchState.event = TE_UP;
-    simTouchState.x = simTouchState.startX;
-    simTouchState.y = simTouchState.startY;
-    if (now - downTime <= TAP_TIME) {
-      if (now - tapTime > TAP_TIME)
-        tapCount = 1;
-      else
-        tapCount++;
-      simTouchState.tapCount = tapCount;
-      tapTime = now;
-    }
-  }
-  else {
-    simTouchState.event = TE_SLIDE_END;
-  }
-  simTouchOccured = true;
-#endif
-
-  return 0;
-}
-
-long OpenTxSim::onMouseMove(FXObject*,FXSelector,void*v)
-{
-  FXEvent * evt = (FXEvent *)v;
-  UNUSED(evt);
-
-  if (evt->state & LEFTBUTTONMASK) {
-    TRACE_WINDOWS("[Mouse Move] %d %d", evt->win_x, evt->win_y);
-
-#if defined(HARDWARE_TOUCH)
-    simTouchState.deltaX += evt->win_x - simTouchState.x;
-    simTouchState.deltaY += evt->win_y - simTouchState.y;
-    if (simTouchState.event == TE_SLIDE || abs(simTouchState.deltaX) >= SLIDE_RANGE || abs(simTouchState.deltaY) >= SLIDE_RANGE) {
-      simTouchState.event = TE_SLIDE;
-      simTouchState.x = evt->win_x;
-      simTouchState.y = evt->win_y;
-    }
-    simTouchOccured = true;
-#endif
-  }
-
-  return 0;
-}
-
 void OpenTxSim::updateKeysAndSwitches(bool start)
 {
   static int keys[] = {
-#if defined(PCBNV14)
-    // no keys
-#elif defined(PCBHORUS)
+#if defined(PCBHORUS)
     KEY_Page_Up,   KEY_PGUP,
     KEY_Page_Down, KEY_PGDN,
     KEY_Return,    KEY_ENTER,
@@ -369,13 +273,22 @@ void OpenTxSim::updateKeysAndSwitches(bool start)
     KEY_Down,      KEY_EXIT,
     KEY_Right,     KEY_TELE,
     KEY_Left,      KEY_SYS,
-#elif defined(RADIO_T8)
+#elif defined(RADIO_T8) || defined(RADIO_Commando8)
     KEY_Page_Up,   KEY_PAGEUP,
     KEY_Page_Down, KEY_PAGEDN,
     KEY_Return,    KEY_ENTER,
     KEY_Right,     KEY_MODEL,
     KEY_BackSpace, KEY_EXIT,
     KEY_Left,      KEY_SYS,
+    KEY_Up,        KEY_PLUS,
+    KEY_Down,      KEY_MINUS,
+#elif defined(RADIO_FAMILY_TBS)
+    KEY_Page_Up,   KEY_MENU,
+  #if defined(KEYS_GPIO_REG_PAGE)
+    KEY_Page_Down, KEY_PAGE,
+  #endif
+    KEY_Return,    KEY_ENTER,
+    KEY_BackSpace, KEY_EXIT,
     KEY_Up,        KEY_PLUS,
     KEY_Down,      KEY_MINUS,
 #elif defined(PCBTARANIS)
@@ -405,12 +318,12 @@ void OpenTxSim::updateKeysAndSwitches(bool start)
   // gruvin: Can't use Function keys on the Mac -- too many other app conflicts.
   //         The ordering of these keys, Q/W,E/R,T/Y,U/I matches the on screen
   //         order of trim sliders
-  static FXuint trimKeys[] = { KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6, KEY_7, KEY_8, KEY_9, KEY_0 };
+  static FXuint trimKeys[] = { KEY_E, KEY_R, KEY_U, KEY_I, KEY_R, KEY_E, KEY_Y, KEY_T, KEY_Q, KEY_W };
 #else
   static FXuint trimKeys[] = { KEY_F1, KEY_F2, KEY_F3, KEY_F4, KEY_F5, KEY_F6, KEY_F7, KEY_F8, KEY_F9, KEY_F10, KEY_F11, KEY_F12 };
 #endif
 
-  for (unsigned i=0; i<sizeof(trimKeys)/(2*sizeof(FXuint)); i++) {
+  for (unsigned i=0; i<NUM_TRIMS_KEYS; i++) {
     simuSetTrim(i, getApp()->getKeyState(trimKeys[i]));
   }
 
@@ -439,6 +352,13 @@ void OpenTxSim::updateKeysAndSwitches(bool start)
   SWITCH_KEY(5, 4, 2);
   SWITCH_KEY(6, 5, 2);
   SWITCH_KEY(7, 6, 2);
+#elif defined(RADIO_FAMILY_TBS)
+  SWITCH_KEY(A, 0, 2);
+  SWITCH_KEY(B, 1, 3);
+  SWITCH_KEY(C, 2, 3);
+  SWITCH_KEY(D, 3, 2);
+  SWITCH_KEY(E, 4, 2);
+  SWITCH_KEY(F, 5, 2);
 #else
   SWITCH_KEY(A, 0, 3);
   SWITCH_KEY(B, 1, 3);
@@ -489,11 +409,11 @@ long OpenTxSim::onTimeout(FXObject*, FXSelector, void*)
 
 #if defined(ROTARY_ENCODER_NAVIGATION)
     static bool rotencAction = false;
-    if (getApp()->getKeyState(KEY_X) || getApp()->getKeyState(KEY_plus)) {
+    if (getApp()->getKeyState(KEY_X)) {
       if (!rotencAction) ROTARY_ENCODER_NAVIGATION_VALUE += ROTARY_ENCODER_GRANULARITY;
       rotencAction = true;
     }
-    else if (getApp()->getKeyState(KEY_W) || getApp()->getKeyState(KEY_minus)) {
+    else if (getApp()->getKeyState(KEY_W)) {
       if (!rotencAction) ROTARY_ENCODER_NAVIGATION_VALUE -= ROTARY_ENCODER_GRANULARITY;
       rotencAction = true;
     }
@@ -534,17 +454,8 @@ void OpenTxSim::setPixel(int x, int y, FXColor color)
 
 void OpenTxSim::refreshDisplay()
 {
-  static bool lightEnabled = (bool)isBacklightEnabled();
-
-  if ((bool(isBacklightEnabled()) != lightEnabled) || simuLcdRefresh) {
-
+  if (simuLcdRefresh) {
     simuLcdRefresh = false;
-
-    if (bool(isBacklightEnabled()) != lightEnabled) {
-      lightEnabled = (bool)isBacklightEnabled();
-      TRACE("backlight %s", lightEnabled ? "ON" : "OFF");
-    }
-    
     FXColor offColor = isBacklightEnabled() ? BL_COLOR : FXRGB(200, 200, 200);
 #if LCD_DEPTH == 1
     FXColor onColor = FXRGB(0, 0, 0);
@@ -552,7 +463,7 @@ void OpenTxSim::refreshDisplay()
     for (int x=0; x<LCD_W; x++) {
       for (int y=0; y<LCD_H; y++) {
 #if defined(COLORLCD)
-    	pixel_t z = simuLcdBuf[y * LCD_W + x];
+    	display_t z = simuLcdBuf[y * LCD_W + x];
     	if (1) {
           if (z == 0) {
             setPixel(x, y, FXRGB(0, 0, 0));
@@ -561,12 +472,25 @@ void OpenTxSim::refreshDisplay()
             setPixel(x, y, FXRGB(255, 255, 255));
           }
           else {
-            FXColor color = FXRGB(((z & 0xF800) >> 8) + ((z & 0xE000) >> 13), ((z & 0x07E0) >> 3) + ((z & 0x0600) >> 9), (((z & 0x001F) << 3) & 0x00F8) + ((z & 0x001C) >> 2));
+            FXColor color = FXRGB(255*((z&0xF800)>>11)/0x1f, 255*((z&0x07E0)>>5)/0x3F, 255*(z&0x001F)/0x01F);
             setPixel(x, y, color);
           }
     	}
+#elif defined(RADIO_TANGO)
+        coord_t xx = LCD_W - x - 1;
+        coord_t yy = LCD_H - y - 1;
+        display_t * p = &simuLcdBuf[yy * (LCD_W / 2) + (xx / 2)];
+        uint8_t z = (xx & 1) ? (*p & 0x0F) : (*p >> 4);
+        if (z) {
+          FXColor color;
+          if (isBacklightEnabled())
+            color = FXRGB(47-(z*47)/15, 123-(z*123)/15, 227-(z*227)/15);
+          else
+            color = FXRGB(200-(z*200)/15, 200-(z*200)/15, 200-(z*200)/15);
+          setPixel(x, y, color);
+        }
 #elif LCD_DEPTH == 4
-        pixel_t * p = &simuLcdBuf[y / 2 * LCD_W + x];
+        display_t * p = &simuLcdBuf[y / 2 * LCD_W + x];
         uint8_t z = (y & 1) ? (*p >> 4) : (*p & 0x0F);
         if (z) {
           FXColor color;
@@ -640,11 +564,11 @@ int main(int argc, char ** argv)
 
   simuInit();
 
-#if defined(EEPROM) || defined(EEPROM_RLC)
-  startEepromThread(argc >= 2 ? argv[1] : "eeprom.bin");
+#if defined(EEPROM)
+  StartEepromThread(argc >= 2 ? argv[1] : "eeprom.bin");
 #endif
-  startAudioThread();
-  simuStart(true/*false*/, argc >= 3 ? argv[2] : 0, argc >= 4 ? argv[3] : 0);
+  StartAudioThread();
+  StartSimu(false, argc >= 3 ? argv[2] : 0, argc >= 4 ? argv[3] : 0);
 
   return application.run();
 }

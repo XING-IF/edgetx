@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -67,7 +66,7 @@ void boardOff();
 
 // Timers driver
 void init2MhzTimer();
-void init1msTimer();
+void init5msTimer();
 
 // PCBREV driver
 enum {
@@ -140,6 +139,14 @@ uint32_t isBootloaderStart(const uint8_t * buffer);
 #define IS_INTERNAL_MODULE_ON()         (GPIO_ReadInputDataBit(INTMODULE_PWR_GPIO, INTMODULE_PWR_GPIO_PIN) == Bit_SET)
 #endif
 
+void intmoduleSerialStart(uint32_t baudrate, uint8_t rxEnable, uint16_t parity, uint16_t stopBits, uint16_t wordLength);
+#if defined(INTERNAL_MODULE_MULTI)
+void intmoduleTimerStart(uint32_t periodMs);
+#endif
+void intmoduleSendByte(uint8_t byte);
+void intmoduleSendBuffer(const uint8_t * data, uint8_t size);
+void intmoduleSendNextFrame();
+
 void extmoduleSerialStart();
 void extmoduleInvertedSerialStart(uint32_t baudrate);
 void extmoduleSendBuffer(const uint8_t * data, uint8_t size);
@@ -151,7 +158,7 @@ void extmoduleSendInvertedByte(uint8_t byte);
 
 #if defined(TRAINER_DETECT_GPIO)
   // Trainer detect is a switch on the jack
-  #define TRAINER_CONNECTED()           (GPIO_ReadInputDataBit(TRAINER_DETECT_GPIO, TRAINER_DETECT_GPIO_PIN) == Bit_RESET)
+  #define TRAINER_CONNECTED()           (GPIO_ReadInputDataBit(TRAINER_DETECT_GPIO, TRAINER_DETECT_GPIO_PIN) == TRAINER_DETECT_GPIO_PIN_VALUE)
 #elif defined(PCBXLITES)
   // Trainer is on the same connector than Headphones
   enum JackState
@@ -362,22 +369,22 @@ enum EnumSwitchesPositions
   SW_SD0,
   SW_SD1,
   SW_SD2,
-#if defined(HARDWARE_SWITCH_E)
+#if defined(PCBX9) || defined(PCBXLITES) || defined(PCBX9LITES) || defined(RADIO_TX12) || defined(RADIO_ZORRO) || defined(RADIO_TPRO)
   SW_SE0,
   SW_SE1,
   SW_SE2,
 #endif
-#if defined(HARDWARE_SWITCH_F)
+#if defined(PCBX9D) || defined(PCBX9DP) || defined(PCBX9E) || defined(PCBX7) || defined(PCBXLITES) || defined(PCBX9LITES) || defined(RADIO_T8) || defined(RADIO_Commando8) || defined(RADIO_ZORRO)  || defined(RADIO_TPRO)
   SW_SF0,
   SW_SF1,
   SW_SF2,
 #endif
-#if defined(HARDWARE_SWITCH_G)
+#if defined(PCBX9D) || defined(PCBX9DP) || defined(PCBX9E) || defined(PCBX9LITES) || defined(RADIO_ZORRO)  || defined(RADIO_TPRO)
   SW_SG0,
   SW_SG1,
   SW_SG2,
 #endif
-#if defined(HARDWARE_SWITCH_H)
+#if defined(PCBX9D) || defined(PCBX9DP) || defined(PCBX9E) || (defined(PCBX7) && !defined(RADIO_TX12)) || defined(RADIO_T8) || defined(RADIO_Commando8) || defined(RADIO_ZORRO) || defined(RADIO_TPRO)
   SW_SH0,
   SW_SH1,
   SW_SH2,
@@ -457,7 +464,7 @@ enum EnumSwitchesPositions
   #define DEFAULT_SWITCH_CONFIG         (SWITCH_TOGGLE << 6) + (SWITCH_TOGGLE << 4) + (SWITCH_3POS << 2) + (SWITCH_3POS << 0);
   #define DEFAULT_FS_CONFIG             (SWITCH_2POS << 10) + (SWITCH_2POS << 8) + (SWITCH_2POS << 6) + (SWITCH_2POS << 4) + (SWITCH_2POS << 2) + (SWITCH_2POS << 0)
   #define DEFAULT_FS_GROUPS             (1 << 10) + (1 << 8) + (1 << 6) + (1 << 4) + (1 << 2) + (1 << 0)  // Set all FS to group 1 to act like a 6pos
-  #define DEFAULT_FS_STARTUP_CONFIG     ((FS_START_PREVIOUS << 10) + (FS_START_PREVIOUS << 8) + (FS_START_PREVIOUS << 6) + (FS_START_PREVIOUS << 4) + (FS_START_PREVIOUS << 2) + (FS_START_PREVIOUS << 0))  // keep last state by default
+  #define DEFAULT_FS_STARTUP_CONFIG     ((FS_START_PREVIOUS << 10) + (FS_START_PREVIOUS << 8) + (FS_START_PREVIOUS << 6) + (FS_START_PREVIOUS << 4) + (FS_START_PREVIOUS << 2) + FS_START_PREVIOUS << 0)  // keep last state by default
   #define DEFAULT_POTS_CONFIG           (POT_WITHOUT_DETENT << 0) + (POT_WITH_DETENT << 2); // S1 = pot without detent, S2 = pot with detent
 #elif defined(RADIO_FAMILY_JUMPER_T12)
   #define NUM_SWITCHES                  8
@@ -475,6 +482,11 @@ enum EnumSwitchesPositions
   #define DEFAULT_SWITCH_CONFIG         (SWITCH_TOGGLE << 14) + (SWITCH_TOGGLE << 12) + (SWITCH_2POS << 10) + (SWITCH_2POS << 8) + (SWITCH_TOGGLE << 6) + (SWITCH_3POS << 4) + (SWITCH_3POS << 2) + (SWITCH_TOGGLE << 0)
   #define DEFAULT_POTS_CONFIG           (POT_WITHOUT_DETENT << 0) + (POT_WITHOUT_DETENT << 2);
 #elif defined(RADIO_T8)
+  #define NUM_SWITCHES                  4
+  #define STORAGE_NUM_SWITCHES          8
+  #define DEFAULT_SWITCH_CONFIG         (SWITCH_2POS << 6) + (SWITCH_3POS << 4) + (SWITCH_3POS << 2) + (SWITCH_2POS << 0);
+  #define DEFAULT_POTS_CONFIG           (0)
+#elif defined(RADIO_Commando8)
   #define NUM_SWITCHES                  4
   #define STORAGE_NUM_SWITCHES          8
   #define DEFAULT_SWITCH_CONFIG         (SWITCH_2POS << 6) + (SWITCH_3POS << 4) + (SWITCH_3POS << 2) + (SWITCH_2POS << 0);
@@ -527,6 +539,23 @@ enum EnumSwitchesPositions
 
 void keysInit();
 uint32_t switchState(uint8_t index);
+#if defined(RADIO_TLITE)
+static const uint8_t switchPosition[][2] = {{0,0}, {1,0}, {0,1}, {1,1}};
+#elif defined(RADIO_TPRO)
+static const uint8_t switchPosition[][2] = {{0,0}, {1,0}, {0,1}, {1,1}};
+#elif defined(PCBX9LITE)
+static const uint8_t switchPosition[][2] = {{0,0}, {0,1}, {1,1}, {0,2}, {1,2}, {2,0}, {3,0}};
+#elif defined(PCBXLITES)
+static const uint8_t switchPosition[][2] = {{0,0}, {0,1}, {1,1}, {0,2}, {1,2}};
+#elif defined(RADIO_X7)
+static const uint8_t switchPosition[][2] = {{0,0}, {0,1}, {1,0}, {1,1}, {0,2}, {1,2}};
+#elif defined(RADIO_TX12)
+static const uint8_t switchPosition[][2] = {{0,1}, {0,0}, {1,0}, {1,1}, {0,2}, {1,2}};
+#elif defined(RADIO_ZORRO)
+static const uint8_t switchPosition[][2] = {{0,0}, {0,1}, {1,0}, {1,1}, {0,2}, {1,2}, {2,0}, {3,0}};
+#else
+static const uint8_t switchPosition[][2] = {{0,0}, {0,1}, {0,2}, {1,0}, {1,1}, {1,2}};
+#endif
 uint32_t readKeys();
 uint32_t readTrims();
 #if defined(FUNCTION_SWITCHES)
@@ -588,14 +617,12 @@ enum Analogs {
   NUM_ANALOGS
 };
 
-#define HAS_TX_RTC_VOLTAGE
-
 #if defined(PCBX9LITE)
   #define NUM_POTS                      1
   #define NUM_SLIDERS                   0
   #define STORAGE_NUM_POTS              1
   #define STORAGE_NUM_SLIDERS           0
-#elif defined(RADIO_T8) || defined(RADIO_TLITE)
+#elif defined(RADIO_T8) || defined(RADIO_TLITE) || defined(RADIO_Commando8)
   #define NUM_POTS                      0
   #define NUM_SLIDERS                   0
   #define STORAGE_NUM_POTS              2
@@ -700,11 +727,18 @@ extern uint16_t adcValues[NUM_ANALOGS];
   #define BATTERY_WARN                  66 // 6.6V
   #define BATTERY_MIN                   67 // 6.7V
   #define BATTERY_MAX                   83 // 8.3V
-#elif defined(RADIO_T8) || defined(RADIO_TLITE)
+  #define BATTERY_TYPE_FIXED
+#elif defined(RADIO_T8) || defined(RADIO_TLITE)   
   // 1S Li-ion /  Lipo, LDO for 3.3V
   #define BATTERY_WARN                  35 // 3.5V
   #define BATTERY_MIN                   34 // 3.4V
   #define BATTERY_MAX                   42 // 4.2V
+  #define BATTERY_TYPE_FIXED
+#elif defined(RADIO_Commando8)         
+  #define BATTERY_WARN                  32 // 3.2V  //Modified T8 applies to commando8
+  #define BATTERY_MIN                   30 // 3.0V
+  #define BATTERY_MAX                   42 // 4.2V
+  #define BATTERY_TYPE_FIXED
 #else
   // NI-MH 7.2V
   #define BATTERY_WARN                  65 // 6.5V
@@ -775,7 +809,11 @@ uint8_t isBacklightEnabled();
   #define USB_NAME                     "Radiomaster Zorro"
   #define USB_MANUFACTURER             'R', 'M', '_', 'T', 'X', ' ', ' ', ' '  /* 8 bytes */
   #define USB_PRODUCT                  'R', 'M', ' ', 'Z', 'O', 'R', 'R', 'O'  /* 8 Bytes */
-#elif defined(RADIO_T8)
+#elif defined(RADIO_Commando8)  //Modified T8 applies to commando8
+  #define USB_NAME                     "iFlight Commando 8"
+  #define USB_MANUFACTURER             'i', 'F', 'l', 'i', 'g', 'h', 't', '-'  /* 8 bytes */
+  #define USB_PRODUCT                  'C', 'o', 'm', 'm', 'a', 'n', 'd', 'o'  /* 8 Bytes */
+#elif defined(RADIO_T8) 
   #define USB_NAME                     "Radiomaster T8"
   #define USB_MANUFACTURER             'R', 'M', '_', 'T', 'X', ' ', ' ', ' '  /* 8 bytes */
   #define USB_PRODUCT                  'R', 'M', ' ', 'T', '8', ' ', ' ', ' '  /* 8 Bytes */
@@ -784,7 +822,7 @@ uint8_t isBacklightEnabled();
   #define USB_MANUFACTURER             'J', 'U', 'M', 'P', 'E', 'R', ' ', ' '  /* 8 bytes */
   #define USB_PRODUCT                  'T', '-', 'L', 'I', 'T', 'E', ' ', ' '  /* 8 Bytes */
 #elif defined(RADIO_TPRO)
-  #define USB_NAME                     "Jumper TPro"
+  #define USB_NAME                     "Jumper TPRO"
   #define USB_MANUFACTURER             'J', 'U', 'M', 'P', 'E', 'R', ' ', ' '  /* 8 bytes */
   #define USB_PRODUCT                  'T', '-', 'P', 'R', 'O', ' ', ' ', ' '  /* 8 Bytes */
 #else
@@ -1005,9 +1043,7 @@ void lcdRefresh();
 void lcdRefresh(bool wait=true); // TODO uint8_t wait to simplify this
 #endif
 void lcdSetRefVolt(unsigned char val);
-#ifdef __cplusplus
-void lcdSetContrast(bool useDefault = false);
-#endif
+void lcdSetContrast();
 
 // Top LCD driver
 #if defined(TOPLCD_GPIO)

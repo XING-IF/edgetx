@@ -1,8 +1,7 @@
 /*
- * Copyright (C) EdgeTX
+ * Copyright (C) OpenTX
  *
  * Based on code named
- *   opentx - https://github.com/opentx/opentx
  *   th9x - http://code.google.com/p/th9x
  *   er9x - http://code.google.com/p/er9x
  *   gruvin9x - http://code.google.com/p/gruvin9x
@@ -27,7 +26,7 @@ constexpr coord_t CHANNEL_GAUGE_OFFSET = CHANNEL_VALUE_OFFSET;
 constexpr coord_t CHANNEL_BAR_WIDTH = 70;
 constexpr coord_t CHANNEL_PROPERTIES_OFFSET = CHANNEL_GAUGE_OFFSET + CHANNEL_BAR_WIDTH + 2;
 
-#if defined(RADIO_T8)
+#if defined(RADIO_T8) ||  defined(RADIO_Commando8)
 #define EVT_KEY_PREVIOUS_VIEW          EVT_KEY_BREAK(KEY_PAGEUP)
 #define EVT_KEY_NEXT_VIEW              EVT_KEY_BREAK(KEY_PAGEDN)
 #define EVT_KEY_NEXT_PAGE              EVT_KEY_BREAK(KEY_PLUS)
@@ -81,7 +80,11 @@ void menuChannelsViewCommon(event_t event)
   // Channels
   for (uint8_t line = 0; line < 8; line++) {
     LimitData * ld = limitAddress(ch);
+#if LCD_H > 64
+    const uint8_t y = 11 + line * 11;
+#else
     const uint8_t y = 9 + line * 7;
+#endif
     const int32_t val = reusableBuffer.viewChannels.mixersView ? ex_chans[ch] : channelOutputs[ch];
     const uint8_t lenLabel = ZLEN(g_model.limitData[ch].name);
 
@@ -89,7 +92,7 @@ void menuChannelsViewCommon(event_t event)
     if (lenLabel > 0) {
       if (lenLabel > 4)
         reusableBuffer.viewChannels.longNames = true;
-      lcdDrawSizedText(CHANNEL_NAME_OFFSET, y, g_model.limitData[ch].name, sizeof(g_model.limitData[ch].name), SMLSIZE);
+      lcdDrawSizedText(CHANNEL_NAME_OFFSET, y, g_model.limitData[ch].name, sizeof(g_model.limitData[ch].name), ZCHAR | SMLSIZE);
     }
     else {
       putsChn(CHANNEL_NAME_OFFSET, y, ch + 1, SMLSIZE);
